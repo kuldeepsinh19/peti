@@ -44,3 +44,21 @@ expression indexes, or triggers.
   the migrations and the schema disagree.
 - Raw SQL is limited to migrations, the hold insert, row locks, worker picks and the discovery query — each
   behind an infrastructure function with an integration test.
+
+## Verification notes (2026-11-12)
+
+- **No drift from hand-written SQL.** After applying the integrity migration,
+  `prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma` produces an empty
+  migration: Prisma 7 does not try to drop the EXCLUDE/CHECK constraints, partial and expression indexes,
+  triggers or the view. CI runs this as `pnpm db:drift` with `--exit-code`.
+- **Constraint names in errors.** With `@prisma/adapter-pg`, Prisma surfaces the SQLSTATE and the
+  Postgres message but not the driver's `constraint` field. `pg-error.ts` therefore reads the name from
+  the message (`violates … constraint "name"`), and trigger-raised errors prefix their message with the
+  constraint name (migration `trigger_error_names`). Both shapes are pinned by unit and integration tests.
+- **Guards proven.** `tests/integration/database/guards.test.ts` bypasses the application and shows that
+  self-rental, mismatched owners, non-initial insert status, illegal transitions, snapshot edits, duplicate
+  pending requests, edits to history/audit rows, overlapping holds, over-refunds and inconsistent deposit
+  states are all rejected by the database. The constraint also caught a genuine modelling gap during
+  seeding (a 5.5 m saree length), fixed in migration `saree_length_measurement`.
+- **Destructive commands.** Prisma refuses `migrate reset` when run by an AI agent. The test database is
+  therefore prepared with the non-destructive `migrate deploy`, and tests truncate tables between cases.
