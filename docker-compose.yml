@@ -1,0 +1,43 @@
+name: peti
+
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: peti
+      POSTGRES_PASSWORD: peti
+      POSTGRES_DB: peti
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    # Small footprint for laptops; tune for anything beyond local development.
+    command: ["postgres", "-c", "shared_buffers=128MB", "-c", "max_connections=60"]
+    volumes:
+      # PostgreSQL 18 images keep PGDATA in a versioned directory under /var/lib/postgresql.
+      - pgdata:/var/lib/postgresql
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U peti -d peti"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Optional S3-compatible storage for exercising the S3 adapter locally:
+  #   docker compose --profile s3 up -d
+  # The default STORAGE_DRIVER=filesystem does not need it.
+  rustfs:
+    image: rustfs/rustfs:1.0.5
+    profiles: ["s3"]
+    restart: unless-stopped
+    environment:
+      RUSTFS_ACCESS_KEY: peti-local
+      RUSTFS_SECRET_KEY: peti-local-secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - rustfs-data:/data
+
+volumes:
+  pgdata:
+  rustfs-data:
