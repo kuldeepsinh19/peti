@@ -1,1 +1,206 @@
 @import "tailwindcss";
+
+/*
+ * Peti design tokens. The rules for using them are in docs/product/design-direction.md.
+ * Never use raw hex values in components; add a token here instead.
+ */
+@theme {
+  /* Colour — surfaces */
+  --color-paper: #fbf8f2;
+  --color-ivory: #f6f1e7;
+  --color-sand: #e6d9c2;
+  --color-sand-deep: #cdb993; /* decorative only, never text */
+
+  /* Colour — text */
+  --color-ink: #1e1b18;
+  --color-graphite: #4a443e;
+  --color-stone: #6f675e; /* captions on paper/ivory only */
+
+  /* Colour — brand and accents */
+  --color-burgundy: #6b1f2a;
+  --color-burgundy-light: #8c2f3b;
+  --color-olive: #5b5e3f;
+  --color-olive-deep: #454830;
+  --color-brass: #b0832f; /* rules, numerals, large text only */
+  --color-brass-deep: #86601a; /* brass when used as body-size text */
+
+  /* Colour — feedback (contrast-checked on paper) */
+  --color-success: #3f5a2c;
+  --color-warning: #86601a;
+  --color-danger: #8f1d1d;
+
+  --color-rule: rgb(30 27 24 / 0.18);
+  --color-rule-strong: rgb(30 27 24 / 0.4);
+
+  /* Typography */
+  --font-display: var(--font-bodoni), "Bodoni 72", "Didot", Georgia, serif;
+  --font-sans: var(--font-schibsted), ui-sans-serif, system-ui, sans-serif;
+  --font-gujarati: var(--font-rasa), "Noto Serif Gujarati", serif;
+
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 1rem;
+  --text-micro--letter-spacing: 0.14em;
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.25rem;
+
+  --text-display-sm: clamp(1.75rem, 1.35rem + 1.8vw, 2.75rem);
+  --text-display-sm--line-height: 1.08;
+  --text-display-md: clamp(2.25rem, 1.5rem + 3.6vw, 4.25rem);
+  --text-display-md--line-height: 1.02;
+  --text-display-lg: clamp(3rem, 1.6rem + 6.4vw, 7.25rem);
+  --text-display-lg--line-height: 0.96;
+  --text-display-xl: clamp(3.5rem, 1.2rem + 9.5vw, 10.5rem);
+  --text-display-xl--line-height: 0.9;
+
+  /* Layout */
+  --container-page: 90rem;
+  --container-prose: 40rem;
+  --spacing-gutter: clamp(1rem, 0.6rem + 1.8vw, 2.5rem);
+  --spacing-section: clamp(4rem, 2.5rem + 6vw, 9rem);
+
+  /* No rounded corners, no shadows: the design uses rules and whitespace instead. */
+  --radius-*: initial;
+  --shadow-*: initial;
+
+  --ease-editorial: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --animate-reveal: reveal 180ms var(--ease-editorial) both;
+
+  @keyframes reveal {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+@layer base {
+  html {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-optical-sizing: auto;
+  }
+
+  body {
+    min-height: 100dvh;
+    background-color: var(--color-paper);
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  ::selection {
+    background-color: var(--color-burgundy);
+    color: var(--color-paper);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-burgundy);
+    outline-offset: 3px;
+  }
+
+  a {
+    text-underline-offset: 0.2em;
+    text-decoration-thickness: 1px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* Small capitals used for captions, metadata and section labels. */
+@utility eyebrow {
+  font-family: var(--font-sans);
+  font-size: var(--text-micro);
+  line-height: var(--text-micro--line-height);
+  letter-spacing: var(--text-micro--letter-spacing);
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+/* Editorial italic for occasion names and pull quotes. */
+@utility display-italic {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+}
+
+@utility numeral {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+@utility page-x {
+  padding-inline: var(--spacing-gutter);
+}
+
+@utility page-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: var(--spacing-gutter);
+  @media (width >= 64rem) {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+}
+
+/* Long-form copy inside Article sections. */
+@utility prose-peti {
+  max-width: 40rem;
+  color: var(--color-graphite);
+  font-size: 1.0625rem;
+  line-height: 1.7;
+  & > * + * {
+    margin-top: 1rem;
+  }
+  & strong {
+    color: var(--color-ink);
+    font-weight: 600;
+  }
+  & a {
+    color: var(--color-burgundy);
+    text-decoration: underline;
+  }
+  & ul,
+  & ol {
+    padding-left: 1.25rem;
+  }
+  & ul {
+    list-style: "— ";
+  }
+  & ol {
+    list-style: decimal;
+  }
+  & li + li {
+    margin-top: 0.5rem;
+  }
+  & h3 {
+    margin-top: 1.75rem;
+    color: var(--color-ink);
+    font-size: 1.375rem;
+  }
+}
