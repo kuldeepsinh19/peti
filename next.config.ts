@@ -18,7 +18,8 @@ const nextConfig: NextConfig = {
     formats: ["image/avif", "image/webp"],
   },
   experimental: {
-    serverActions: { bodySizeLimit: "2mb" },
+    // Listing and condition photographs (up to 8 MB each) are uploaded through Server Actions.
+    serverActions: { bodySizeLimit: "9mb" },
   },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
