@@ -2,7 +2,7 @@
 
 Versions were checked against the npm registry, official documentation and GitHub releases on 2026-11-11
 before scaffolding. Exact installed versions are in `package.json` / `pnpm-lock.yaml`; this file records
-*why* those versions, and the traps found on the way. Items we could not confirm are marked UNVERIFIED.
+_why_ those versions, and the traps found on the way. Items we could not confirm are marked UNVERIFIED.
 
 ## Runtime
 

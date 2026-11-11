@@ -8,21 +8,21 @@ and why choices were made; the design direction document records the rules.
 All candidates below were checked in the `google/fonts` repository metadata. Every one is SIL OFL, so it can
 be loaded with `next/font/google` and redistributed.
 
-| Font | Axes | Italic | Verdict |
-|---|---|---|---|
-| **Bodoni Moda** | opsz 6–96, wght 400–900 | Yes | **Chosen display face.** High-contrast Didone in the lineage of fashion mastheads; optical sizing keeps hairlines usable at small sizes. |
-| Newsreader | opsz 6–72, wght 200–800 | Yes | Runner-up display face: literary, excellent italics, less fashion. |
-| Fraunces | opsz, wght, SOFT, WONK | Yes | Rejected: reads food/lifestyle and is common on startup sites. |
-| Instrument Serif | 400 only | Yes | Rejected: a cliché of AI-generated landing pages. |
-| Cormorant Garamond | wght 300–700 | Yes | Rejected: wedding-invitation cliché, too thin small. |
-| Playfair Display | wght 400–900 | Yes | Rejected: the most over-used "elegant" Google font. |
+| Font               | Axes                    | Italic | Verdict                                                                                                                                  |
+| ------------------ | ----------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **Bodoni Moda**    | opsz 6–96, wght 400–900 | Yes    | **Chosen display face.** High-contrast Didone in the lineage of fashion mastheads; optical sizing keeps hairlines usable at small sizes. |
+| Newsreader         | opsz 6–72, wght 200–800 | Yes    | Runner-up display face: literary, excellent italics, less fashion.                                                                       |
+| Fraunces           | opsz, wght, SOFT, WONK  | Yes    | Rejected: reads food/lifestyle and is common on startup sites.                                                                           |
+| Instrument Serif   | 400 only                | Yes    | Rejected: a cliché of AI-generated landing pages.                                                                                        |
+| Cormorant Garamond | wght 300–700            | Yes    | Rejected: wedding-invitation cliché, too thin small.                                                                                     |
+| Playfair Display   | wght 400–900            | Yes    | Rejected: the most over-used "elegant" Google font.                                                                                      |
 
-| Sans | Axes | Italic | Verdict |
-|---|---|---|---|
-| **Schibsted Grotesk** | wght 400–900 | Yes | **Chosen body/UI face.** Designed for a news-media group: editorial pedigree, sturdy at small sizes, rarely seen. |
-| Hanken Grotesk | wght 100–900 | Yes | Runner-up. |
-| Instrument Sans | wdth 75–100, wght 400–700 | Yes | Considered for condensed captions. |
-| Geist, Inter, Manrope, DM Sans | — | — | Rejected: read as framework or SaaS defaults. |
+| Sans                           | Axes                      | Italic | Verdict                                                                                                           |
+| ------------------------------ | ------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------- |
+| **Schibsted Grotesk**          | wght 400–900              | Yes    | **Chosen body/UI face.** Designed for a news-media group: editorial pedigree, sturdy at small sizes, rarely seen. |
+| Hanken Grotesk                 | wght 100–900              | Yes    | Runner-up.                                                                                                        |
+| Instrument Sans                | wdth 75–100, wght 400–700 | Yes    | Considered for condensed captions.                                                                                |
+| Geist, Inter, Manrope, DM Sans | —                         | —      | Rejected: read as framework or SaaS defaults.                                                                     |
 
 Gujarati companion: **Rasa** (Gujarati + Latin, wght 300–700, italic), a calligraphic text serif that sits
 well beside Bodoni. Used for the wordmark companion "પેટી" and small bilingual labels only.
@@ -65,11 +65,11 @@ reads as zari and temple lamps without the saturation.
 
 ## Photography licensing
 
-| Source | Commercial use | Attribution | Key restrictions |
-|---|---|---|---|
-| Unsplash (free) | Yes | Not required | No selling unmodified copies; no compiling into a competing service; no rights to recognisable people, trademarks or artworks in images. **Unsplash+ images are a separate paid licence and are excluded.** |
-| Pexels | Yes | Not required | No selling unaltered copies; no showing identifiable people in a bad light; no implying endorsement by people or brands shown; no redistribution on stock platforms. |
-| Wikimedia Commons | Per file | Required | CC BY-SA requires attribution and share-alike for derivatives. |
+| Source            | Commercial use | Attribution  | Key restrictions                                                                                                                                                                                            |
+| ----------------- | -------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unsplash (free)   | Yes            | Not required | No selling unmodified copies; no compiling into a competing service; no rights to recognisable people, trademarks or artworks in images. **Unsplash+ images are a separate paid licence and are excluded.** |
+| Pexels            | Yes            | Not required | No selling unaltered copies; no showing identifiable people in a bad light; no implying endorsement by people or brands shown; no redistribution on stock platforms.                                        |
+| Wikimedia Commons | Per file       | Required     | CC BY-SA requires attribution and share-alike for derivatives.                                                                                                                                              |
 
 Rules Peti follows as a result:
 

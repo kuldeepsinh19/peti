@@ -7,11 +7,11 @@ international P2P fashion rental for contrast.
 
 Every claim carries one of three tags:
 
-| Tag | Meaning |
-|---|---|
-| **VF** | Verified fact, with a source link. |
+| Tag    | Meaning                                                                   |
+| ------ | ------------------------------------------------------------------------- |
+| **VF** | Verified fact, with a source link.                                        |
 | **MC** | Marketing claim: the company's own statement, not independently verified. |
-| **NF** | Not found or unverified. We looked and could not confirm it. |
+| **NF** | Not found or unverified. We looked and could not confirm it.              |
 
 Some international help centres blocked automated fetching (HTTP 401/403). Where a figure comes only from a
 search engine's excerpt of an official page, it is marked **(snippet)** and must be confirmed by hand before
@@ -121,11 +121,11 @@ Not to be confused with sharedrobe.app, sharedrobe.me or the US resale app of a 
 - **Fees.** Owner subscriptions, paid by UPI and manually verified within 24 hours (VF,
   [Pricing](https://www.sharedrobe.in/pricing)). No commission stated.
 
-  | Plan | Price | Listings |
-  |---|---|---|
-  | Free | ₹0 | 2 |
-  | Basic | ₹99/month | 5 |
-  | Pro | ₹299/month | 15 |
+  | Plan      | Price      | Listings  |
+  | --------- | ---------- | --------- |
+  | Free      | ₹0         | 2         |
+  | Basic     | ₹99/month  | 5         |
+  | Pro       | ₹299/month | 15        |
   | Unlimited | ₹499/month | Unlimited |
 
 - **Deposit, damage, cancellation.** "Hosts may collect a security deposit (as displayed on the listing)".
@@ -238,18 +238,18 @@ Not to be confused with sharedrobe.app, sharedrobe.me or the US resale app of a 
 
 ## Comparison
 
-| Platform | Model | Payments on-platform | Take rate | Booking | Min duration | Deposit | Cleaning | Disputes |
-|---|---|---|---|---|---|---|---|---|
-| Anokhi Reet | P2P classifieds | No | 0% (MC) | Inquiry / chat | NF | Owner-set, off-platform | Parties agree | None |
-| WEVTRA | P2P classifieds | NF | 0% (MC) | Chat | NF | NF | NF | NF |
-| SharedRobe | P2P classifieds | No (subscriptions only) | ₹0–499/month | Chat + meetup | NF | Host-set | NF | Discretionary |
-| SWRL | P2P, platform logistics | Yes | 21% (FAQ) vs 15%+GST (T&C) | Lender approves | 3 days | 40% of retail | Lender-set fee | Platform |
-| Flyrobe | ~80% owned / 20% C2C (MC) | Yes | NF | Checkout | NF | NF | Company | Complaints exist |
-| By Rotation | P2P | Yes | 15% + 15% (snippet) | Request / approve | 3 days | None off-platform | Lender | 24 h / 7 days |
-| HURR | P2P | Yes | 15% + 15% | 48 h acceptance | NF | Optional protection | In price | Charge requests |
-| Tulerie | P2P, membership | Yes | 24% (snippet) | Request | 4 days | NF | Lender | NF |
-| Pickle | P2P | Yes | ~20% | Offer / accept / counter | 1 day | Card hold | Conflicting sources | Support |
-| Rent the Runway | Owned | Yes | n/a | Instant | 4 days | n/a | Company | Company |
+| Platform        | Model                     | Payments on-platform    | Take rate                  | Booking                  | Min duration | Deposit                 | Cleaning            | Disputes         |
+| --------------- | ------------------------- | ----------------------- | -------------------------- | ------------------------ | ------------ | ----------------------- | ------------------- | ---------------- |
+| Anokhi Reet     | P2P classifieds           | No                      | 0% (MC)                    | Inquiry / chat           | NF           | Owner-set, off-platform | Parties agree       | None             |
+| WEVTRA          | P2P classifieds           | NF                      | 0% (MC)                    | Chat                     | NF           | NF                      | NF                  | NF               |
+| SharedRobe      | P2P classifieds           | No (subscriptions only) | ₹0–499/month               | Chat + meetup            | NF           | Host-set                | NF                  | Discretionary    |
+| SWRL            | P2P, platform logistics   | Yes                     | 21% (FAQ) vs 15%+GST (T&C) | Lender approves          | 3 days       | 40% of retail           | Lender-set fee      | Platform         |
+| Flyrobe         | ~80% owned / 20% C2C (MC) | Yes                     | NF                         | Checkout                 | NF           | NF                      | Company             | Complaints exist |
+| By Rotation     | P2P                       | Yes                     | 15% + 15% (snippet)        | Request / approve        | 3 days       | None off-platform       | Lender              | 24 h / 7 days    |
+| HURR            | P2P                       | Yes                     | 15% + 15%                  | 48 h acceptance          | NF           | Optional protection     | In price            | Charge requests  |
+| Tulerie         | P2P, membership           | Yes                     | 24% (snippet)              | Request                  | 4 days       | NF                      | Lender              | NF               |
+| Pickle          | P2P                       | Yes                     | ~20%                       | Offer / accept / counter | 1 day        | Card hold               | Conflicting sources | Support          |
+| Rent the Runway | Owned                     | Yes                     | n/a                        | Instant                  | 4 days       | n/a                     | Company             | Company          |
 
 ## Patterns that look standard in P2P fashion rental
 
