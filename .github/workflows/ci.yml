@@ -80,6 +80,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: quality
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: peti
+          POSTGRES_PASSWORD: peti
+          POSTGRES_DB: peti
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U peti -d peti"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -88,11 +102,11 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm db:deploy
+      - run: pnpm db:seed
       - run: pnpm build
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
-        env:
-          AUTH_TRUSTED_ORIGINS: http://localhost:3100
       - uses: actions/upload-artifact@v7
         if: failure()
         with:

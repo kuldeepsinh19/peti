@@ -32,5 +32,7 @@ export default defineConfig({
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,
         stdout: "pipe",
+        // Auth callbacks and links must point at the e2e server, not the dev server.
+        env: { APP_URL: baseURL, AUTH_TRUSTED_ORIGINS: baseURL },
       },
 });
