@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { site } from "@/config/site";
+import { getActor } from "@/composition/session";
 import { SiteFooter } from "./_components/site-footer";
 import { SiteHeader } from "./_components/site-header";
 import { fontVariables } from "./fonts";
@@ -16,7 +17,9 @@ export const viewport: Viewport = {
   themeColor: "#fbf8f2",
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const actor = await getActor();
+  const viewer = actor ? { displayName: actor.displayName, isAdmin: actor.isAdmin } : null;
   return (
     <html lang="en-IN" className={fontVariables}>
       <body className="flex min-h-dvh flex-col">
@@ -26,7 +29,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         >
           Skip to content
         </a>
-        <SiteHeader viewer={null} />
+        <SiteHeader viewer={viewer} />
         <main id="main" className="flex-1">
           {children}
         </main>
