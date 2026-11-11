@@ -16,7 +16,7 @@
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "boundaries": "depcruise src --config .dependency-cruiser.cjs",
     "test": "vitest run --project unit --project component",
     "test:unit": "vitest run --project unit",

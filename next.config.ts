@@ -12,7 +12,6 @@ const nextConfig: NextConfig = {
   turbopack: { root: import.meta.dirname },
   reactStrictMode: true,
   poweredByHeader: false,
-  typedRoutes: true,
   serverExternalPackages: ["sharp", "pg"],
   images: {
     qualities: [70, 85],
