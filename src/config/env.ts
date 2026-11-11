@@ -29,8 +29,6 @@ export const envSchema = z
     BETTER_AUTH_SECRET: z.string().min(32, "BETTER_AUTH_SECRET must be at least 32 characters"),
     /** Comma-separated list of extra trusted origins for auth (e.g. the e2e server). */
     AUTH_TRUSTED_ORIGINS: optionalString,
-    /** Set when running behind a proxy that sets X-Forwarded-For. Never trust the header otherwise. */
-    TRUST_PROXY: booleanString,
 
     PAYMENT_PROVIDER: z.enum(["sandbox", "razorpay"]).default("sandbox"),
     SANDBOX_PAYMENT_KEY_SECRET: optionalString,
