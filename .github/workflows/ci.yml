@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+  APP_ENV: test
+  APP_URL: http://localhost:3100
+  BETTER_AUTH_SECRET: ci-only-secret-not-used-anywhere-else-000000
+  PAYMENT_PROVIDER: sandbox
+  SANDBOX_PAYMENT_KEY_SECRET: ci-sandbox-key-secret
+  SANDBOX_PAYMENT_WEBHOOK_SECRET: ci-sandbox-webhook-secret
+  CRON_SECRET: ci-cron-secret
+  DATABASE_URL: postgresql://peti:peti@localhost:5432/peti
+  DATABASE_URL_TEST: postgresql://peti:peti@localhost:5432/peti
+
+jobs:
+  quality:
+    name: Lint, types, boundaries, unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm boundaries
+      - run: pnpm test
+
+  e2e:
+    name: Build and end-to-end tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: quality
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+        env:
+          AUTH_TRUSTED_ORIGINS: http://localhost:3100
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
