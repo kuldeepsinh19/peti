@@ -34,7 +34,9 @@ module.exports = {
         path: [
           "^src/modules/[^/]+/(application|infrastructure|ui)/",
           "^src/shared/(application|infrastructure|ui)/",
-          "^src/(app|composition|config)/",
+          "^src/(app|composition)/",
+          // Policy defaults are pure data and may be read by domain code; nothing else in config may.
+          "^src/config/(?!marketplace-policy\\.ts$)",
           ...FRAMEWORK_AND_IO,
         ],
       },
