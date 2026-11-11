@@ -11,11 +11,17 @@ import {
   outboxSmsSender,
   smtpMailSender,
 } from "@/modules/notifications/infrastructure/senders";
+import { listingsUseCases } from "@/modules/listings";
+import { storagePhotoStore } from "@/modules/listings/infrastructure/photo-store";
+import { prismaListingRepository } from "@/modules/listings/infrastructure/prisma-listing-repository";
+import { searchUseCases } from "@/modules/search";
+import { prismaCatalogueQueries } from "@/modules/search/infrastructure/catalogue-queries";
 import { usersUseCases } from "@/modules/users";
 import { prismaUserRepository } from "@/modules/users/infrastructure/prisma-user-repository";
 import type { UserActor } from "@/shared/application/actor";
 import { systemClock } from "@/shared/domain/clock";
 import { getPrisma } from "@/shared/infrastructure/prisma";
+import { prismaAuditLog } from "@/shared/infrastructure/audit";
 import { postgresRateLimiter } from "@/shared/infrastructure/rate-limiter";
 
 /**
@@ -67,6 +73,13 @@ function build() {
     devTooling: isDevToolingEnabled(env),
     rateLimiter: postgresRateLimiter(db, clock),
     users: usersUseCases({ users: prismaUserRepository(db) }),
+    listings: listingsUseCases({
+      listings: prismaListingRepository(db),
+      photos: storagePhotoStore(storage, images),
+      audit: prismaAuditLog(db),
+      clock,
+    }),
+    search: searchUseCases({ catalogue: prismaCatalogueQueries(db), clock }),
   };
 }
 
