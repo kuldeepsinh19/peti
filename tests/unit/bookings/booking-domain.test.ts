@@ -204,7 +204,7 @@ describe("settlement", () => {
           expect(s.refund.totalPaise + payoutNet + s.commissionPaise).toBe(fee + deposit);
           expect(s.refund.rentalFeePortionPaise + s.refund.depositPortionPaise).toBe(s.refund.totalPaise);
           expect(s.deposit.withheldPaise).toBe(late + damage);
-          if (s.payout) expect(s.payout.netPaise).toBeGreaterThan(0);
+          if (s.payout) expect(s.payout.netPaise).toBeGreaterThanOrEqual(0);
         },
       ),
     );
@@ -222,6 +222,24 @@ describe("settlement", () => {
       "PARTIALLY_WITHHELD",
     );
     expect(settle({ ...base, lateFeePaise: 300_000, damagePaise: 500_000 }).deposit.status).toBe("FORFEITED");
+  });
+
+  it("keeps a zero-net payout row so a 100% commission still reconciles (found by the property test)", () => {
+    const s = settle({
+      rentalFeePaise: 100_000,
+      depositPaise: 50_000,
+      commissionRateBps: 10_000,
+      retainedFeePaise: 100_000,
+      lateFeePaise: 0,
+      damagePaise: 0,
+    });
+    expect(s.payout).toEqual({
+      grossRentalPaise: 100_000,
+      commissionPaise: 100_000,
+      depositWithheldPaise: 0,
+      netPaise: 0,
+    });
+    expect(s.refund.totalPaise + s.payout!.netPaise + s.commissionPaise).toBe(150_000);
   });
 
   it("creates no payout when the owner keeps nothing", () => {
