@@ -8,15 +8,20 @@ import { Button } from "@/shared/ui/button";
 import { EmptyState, Notice, Tag } from "@/shared/ui/feedback";
 import { PageHeader, SectionIndex } from "@/shared/ui/layout";
 import { runAction } from "../../_lib/action";
+import { LIMITS } from "../../_lib/limits";
 
 export const metadata: Metadata = { title: "Reviews" };
 const field = "border-0 border-b border-rule-strong bg-transparent py-2 focus:border-ink focus:outline-none";
 
 async function submitReviewAction(formData: FormData) {
   "use server";
-  const result = await runAction("submitReview", async (actor): Promise<void> => {
-    await container().reviews.submit(actor, formDataToObject(formData));
-  });
+  const result = await runAction(
+    "submitReview",
+    async (actor): Promise<void> => {
+      await container().reviews.submit(actor, formDataToObject(formData));
+    },
+    LIMITS.reviewWrite,
+  );
   revalidatePath("/account/reviews");
   redirect(
     "/account/reviews?" + (result.ok ? "done=1" : "error=" + encodeURIComponent(result.error.message)),

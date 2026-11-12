@@ -6,13 +6,18 @@ import type { ActionResult } from "@/shared/contracts/action-result";
 import { ValidationError } from "@/shared/domain/errors";
 import { formDataToObject } from "@/shared/contracts/validation";
 import { runAction } from "../../_lib/action";
+import { LIMITS } from "../../_lib/limits";
 
 export async function createListingAction(input: unknown): Promise<ActionResult<{ redirectTo: string }>> {
-  return runAction("createListing", async (actor) => {
-    const created = await container().listings.createListing(actor, input);
-    revalidatePath("/lend/dashboard");
-    return { redirectTo: `/lend/outfits/${created.id}/edit?created=1#photos` };
-  });
+  return runAction(
+    "createListing",
+    async (actor) => {
+      const created = await container().listings.createListing(actor, input);
+      revalidatePath("/lend/dashboard");
+      return { redirectTo: `/lend/outfits/${created.id}/edit?created=1#photos` };
+    },
+    LIMITS.listingWrite,
+  );
 }
 
 export async function updateListingAction(
@@ -28,26 +33,26 @@ export async function updateListingAction(
 }
 
 export async function uploadPhotoAction(formData: FormData): Promise<ActionResult<{ id: string }>> {
-  return runAction("uploadPhoto", async (actor) => {
-    const outfitId = String(formData.get("outfitId") ?? "");
-    const file = formData.get("photo");
-    if (!(file instanceof File) || file.size === 0) {
-      throw new ValidationError("Choose a photograph to upload.", { photo: ["Choose a photograph."] });
-    }
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    await container().rateLimiter.consume(
-      { name: "photo-upload", limit: 40, windowSeconds: 3600 },
-      actor.userId,
-    );
-    const photo = await container().listings.addPhoto(
-      actor,
-      outfitId,
-      bytes,
-      String(formData.get("altText") ?? ""),
-    );
-    revalidatePath(`/lend/outfits/${outfitId}/edit`);
-    return { id: photo.id };
-  });
+  return runAction(
+    "uploadPhoto",
+    async (actor) => {
+      const outfitId = String(formData.get("outfitId") ?? "");
+      const file = formData.get("photo");
+      if (!(file instanceof File) || file.size === 0) {
+        throw new ValidationError("Choose a photograph to upload.", { photo: ["Choose a photograph."] });
+      }
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const photo = await container().listings.addPhoto(
+        actor,
+        outfitId,
+        bytes,
+        String(formData.get("altText") ?? ""),
+      );
+      revalidatePath(`/lend/outfits/${outfitId}/edit`);
+      return { id: photo.id };
+    },
+    LIMITS.photoUpload,
+  );
 }
 
 export async function removePhotoAction(formData: FormData): Promise<ActionResult<undefined>> {

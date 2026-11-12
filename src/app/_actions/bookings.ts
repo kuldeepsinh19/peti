@@ -6,6 +6,8 @@ import { container } from "@/composition/container";
 import type { ActionResult } from "@/shared/contracts/action-result";
 import { formDataToObject } from "@/shared/contracts/validation";
 import { runAction } from "../_lib/action";
+import { LIMITS } from "../_lib/limits";
+import { isSafeReturnPath } from "../_lib/paths";
 
 /** Booking pages live under three areas; refresh all views of a booking after any change. */
 function refresh(bookingId: string) {
@@ -58,11 +60,16 @@ const SIMPLE: readonly SimpleCommand[] = [
 export async function bookingCommandAction(formData: FormData): Promise<void> {
   const command = String(formData.get("command")) as SimpleCommand;
   const returnTo = String(formData.get("returnTo") ?? "/account/rentals");
-  if (!SIMPLE.includes(command) || !returnTo.startsWith("/")) return;
+  if (!SIMPLE.includes(command) || !isSafeReturnPath(returnTo)) return;
   const input = formDataToObject(formData);
-  const result = await runAction(`booking.${command}`, async (actor): Promise<void> => {
-    await container().bookings[command](actor, input);
-  });
+  const writesText = command === "openDispute" || command === "addDisputeMessage";
+  const result = await runAction(
+    `booking.${command}`,
+    async (actor): Promise<void> => {
+      await container().bookings[command](actor, input);
+    },
+    writesText ? LIMITS.disputeWrite : undefined,
+  );
   refresh(String(input.bookingId));
   const sep = returnTo.includes("?") ? "&" : "?";
   redirect(
@@ -72,19 +79,19 @@ export async function bookingCommandAction(formData: FormData): Promise<void> {
 
 /** Condition reports carry photographs, so they are submitted as multipart form data. */
 export async function conditionReportAction(formData: FormData): Promise<ActionResult<undefined>> {
-  return runAction("conditionReport", async (actor) => {
-    const files = formData.getAll("photos").filter((f): f is File => f instanceof File && f.size > 0);
-    const bytes = await Promise.all(files.map(async (f) => new Uint8Array(await f.arrayBuffer())));
-    await container().rateLimiter.consume(
-      { name: "report-upload", limit: 20, windowSeconds: 3600 },
-      actor.userId,
-    );
-    const input = formDataToObject(formData);
-    if (input.kind === "RETURN") await container().bookings.recordReturn(actor, input, bytes);
-    else await container().bookings.submitHandoverReport(actor, input, bytes);
-    refresh(String(input.bookingId));
-    return undefined;
-  });
+  return runAction(
+    "conditionReport",
+    async (actor) => {
+      const files = formData.getAll("photos").filter((f): f is File => f instanceof File && f.size > 0);
+      const bytes = await Promise.all(files.map(async (f) => new Uint8Array(await f.arrayBuffer())));
+      const input = formDataToObject(formData);
+      if (input.kind === "RETURN") await container().bookings.recordReturn(actor, input, bytes);
+      else await container().bookings.submitHandoverReport(actor, input, bytes);
+      refresh(String(input.bookingId));
+      return undefined;
+    },
+    LIMITS.reportUpload,
+  );
 }
 
 /** Starts checkout and sends the renter to the provider (redirect) or returns the SDK config. */
