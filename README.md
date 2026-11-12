@@ -31,7 +31,7 @@ return, and a dispute process. That is what this codebase concentrates on.
 | Money          | Integer paise everywhere; rental fee, deposit, commission, refunds and payouts recorded separately; refunds sent through an outbox; a reconciliation view proves every closed booking balances |
 | Cancellations  | Renter tiers (full / half / none by notice), owner cancellations refunded in full and counted                                                                                                  |
 | Trust          | Double-blind reviews after completion, disputes (accept, withdraw, administrator decision), contact details revealed only after payment, no identity documents collected                       |
-| Administration | Overview metrics, listing moderation, users (suspend/reinstate), bookings, disputes, payouts (mark paid with reference), failed-refund retry, categories, append-only activity log           |
+| Administration | Overview metrics, listing moderation, users (suspend/reinstate), bookings, disputes, payouts (mark paid with reference), failed-refund retry, categories, append-only activity log             |
 | Operations     | Idempotent sweep for deadlines, refunds, emails and reviews; dev outbox for emails and codes; sandbox checkout that signs callbacks and webhooks like a real provider                          |
 
 ## Architecture
