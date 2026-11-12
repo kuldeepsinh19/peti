@@ -11,32 +11,24 @@ export interface PendingEmail {
 }
 
 export interface NotificationOutbox {
-  claimPendingEmails(limit: number): Promise<PendingEmail[]>;
-  markSent(id: string): Promise<void>;
-  markFailed(id: string, error: string, giveUp: boolean): Promise<void>;
+  /**
+   * Locks up to `limit` pending email notifications (SKIP LOCKED), hands each to `send` while the lock is
+   * held, and records the outcome in the same transaction, so two sweeps can never send the same email.
+   */
+  processPendingEmails(
+    limit: number,
+    send: (email: PendingEmail) => Promise<void>,
+  ): Promise<{ claimed: number; sent: number }>;
 }
 
 /** Delivers queued notification emails after the business transaction committed. */
-export async function dispatchPendingEmails(
+export function dispatchPendingEmails(
   outbox: NotificationOutbox,
   mail: MailSender,
   appUrl: string,
   limit = 50,
 ) {
-  const pending = await outbox.claimPendingEmails(limit);
-  let sent = 0;
-  for (const n of pending) {
-    try {
-      await mail.send(notificationEmail(n.to, n.subject, n.body, n.link ? `${appUrl}${n.link}` : undefined));
-      await outbox.markSent(n.id);
-      sent++;
-    } catch (error) {
-      await outbox.markFailed(
-        n.id,
-        error instanceof Error ? error.message : String(error),
-        n.attempts + 1 >= 5,
-      );
-    }
-  }
-  return { claimed: pending.length, sent };
+  return outbox.processPendingEmails(limit, async (n) => {
+    await mail.send(notificationEmail(n.to, n.subject, n.body, n.link ? appUrl + n.link : undefined));
+  });
 }
