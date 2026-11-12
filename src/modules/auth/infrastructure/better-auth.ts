@@ -32,6 +32,9 @@ export function createAuth({ env, db, mail, sms }: AuthDeps) {
       .filter(Boolean) ?? []),
   ];
 
+  // Automated end-to-end runs sign in many times a minute from one address; keep limits on, but looser.
+  const scale = env.APP_ENV === "test" ? 20 : 1;
+
   return betterAuth({
     appName: "Peti",
     baseURL: env.APP_URL,
@@ -73,10 +76,10 @@ export function createAuth({ env, db, mail, sms }: AuthDeps) {
       window: 60,
       max: 100,
       customRules: {
-        "/sign-in/email": { window: 60, max: 10 },
-        "/sign-up/email": { window: 60, max: 5 },
-        "/request-password-reset": { window: 300, max: 5 },
-        "/phone-number/send-otp": { window: 300, max: 5 },
+        "/sign-in/email": { window: 60, max: 10 * scale },
+        "/sign-up/email": { window: 60, max: 5 * scale },
+        "/request-password-reset": { window: 300, max: 5 * scale },
+        "/phone-number/send-otp": { window: 300, max: 5 * scale },
         "/phone-number/verify": { window: 300, max: 10 },
       },
     },
