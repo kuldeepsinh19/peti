@@ -1,0 +1,13 @@
+# The Vercel CLI does not read .gitignore: keep local secrets and artefacts out of uploads.
+.env
+.env.*
+!.env.example
+storage/
+.next/
+node_modules/
+coverage/
+playwright-report/
+test-results/
+blob-report/
+*.log
+# demo-storage/ is deliberately uploaded: it holds the seeded demo photographs.

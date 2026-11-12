@@ -38,3 +38,9 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# seeded photographs bundled into the Vercel demo deployment (see the deployment guide)
+demo-storage/
+
+# Vercel CLI project link
+.vercel
