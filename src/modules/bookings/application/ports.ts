@@ -38,6 +38,8 @@ export interface LockedOutfit {
   title: string;
   depositPaise: number;
   turnaroundDays: number;
+  /** The owner's account is suspended: the outfit cannot be requested. */
+  ownerSuspended: boolean;
 }
 
 export interface NewBooking {

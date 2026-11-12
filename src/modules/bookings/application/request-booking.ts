@@ -32,7 +32,7 @@ export async function requestBooking(deps: BookingsDeps, actor: Actor, input: un
 
   return deps.uow.run(async (store) => {
     const outfit = await store.lockOutfit(data.outfitId, false);
-    if (!outfit || outfit.status !== "ACTIVE") throw new NotFoundError("Outfit");
+    if (!outfit || outfit.status !== "ACTIVE" || outfit.ownerSuspended) throw new NotFoundError("Outfit");
     if (outfit.ownerId === renter.userId) {
       throw new PreconditionError("OWN_OUTFIT", "You cannot rent your own outfit.");
     }

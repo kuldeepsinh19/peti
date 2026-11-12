@@ -63,6 +63,8 @@ export interface OutfitDetail {
     rating: number | null;
     ratingCount: number;
     completedRentals: number;
+    /** Suspended by an administrator: the listing is hidden from everyone but admins. */
+    suspended: boolean;
   };
   publishedAt: Date | null;
 }

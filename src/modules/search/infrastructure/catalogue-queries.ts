@@ -82,7 +82,7 @@ export function prismaCatalogueQueries(db: Db): CatalogueQueries {
   return {
     async explore(query: ExploreQuery, today: string): Promise<ExploreResult> {
       const page = query.page ?? 1;
-      const conditions: Prisma.Sql[] = [sql`o.status = 'ACTIVE'`];
+      const conditions: Prisma.Sql[] = [sql`o.status = 'ACTIVE' AND u.banned IS NOT TRUE`];
 
       // Price is compared against the chosen duration when the renter picked one.
       const priceJoin = query.days
@@ -180,6 +180,7 @@ export function prismaCatalogueQueries(db: Db): CatalogueQueries {
               createdAt: true,
               emailVerified: true,
               phoneNumberVerified: true,
+              banned: true,
               profile: { select: { displayName: true, ownerRatingSum: true, ownerRatingCount: true } },
               _count: { select: { bookingsAsOwner: { where: { status: "COMPLETED" } } } },
             },
@@ -237,6 +238,7 @@ export function prismaCatalogueQueries(db: Db): CatalogueQueries {
               : null,
           ratingCount: p?.ownerRatingCount ?? 0,
           completedRentals: o.owner._count.bookingsAsOwner,
+          suspended: o.owner.banned === true,
         },
         publishedAt: o.publishedAt,
       };
@@ -251,7 +253,7 @@ export function prismaCatalogueQueries(db: Db): CatalogueQueries {
       const rows = await db.$queryRaw<CardRow[]>`
         ${cardSelect(cheapestPrice)}
         JOIN saved_outfits s ON s.outfit_id = o.id AND s.user_id = ${userId}::uuid
-        WHERE o.status = 'ACTIVE'
+        WHERE o.status = 'ACTIVE' AND u.banned IS NOT TRUE
         ORDER BY s.created_at DESC
         LIMIT 100`;
       return rows.map(toCard);
@@ -270,7 +272,7 @@ export function prismaCatalogueQueries(db: Db): CatalogueQueries {
     async recentlyListed(limit) {
       const rows = await db.$queryRaw<CardRow[]>`
         ${cardSelect(cheapestPrice)}
-        WHERE o.status = 'ACTIVE'
+        WHERE o.status = 'ACTIVE' AND u.banned IS NOT TRUE
         ORDER BY o.published_at DESC NULLS LAST
         LIMIT ${limit}`;
       return rows.map(toCard);

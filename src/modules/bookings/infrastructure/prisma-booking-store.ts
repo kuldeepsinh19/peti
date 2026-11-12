@@ -82,30 +82,24 @@ export function prismaBookingStore(tx: Tx, notifications: NotificationWriter): B
 
   return {
     async lockOutfit(outfitId, lock = true) {
+      type Row = {
+        id: string;
+        owner_id: string;
+        status: string;
+        title: string;
+        deposit_paise: number;
+        turnaround_days: number;
+        owner_suspended: boolean;
+      };
+      // The owner's suspension is read through a subquery so the lock stays on the outfit row only.
       const rows = lock
-        ? await tx.$queryRaw<
-            Array<{
-              id: string;
-              owner_id: string;
-              status: string;
-              title: string;
-              deposit_paise: number;
-              turnaround_days: number;
-            }>
-          >`
-            SELECT id, owner_id, status::text AS status, title, deposit_paise, turnaround_days
+        ? await tx.$queryRaw<Row[]>`
+            SELECT id, owner_id, status::text AS status, title, deposit_paise, turnaround_days,
+                   COALESCE((SELECT banned FROM users WHERE id = owner_id), false) AS owner_suspended
             FROM outfits WHERE id = ${outfitId}::uuid FOR NO KEY UPDATE`
-        : await tx.$queryRaw<
-            Array<{
-              id: string;
-              owner_id: string;
-              status: string;
-              title: string;
-              deposit_paise: number;
-              turnaround_days: number;
-            }>
-          >`
-            SELECT id, owner_id, status::text AS status, title, deposit_paise, turnaround_days
+        : await tx.$queryRaw<Row[]>`
+            SELECT id, owner_id, status::text AS status, title, deposit_paise, turnaround_days,
+                   COALESCE((SELECT banned FROM users WHERE id = owner_id), false) AS owner_suspended
             FROM outfits WHERE id = ${outfitId}::uuid`;
       const o = rows[0];
       return o
@@ -116,6 +110,7 @@ export function prismaBookingStore(tx: Tx, notifications: NotificationWriter): B
             title: o.title,
             depositPaise: o.deposit_paise,
             turnaroundDays: o.turnaround_days,
+            ownerSuspended: o.owner_suspended,
           }
         : null;
     },

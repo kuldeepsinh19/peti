@@ -4,6 +4,7 @@ import type { Clock } from "@/shared/domain/clock";
 import { NotFoundError } from "@/shared/domain/errors";
 import { localDateInIndia } from "@/shared/domain/local-date";
 import { z } from "zod";
+import { parseInput } from "@/shared/contracts/validation";
 import { exploreQuerySchema } from "./contracts";
 import type { CatalogueQueries, OutfitDetail } from "./ports";
 
@@ -15,19 +16,24 @@ export function searchUseCases({ catalogue, clock }: { catalogue: CatalogueQueri
       return { query, result: catalogue.explore(query, localDateInIndia(clock.now())) };
     },
 
-    /** Live listings are public. Drafts and listings under review are visible only to the owner and admins. */
+    /**
+     * Live listings are public. Drafts and listings under review are visible only to the owner and admins;
+     * listings of a suspended owner only to admins.
+     */
     async outfit(actor: Actor | null, slug: string): Promise<OutfitDetail> {
       const outfit = await catalogue.outfitBySlug(slug);
       if (!outfit) throw new NotFoundError("Outfit");
       const isOwner = actor?.kind === "user" && actor.userId === outfit.owner.id;
       const isAdmin = actor?.kind === "user" && actor.isAdmin;
-      if (outfit.status !== "ACTIVE" && !isOwner && !isAdmin) throw new NotFoundError("Outfit");
+      if (isAdmin) return outfit;
+      if (outfit.owner.suspended || (outfit.status !== "ACTIVE" && !isOwner))
+        throw new NotFoundError("Outfit");
       return outfit;
     },
 
     async toggleSaved(actor: Actor, input: unknown) {
       const user = requireUser(actor);
-      const { outfitId } = z.object({ outfitId: z.uuid() }).parse(input);
+      const { outfitId } = parseInput(z.object({ outfitId: z.uuid() }), input);
       return catalogue.toggleSaved(user.userId, outfitId);
     },
 
