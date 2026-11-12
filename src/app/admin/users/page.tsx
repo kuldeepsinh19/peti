@@ -29,7 +29,7 @@ export default async function AdminUsersPage({
           {params.error}
         </Notice>
       ) : null}
-      {params.done === "1" ? <Notice tone="success" title="Recorded in the audit log" /> : null}
+      {typeof params.done === "string" ? <Notice tone="success" title="Recorded in the audit log" /> : null}
       <form className="flex max-w-md items-end gap-3">
         <label className="flex flex-1 flex-col gap-1">
           <span className="eyebrow text-graphite">Search name or email</span>

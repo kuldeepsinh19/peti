@@ -22,11 +22,13 @@ export async function moderateListingAction(formData: FormData): Promise<void> {
   );
 }
 
-type AdminCommand = "suspendUser" | "reinstateUser" | "markPayoutPaid" | "createCategory" | "toggleCategory";
+type AdminCommand =
+  "suspendUser" | "reinstateUser" | "markPayoutPaid" | "retryRefund" | "createCategory" | "toggleCategory";
 const ADMIN: Record<AdminCommand, string> = {
   suspendUser: "/admin/users",
   reinstateUser: "/admin/users",
   markPayoutPaid: "/admin/payouts",
+  retryRefund: "/admin/payouts",
   createCategory: "/admin/categories",
   toggleCategory: "/admin/categories",
 };
@@ -40,5 +42,7 @@ export async function adminCommandAction(formData: FormData): Promise<void> {
     await container().admin[command](actor, formDataToObject(formData));
   });
   revalidatePath(path);
-  redirect(path + "?" + (result.ok ? "done=1" : "error=" + encodeURIComponent(result.error.message)));
+  redirect(
+    path + "?" + (result.ok ? "done=" + command : "error=" + encodeURIComponent(result.error.message)),
+  );
 }

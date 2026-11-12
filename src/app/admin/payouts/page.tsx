@@ -21,7 +21,10 @@ export default async function AdminPayoutsPage({
   const actor = await requireAdminOrNotFound();
   const params = await searchParams;
   const showPaid = params.view === "paid";
-  const rows = await container().admin.payouts(actor, showPaid ? "PAID" : "PENDING");
+  const [rows, failed] = await Promise.all([
+    container().admin.payouts(actor, showPaid ? "PAID" : "PENDING"),
+    container().admin.failedRefunds(actor),
+  ]);
   return (
     <div className="flex flex-col gap-8 pb-16">
       <PageHeader
@@ -34,7 +37,55 @@ export default async function AdminPayoutsPage({
           {params.error}
         </Notice>
       ) : null}
-      {params.done === "1" ? <Notice tone="success" title="Payout recorded as paid" /> : null}
+      {params.done === "markPayoutPaid" ? <Notice tone="success" title="Payout recorded as paid" /> : null}
+      {params.done === "retryRefund" ? (
+        <Notice tone="success" title="Refund queued again">
+          The next sweep sends it to the payment provider.
+        </Notice>
+      ) : null}
+      {failed.length ? (
+        <section aria-labelledby="failed-refunds" className="flex flex-col gap-4">
+          <h2 id="failed-refunds" className="font-display text-2xl">
+            Refunds that failed
+          </h2>
+          <p className="max-w-2xl text-sm text-graphite">
+            The provider rejected these refunds after several attempts. Check the error, fix the cause with
+            the provider if needed, then queue the refund again. Each retry is audit-logged.
+          </p>
+          <Ledger
+            caption="Failed refunds"
+            rows={failed}
+            rowKey={(r) => r.id}
+            columns={[
+              {
+                key: "ref",
+                header: "Booking",
+                cell: (r) => (
+                  <Link href={"/admin/bookings/" + r.bookingId} className="numeral">
+                    {r.reference}
+                  </Link>
+                ),
+              },
+              { key: "amount", header: "Amount", align: "right", cell: (r) => formatInr(r.amountPaise) },
+              { key: "attempts", header: "Attempts", align: "right", cell: (r) => r.attempts },
+              { key: "error", header: "Last error", cell: (r) => r.lastError ?? "—" },
+              {
+                key: "act",
+                header: "Action",
+                cell: (r) => (
+                  <form action={adminCommandAction}>
+                    <input type="hidden" name="command" value="retryRefund" />
+                    <input type="hidden" name="refundId" value={r.id} />
+                    <Button type="submit" size="sm" variant="secondary">
+                      Retry refund
+                    </Button>
+                  </form>
+                ),
+              },
+            ]}
+          />
+        </section>
+      ) : null}
       <nav className="flex gap-6 text-sm">
         <Link href="/admin/payouts" className={showPaid ? "text-graphite" : "text-ink"}>
           To pay

@@ -5,6 +5,24 @@ import { requireAdmin } from "@/shared/application/authorization";
 import { NotFoundError, PreconditionError } from "@/shared/domain/errors";
 import { parseInput } from "@/shared/contracts/validation";
 
+const BOOKING_STATUSES = [
+  "PENDING_APPROVAL",
+  "AWAITING_PAYMENT",
+  "CONFIRMED",
+  "ACTIVE",
+  "RETURNED",
+  "DISPUTED",
+  "COMPLETED",
+  "CANCELLED",
+  "REJECTED",
+  "EXPIRED",
+] as const;
+const PAYOUT_STATUSES = ["PENDING", "PAID", "CANCELLED"] as const;
+
+function knownOrUndefined(known: readonly string[], value: string | undefined) {
+  return value !== undefined && known.includes(value) ? value : undefined;
+}
+
 export interface Metrics {
   users: number;
   verifiedUsers: number;
@@ -81,7 +99,18 @@ export interface CategoryRow {
   outfits: number;
 }
 
+export interface FailedRefundRow {
+  id: string;
+  bookingId: string;
+  reference: string;
+  amountPaise: number;
+  attempts: number;
+  lastError: string | null;
+}
+
 export interface AdminRepository {
+  failedRefunds(): Promise<FailedRefundRow[]>;
+  retryRefund(refundId: string): Promise<boolean>;
   metrics(): Promise<Metrics>;
   users(search: string | undefined): Promise<AdminUserRow[]>;
   findUser(userId: string): Promise<{ id: string; role: string; banned: boolean } | null>;
@@ -131,6 +160,7 @@ const categorySchema = z.object({
     .optional()
     .transform((v) => (v ? v : null)),
 });
+const refundSchema = z.object({ refundId: z.uuid() });
 const toggleCategorySchema = z.object({ categoryId: z.uuid(), active: z.enum(["true", "false"]) });
 
 /** Administration. Every function re-checks the admin role on the server and audits what it changes. */
@@ -152,9 +182,10 @@ export function adminUseCases({
       requireAdmin(actor);
       return admin.users(search?.trim() || undefined);
     },
+    /** An unknown `status` (for example a hand-edited URL) is ignored rather than passed to the database. */
     bookings: async (actor: Actor, status?: string) => {
       requireAdmin(actor);
-      return admin.bookings(status);
+      return admin.bookings(knownOrUndefined(BOOKING_STATUSES, status));
     },
     openDisputes: async (actor: Actor) => {
       requireAdmin(actor);
@@ -162,7 +193,7 @@ export function adminUseCases({
     },
     payouts: async (actor: Actor, status?: string) => {
       requireAdmin(actor);
-      return admin.payouts(status);
+      return admin.payouts(knownOrUndefined(PAYOUT_STATUSES, status));
     },
     activity: async (actor: Actor) => {
       requireAdmin(actor);
@@ -232,6 +263,25 @@ export function adminUseCases({
         entityType: "payout",
         entityId: payoutId,
         after: { status: "PAID", reference, netPaise: payout.netPaise },
+      });
+    },
+
+    failedRefunds: async (actor: Actor) => {
+      requireAdmin(actor);
+      return admin.failedRefunds();
+    },
+
+    /** Puts a failed refund back in the outbox; the next sweep sends it again (idempotent at the provider). */
+    async retryRefund(actor: Actor, input: unknown) {
+      const me = requireAdmin(actor);
+      const { refundId } = parseInput(refundSchema, input);
+      if (!(await admin.retryRefund(refundId))) throw new NotFoundError("Failed refund");
+      await audit.record({
+        actorUserId: me.userId,
+        actorRole: "ADMIN",
+        action: "refund.retry",
+        entityType: "refund",
+        entityId: refundId,
       });
     },
 

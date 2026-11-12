@@ -214,6 +214,30 @@ export function prismaAdminRepository(db: Db): AdminRepository {
       }));
     },
 
+    async failedRefunds() {
+      const rows = await db.refund.findMany({
+        where: { status: "FAILED" },
+        orderBy: { createdAt: "asc" },
+        include: { booking: { select: { reference: true } } },
+      });
+      return rows.map((r) => ({
+        id: r.id,
+        bookingId: r.bookingId,
+        reference: r.booking.reference,
+        amountPaise: r.amountPaise,
+        attempts: r.attempts,
+        lastError: r.lastError,
+      }));
+    },
+
+    async retryRefund(refundId) {
+      const result = await db.refund.updateMany({
+        where: { id: refundId, status: "FAILED" },
+        data: { status: "PENDING", attempts: 0 },
+      });
+      return result.count === 1;
+    },
+
     async categories() {
       const rows = await db.outfitCategory.findMany({
         orderBy: [{ sortOrder: "asc" }],

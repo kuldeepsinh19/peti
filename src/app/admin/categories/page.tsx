@@ -27,7 +27,7 @@ export default async function AdminCategoriesPage({
           {params.error}
         </Notice>
       ) : null}
-      {params.done === "1" ? <Notice tone="success" title="Saved" /> : null}
+      {typeof params.done === "string" ? <Notice tone="success" title="Saved" /> : null}
       <Ledger
         caption="Categories"
         rows={rows}
