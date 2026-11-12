@@ -31,7 +31,7 @@ return, and a dispute process. That is what this codebase concentrates on.
 | Money          | Integer paise everywhere; rental fee, deposit, commission, refunds and payouts recorded separately; refunds sent through an outbox; a reconciliation view proves every closed booking balances |
 | Cancellations  | Renter tiers (full / half / none by notice), owner cancellations refunded in full and counted                                                                                                  |
 | Trust          | Double-blind reviews after completion, disputes (accept, withdraw, administrator decision), contact details revealed only after payment, no identity documents collected                       |
-| Administration | Overview metrics, listing moderation, users (suspend/reinstate), bookings, disputes, payouts (mark paid with reference), categories, append-only activity log                                  |
+| Administration | Overview metrics, listing moderation, users (suspend/reinstate), bookings, disputes, payouts (mark paid with reference), failed-refund retry, categories, append-only activity log           |
 | Operations     | Idempotent sweep for deadlines, refunds, emails and reviews; dev outbox for emails and codes; sandbox checkout that signs callbacks and webhooks like a real provider                          |
 
 ## Architecture
@@ -143,7 +143,10 @@ end-to-end journeys in Chromium. See the [testing guide](docs/development/testin
 - No real money: the sandbox provider is for local and test use, and the Razorpay adapter accepts test
   keys only. Owner payouts are recorded and marked paid by an administrator; automated settlement needs a
   marketplace product such as Razorpay Route.
-- SMS codes are delivered to the dev outbox; production needs an SMS provider with DLT registration.
+- SMS codes are delivered to the dev outbox. There is no SMS provider yet, so `APP_ENV=production` refuses
+  to start until one (with DLT registration) is added.
+- An independent security review found issues that were fixed with regression tests; a few lower-risk
+  items remain open and are listed in the [security architecture](docs/architecture/security-architecture.md#review-findings-and-fixes).
 - Identity verification is an interface only; nobody is ever shown as identity-verified.
 - Terms and privacy pages are drafts that need legal review; GST and TDS are not modelled.
 - One city. No in-app chat, delivery or insurance.
