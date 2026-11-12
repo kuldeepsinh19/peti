@@ -48,7 +48,11 @@ export default async function OutfitPage({
 }) {
   const { slug } = await params;
   const { actor, outfit } = await load(slug);
-  const saved = (await container().search.savedIds(actor)).has(outfit.id);
+  const [savedIds, reviews] = await Promise.all([
+    container().search.savedIds(actor),
+    container().reviews.forOutfit(outfit.id),
+  ]);
+  const saved = savedIds.has(outfit.id);
   const isOwner = actor?.userId === outfit.owner.id;
   const measurements = Object.entries(outfit.measurementsMm).filter(([, mm]) => mm !== null) as Array<
     [string, number]
@@ -207,6 +211,26 @@ export default async function OutfitPage({
                 ]}
               />
             </section>
+
+            {reviews.length ? (
+              <section aria-labelledby="reviews">
+                <h2 id="reviews" className="border-b border-ink pb-2 eyebrow font-sans text-graphite">
+                  From people who rented it
+                </h2>
+                <ul>
+                  {reviews.map((r) => (
+                    <li key={r.id} className="border-b border-rule py-3 text-sm">
+                      <p className="text-burgundy" aria-label={r.rating + " out of 5"}>
+                        {"★".repeat(r.rating)}
+                        {"☆".repeat(5 - r.rating)}
+                      </p>
+                      {r.comment ? <p className="mt-1">{r.comment}</p> : null}
+                      <p className="mt-1 text-caption text-stone">{r.authorName}</p>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
 
             <section aria-labelledby="lender" className="border-t border-ink pt-4">
               <h2 id="lender" className="eyebrow font-sans text-graphite">
