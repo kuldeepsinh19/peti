@@ -1,6 +1,8 @@
 import "server-only";
 import { getEnv, isDevToolingEnabled } from "@/config/env";
 import { marketplacePolicy } from "@/config/marketplace-policy";
+import { adminUseCases } from "@/modules/admin";
+import { prismaAdminRepository } from "@/modules/admin/infrastructure/prisma-admin-repository";
 import { createAuth } from "@/modules/auth/infrastructure/better-auth";
 import { bookingsUseCases } from "@/modules/bookings";
 import { prismaBookingQueries } from "@/modules/bookings/infrastructure/booking-queries";
@@ -12,7 +14,13 @@ import { prismaListingRepository } from "@/modules/listings/infrastructure/prism
 import type { ObjectStorage } from "@/modules/media";
 import { sharpImageProcessor } from "@/modules/media/infrastructure/image-processor";
 import { filesystemStorage, s3Storage } from "@/modules/media/infrastructure/storage";
-import { dispatchPendingEmails, type MailSender, type SmsSender } from "@/modules/notifications";
+import {
+  dispatchPendingEmails,
+  inboxUseCases,
+  type MailSender,
+  type SmsSender,
+} from "@/modules/notifications";
+import { prismaInboxRepository } from "@/modules/notifications/infrastructure/inbox-repository";
 import { prismaNotificationOutbox } from "@/modules/notifications/infrastructure/notification-outbox";
 import { prismaNotificationWriter } from "@/modules/notifications/infrastructure/notification-writer";
 import {
@@ -24,6 +32,8 @@ import { type PaymentProvider, paymentsUseCases, type PaymentsUseCases } from "@
 import { prismaPaymentRepository } from "@/modules/payments/infrastructure/prisma-payment-repository";
 import { razorpayProvider } from "@/modules/payments/infrastructure/razorpay-provider";
 import { type SandboxProvider, sandboxProvider } from "@/modules/payments/infrastructure/sandbox-provider";
+import { reviewsUseCases } from "@/modules/reviews";
+import { prismaReviewRepository } from "@/modules/reviews/infrastructure/prisma-review-repository";
 import { searchUseCases } from "@/modules/search";
 import { prismaCatalogueQueries } from "@/modules/search/infrastructure/catalogue-queries";
 import { usersUseCases } from "@/modules/users";
@@ -105,6 +115,7 @@ function build() {
     appUrl: env.APP_URL,
   });
   const paymentsRef = payments;
+  const reviews = reviewsUseCases({ reviews: prismaReviewRepository(db), clock });
 
   return {
     env,
@@ -132,12 +143,16 @@ function build() {
     search: searchUseCases({ catalogue: prismaCatalogueQueries(db), clock }),
     bookings,
     payments: paymentsRef,
+    reviews,
+    inbox: inboxUseCases({ inbox: prismaInboxRepository(db), clock }),
+    admin: adminUseCases({ admin: prismaAdminRepository(db), audit: prismaAuditLog(db), clock }),
     /** Background work: deadlines, refunds and emails. Idempotent and safe to run concurrently. */
     async sweep() {
       const bookingReport = await bookings.sweep();
       const refunds = await paymentsRef.dispatchRefunds();
       const emails = await dispatchPendingEmails(prismaNotificationOutbox(db), mail, env.APP_URL);
-      return { bookings: bookingReport, refunds, emails };
+      const reviewsPublished = await reviews.publishExpired();
+      return { bookings: bookingReport, refunds, emails, reviewsPublished };
     },
   };
 }
