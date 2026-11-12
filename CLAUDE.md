@@ -67,15 +67,18 @@ Modular monolith, see [ADR-002](docs/decisions/ADR-002-modular-monolith.md). Eac
   `@/composition/container`.
 - Business rules live in `domain/` (pure functions, state machines, policies) and `application/`
   (use cases). **No business rules in React components or route handlers.**
-- One use case per file, named for the intent: `approve-booking.ts` exporting `approveBooking`.
-  Prefer functions taking a `deps` object over classes. No god services.
+- Business-critical commands get their own file named for the intent (`request-booking.ts`,
+  `payment-events.ts`); simple CRUD use cases of a module may share `use-cases.ts`. Prefer functions taking a
+  `deps` object over classes. No god services.
 - Add an abstraction only when there are two implementations or a real test seam (ports for payment,
   storage, mail, SMS, identity, clock). Repositories are ports where a use case needs a seam; simple
   read queries can live in the module's `infrastructure/queries.ts` exposed through a query port.
 - No circular dependencies, ever.
 
-Modules: `auth`, `users`, `listings`, `categories`, `search`, `availability`, `bookings`, `payments`,
-`deposits`, `reviews`, `notifications`, `disputes`, `admin`, `media`.
+Modules: `auth`, `users`, `listings`, `search` (discovery and category reads), `bookings` (lifecycle, calendar holds,
+owner blocks, condition reports and disputes — all transitions of the booking aggregate), `payments`, `deposits`
+(pure settlement maths), `reviews`, `notifications`, `admin` (metrics, users, payouts, categories, audit) and
+`media`.
 
 ## 5. Naming conventions
 

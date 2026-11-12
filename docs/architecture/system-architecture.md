@@ -78,22 +78,19 @@ serialisable DTOs (money as paise numbers, dates as `YYYY-MM-DD` strings).
 
 ## Modules
 
-| Module          | Responsibility                                                                            |
-| --------------- | ----------------------------------------------------------------------------------------- |
-| `auth`          | Better Auth configuration, session → actor, sign-up hooks                                 |
-| `users`         | Profiles, addresses, contact verification state, identity-verification port (status only) |
-| `categories`    | Category tree, admin management                                                           |
-| `listings`      | Outfits, photos, measurements, price options, moderation workflow                         |
-| `search`        | Discovery query: keyword, filters, date availability                                      |
-| `availability`  | Calendar holds and owner blocks; the exclusion-constraint boundary                        |
-| `bookings`      | Request, approve, reject, cancel, handover, return; state machine and history             |
-| `payments`      | Provider port and adapters, payment confirmation, webhook inbox, refunds outbox           |
-| `deposits`      | Deposit lifecycle and settlement maths, payouts                                           |
-| `disputes`      | Opening, accepting, withdrawing and resolving disputes                                    |
-| `reviews`       | Double-blind reviews after completion                                                     |
-| `notifications` | In-app notifications and email/SMS outbox                                                 |
-| `media`         | Upload validation, re-encoding, storage port                                              |
-| `admin`         | Metrics, user and listing moderation, audit log                                           |
+| Module          | Responsibility                                                                                                                                        |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auth`          | Better Auth configuration, session → actor, sign-up hooks                                                                                             |
+| `users`         | Profiles, addresses, contact verification state, identity-verification port (status only)                                                             |
+| `listings`      | Outfits, photos, measurements, price options, moderation workflow                                                                                     |
+| `search`        | Discovery query (keyword, filters, date availability), category and locality reads, saved outfits                                                     |
+| `bookings`      | Request, approve, reject, cancel, handover, return, disputes, owner blocks, sweep; state machine, history, calendar holds and booking-side money rows |
+| `payments`      | Provider port and adapters, payment confirmation, webhook inbox, refunds outbox                                                                       |
+| `deposits`      | Pure settlement maths (refund, deposit outcome, commission, payout)                                                                                   |
+| `reviews`       | Double-blind reviews after completion                                                                                                                 |
+| `notifications` | In-app notifications and email/SMS outbox                                                                                                             |
+| `media`         | Upload validation, re-encoding, storage port                                                                                                          |
+| `admin`         | Metrics, user suspension, payouts, category management, audit log                                                                                     |
 
 ## Cross-cutting concerns
 
@@ -109,3 +106,11 @@ serialisable DTOs (money as paise numbers, dates as `YYYY-MM-DD` strings).
 If a module later needs to scale or be owned separately (payments is the likeliest), its `index.ts` becomes
 a client for a service with the same use-case signatures. The webhook inbox and refunds outbox already
 behave like message boundaries.
+
+## Why some planned modules were merged
+
+The plan listed separate `availability`, `disputes` and `categories` modules. In practice calendar holds and
+disputes change the booking aggregate inside the same transaction as a status transition, so splitting them
+would have meant cross-module transactions; they live in `bookings`. Category reads belong to discovery
+(`search`) and category management to `admin`. Payments depends on bookings (never the reverse): the payments
+module verifies the provider and then calls `bookings.recordCapturedPayment`, the only path to `CONFIRMED`.
