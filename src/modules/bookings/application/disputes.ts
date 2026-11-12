@@ -153,7 +153,11 @@ export async function acceptClaim(deps: BookingsDeps, actor: Actor, input: unkno
     if (!dispute) throw new NotFoundError("Open dispute");
     if (dispute.openedByRole === role)
       throw new PreconditionError("NOT_RESPONDENT", "Only the other person can accept a claim.");
-    if (dispute.openedFromStatus !== "RETURNED" || !dispute.claimedAmountPaise) {
+    // Only a claim one participant made against the other can be settled by the other's acceptance. A claim
+    // opened by an administrator or the system has no single respondent (the owner could otherwise accept a
+    // damage claim in their own favour), so it is decided by an administrator.
+    const openedByParticipant = dispute.openedByRole === "RENTER" || dispute.openedByRole === "OWNER";
+    if (!openedByParticipant || dispute.openedFromStatus !== "RETURNED" || !dispute.claimedAmountPaise) {
       throw new PreconditionError("NEEDS_ADMIN", "This dispute has to be decided by an administrator.");
     }
     await settleDispute(store, booking, {
