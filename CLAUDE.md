@@ -214,7 +214,7 @@ pnpm check                   # lint + typecheck + boundaries + unit/component te
 pnpm db:test:prepare         # migrate the peti_test database
 pnpm test:integration        # integration tests against peti_test
 pnpm build && pnpm test:e2e  # production build + Playwright
-pnpm jobs:sweep              # run expiry / auto-complete / outbox dispatch once
+pnpm jobs:sweep              # with a server running: expiry, auto-complete, refunds, emails once
 ```
 
 ## 17. Definition of done

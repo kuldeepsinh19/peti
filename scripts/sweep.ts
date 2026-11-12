@@ -11,6 +11,12 @@ if (!secret) {
   console.error("CRON_SECRET is not set.");
   process.exit(1);
 }
-const response = await fetch(url, { method: "POST", headers: { authorization: `Bearer ${secret}` } });
+let response: Response;
+try {
+  response = await fetch(url, { method: "POST", headers: { authorization: `Bearer ${secret}` } });
+} catch {
+  console.error(`No Peti server answered at ${url.origin}. Start one first (pnpm dev or pnpm start).`);
+  process.exit(1);
+}
 console.log(response.status, await response.text());
 if (!response.ok) process.exitCode = 1;
