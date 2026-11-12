@@ -7,7 +7,6 @@ export const site = {
     "Rent sherwanis, Jodhpuri suits, lehengas and designer sarees from people in Ahmedabad who wore them once — or lend yours and let it earn.",
   launchCity: "Ahmedabad",
   repositoryUrl: "https://github.com/kuldeepsinh19/peti",
-  attributionUrl: "https://github.com/kuldeepsinh19/peti/blob/main/public/images/ATTRIBUTION.md",
 } as const;
 
 export const primaryNav = [

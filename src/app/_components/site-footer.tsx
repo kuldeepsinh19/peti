@@ -60,20 +60,8 @@ export function SiteFooter() {
         ))}
       </div>
       <div className="border-t border-paper/20">
-        <div className="mx-auto flex max-w-page flex-col gap-2 page-x py-6 text-caption text-sand sm:flex-row sm:justify-between">
-          <p>
-            Open source under the MIT licence ·{" "}
-            <a href={site.repositoryUrl} className="text-paper">
-              Source code
-            </a>
-          </p>
-          <p>
-            Photographs from Pexels and Unsplash, credited in{" "}
-            <a href={site.attributionUrl} className="text-paper">
-              ATTRIBUTION.md
-            </a>
-            . Models shown are not Peti users.
-          </p>
+        <div className="mx-auto max-w-page page-x py-6 text-caption text-sand">
+          <p>Models shown in photographs are not Peti users.</p>
         </div>
       </div>
     </footer>
