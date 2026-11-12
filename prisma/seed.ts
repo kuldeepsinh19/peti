@@ -59,10 +59,15 @@ async function seedReferenceData() {
   }
 }
 
+// `--without-admin` (used for the public demo): no administrator account, because the demo's dev outbox
+// is public and anyone could read a password-reset link for it.
+const withoutAdmin = process.argv.includes("--without-admin");
+const seededUsers = users.filter((u) => !(withoutAdmin && u.role === "admin"));
+
 async function seedUsers(): Promise<Map<string, string>> {
   const ids = new Map<string, string>();
   const hash = await hashPassword(demoPassword);
-  for (const u of users) {
+  for (const u of seededUsers) {
     const existing = await db.user.findUnique({ where: { email: u.email } });
     if (existing) {
       ids.set(u.key, existing.id);
@@ -190,11 +195,12 @@ async function main() {
   const userIds = await seedUsers();
   const createdOutfits = await seedOutfits(userIds);
   console.log(
-    `Seeded ${localities.length} localities, ${categories.length} categories, ${users.length} demo accounts,`,
+    `Seeded ${localities.length} localities, ${categories.length} categories, ${seededUsers.length} demo accounts,`,
   );
   console.log(`${createdOutfits} new demo listings.`);
+  if (withoutAdmin) console.log("No administrator account (--without-admin).");
   console.log(`\nDemo accounts (fictional), all with password "${demoPassword}":`);
-  for (const u of users) console.log(`  ${u.role.padEnd(5)}  ${u.email}`);
+  for (const u of seededUsers) console.log(`  ${u.role.padEnd(5)}  ${u.email}`);
 }
 
 main()
