@@ -55,7 +55,12 @@ export const TRANSITIONS: readonly Transition[] = [
   { from: "AWAITING_PAYMENT", to: "CANCELLED", command: "cancel", actors: ["RENTER", "OWNER", "ADMIN"] },
   { from: "CONFIRMED", to: "ACTIVE", command: "acknowledgeHandover", actors: ["RENTER", "ADMIN"] },
   { from: "CONFIRMED", to: "CANCELLED", command: "cancel", actors: ["RENTER", "OWNER", "ADMIN"] },
-  { from: "CONFIRMED", to: "DISPUTED", command: "openDispute", actors: ["RENTER", "OWNER", "ADMIN"] },
+  {
+    from: "CONFIRMED",
+    to: "DISPUTED",
+    command: "openDispute",
+    actors: ["RENTER", "OWNER", "ADMIN", "SYSTEM"],
+  },
   { from: "ACTIVE", to: "RETURNED", command: "recordReturn", actors: ["OWNER", "ADMIN"] },
   { from: "ACTIVE", to: "DISPUTED", command: "openDispute", actors: ["RENTER", "OWNER", "ADMIN", "SYSTEM"] },
   { from: "RETURNED", to: "COMPLETED", command: "confirmReturn", actors: ["OWNER", "ADMIN"] },

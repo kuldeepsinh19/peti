@@ -1,6 +1,7 @@
 import type { Actor } from "@/shared/application/actor";
 import { requireUser } from "@/shared/application/authorization";
 import { PreconditionError, ValidationError } from "@/shared/domain/errors";
+import { localDateInIndia } from "@/shared/domain/local-date";
 import { parseInput } from "@/shared/contracts/validation";
 import {
   assertPaymentWindowUsable,
@@ -98,6 +99,21 @@ export async function cancelBooking(deps: BookingsDeps, actor: Actor, input: unk
     if (booking.status === "AWAITING_PAYMENT") {
       await store.abandonPayment(booking.id);
     } else if (booking.status === "CONFIRMED") {
+      // Once the owner has recorded the handover, or the rental has started, the garment may already have
+      // changed hands: a cancellation would refund the deposit with no inspection. Problems from this point
+      // go through a dispute, which keeps the deposit held. (Owners are told to record the handover report
+      // before giving the garment over; the day before the start stays cancellable under the < 48 h tier.)
+      if (role !== "ADMIN") {
+        const handoverStarted =
+          (await store.getConditionReport(booking.id, "HANDOVER")) !== null ||
+          localDateInIndia(now) >= booking.startDate;
+        if (handoverStarted) {
+          throw new PreconditionError(
+            "HANDOVER_UNDER_WAY",
+            "The handover has started, so this booking can no longer be cancelled. Report a problem instead.",
+          );
+        }
+      }
       let retained = 0;
       if (role === "RENTER")
         retained = renterCancellationRetainedFee(

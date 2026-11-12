@@ -255,6 +255,26 @@ describe("cancellation", () => {
     expect(await reconciliation(bookingId)).toMatchObject({ imbalance_paise: 0 });
   });
 
+  it("nobody but an admin can cancel once the handover is recorded", async () => {
+    const { app, owner, renter, bookingId } = await paidBooking();
+    app.clock.set("2026-12-19T06:00:00Z"); // the day before the start
+    await app.bookings.submitHandoverReport(owner, { bookingId, grade: "GOOD", notes: "Fine." }, photos(3));
+    for (const actor of [renter, owner]) {
+      await expect(app.bookings.cancel(actor, { bookingId })).rejects.toMatchObject({
+        code: "HANDOVER_UNDER_WAY",
+      });
+    }
+    expect((await db.booking.findUniqueOrThrow({ where: { id: bookingId } })).status).toBe("CONFIRMED");
+  });
+
+  it("nobody but an admin can cancel from the start date, even without a handover report", async () => {
+    const { app, renter, bookingId } = await paidBooking();
+    app.clock.set("2026-12-19T19:00:00Z"); // 00:30 IST on 20 Dec, the start date
+    await expect(app.bookings.cancel(renter, { bookingId })).rejects.toMatchObject({
+      code: "HANDOVER_UNDER_WAY",
+    });
+  });
+
   it("owner cancelling refunds everything and is counted against the owner", async () => {
     const { app, owner, bookingId } = await paidBooking();
     await app.bookings.cancel(owner, { bookingId });

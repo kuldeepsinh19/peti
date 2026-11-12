@@ -7,6 +7,8 @@ export interface SweepCandidates {
   expiredPayments(now: Date): Promise<string[]>;
   inspectionsDue(now: Date): Promise<string[]>;
   overdueRentals(beforeEndDate: string): Promise<string[]>;
+  /** CONFIRMED bookings whose rental period ended without the handover being acknowledged. */
+  stuckHandovers(today: string): Promise<string[]>;
 }
 
 export interface SweepReport {
@@ -15,6 +17,8 @@ export interface SweepReport {
   autoCompleted: number;
   autoDisputed: number;
   errors: number;
+  /** Failures are reported, not swallowed, so a stuck booking is visible to whoever runs the sweep. */
+  failures: Array<{ bookingId: string; step: string; message: string }>;
 }
 
 /**
@@ -29,12 +33,22 @@ export async function runBookingSweep(deps: BookingsDeps, candidates: SweepCandi
     autoCompleted: 0,
     autoDisputed: 0,
     errors: 0,
+    failures: [],
   };
-  const attempt = async (key: keyof Omit<SweepReport, "errors">, work: () => Promise<boolean>) => {
+  const attempt = async (
+    key: keyof Omit<SweepReport, "errors" | "failures">,
+    work: () => Promise<boolean>,
+    bookingId = "",
+  ) => {
     try {
       if (await work()) report[key]++;
-    } catch {
+    } catch (error) {
       report.errors++;
+      report.failures.push({
+        bookingId,
+        step: key,
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   };
 
@@ -119,6 +133,36 @@ export async function runBookingSweep(deps: BookingsDeps, candidates: SweepCandi
         });
         return true;
       }),
+    );
+  }
+  // A paid booking whose rental period ended without an acknowledged handover is escalated to an
+  // administrator instead of sitting in CONFIRMED forever with the deposit held.
+  for (const id of await candidates.stuckHandovers(today)) {
+    await attempt(
+      "autoDisputed",
+      () =>
+        deps.uow.run(async (store) => {
+          const b = await loadBooking(store, id);
+          if (b.status !== "CONFIRMED" || today <= b.endDate) return false;
+          if (await store.hasOpenDispute(b.id)) return false;
+          const disputeId = await store.insertDispute({
+            bookingId: b.id,
+            openedById: null,
+            openedByRole: "SYSTEM",
+            openedFromStatus: "CONFIRMED",
+            kind: "HANDOVER_FAILED",
+            description:
+              "Opened automatically: the rental period ended without the handover being acknowledged.",
+            claimedAmountPaise: null,
+          });
+          await applyTransition(store, b, "openDispute", "SYSTEM", {
+            actorUserId: null,
+            reason: "HANDOVER_FAILED",
+            metadata: { disputeId },
+          });
+          return true;
+        }),
+      id,
     );
   }
   return report;

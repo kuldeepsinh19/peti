@@ -305,6 +305,8 @@ export function prismaBookingQueries(db: Db): BookingQueries {
     expiredApprovals: (now) => ids({ where: { status: "PENDING_APPROVAL", expiresAt: { lte: now } } }),
     expiredPayments: (now) => ids({ where: { status: "AWAITING_PAYMENT", expiresAt: { lte: now } } }),
     inspectionsDue: (now) => ids({ where: { status: "RETURNED", inspectionDeadline: { lte: now } } }),
+    stuckHandovers: (today) =>
+      ids({ where: { status: "CONFIRMED", endDate: { lt: new Date(today + "T00:00:00Z") } } }),
     overdueRentals: (today) =>
       ids({ where: { status: "ACTIVE", endDate: { lt: new Date(`${today}T00:00:00Z`) } } }),
   };
