@@ -16,6 +16,9 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   serverExternalPackages: ["sharp", "pg"],
+  // Public demo on Vercel: the seeded photographs are generated into demo-storage/ before deploying and
+  // shipped with the file-serving function (the serverless disk is read-only). Absent locally: no effect.
+  outputFileTracingIncludes: { "/api/files/[...key]": ["./demo-storage/**/*"] },
   images: {
     qualities: [70, 85],
     formats: ["image/avif", "image/webp"],
