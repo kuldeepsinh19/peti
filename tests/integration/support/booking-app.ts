@@ -9,6 +9,7 @@ import type { RateLimiter } from "@/shared/application/rate-limiter";
 import type { UserActor } from "@/shared/application/actor";
 import { fixedClock } from "@/shared/domain/clock";
 import { prismaUnitOfWork } from "@/shared/infrastructure/unit-of-work";
+import { prismaAuditLog } from "@/shared/infrastructure/audit";
 import { actorFor } from "./app";
 import { createOutfit, createUser, db } from "./db";
 
@@ -42,6 +43,7 @@ export function buildBookingApp(start = "2026-12-01T06:30:00Z") {
     bookings,
     clock,
     appUrl: "http://localhost:3100",
+    audit: prismaAuditLog(db),
   });
   const pay = payments;
 

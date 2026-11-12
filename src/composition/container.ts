@@ -42,6 +42,7 @@ import type { UserActor } from "@/shared/application/actor";
 import { systemClock } from "@/shared/domain/clock";
 import { prismaAuditLog } from "@/shared/infrastructure/audit";
 import { getPrisma } from "@/shared/infrastructure/prisma";
+import { logger } from "@/shared/infrastructure/logger";
 import { postgresRateLimiter } from "@/shared/infrastructure/rate-limiter";
 import { prismaUnitOfWork } from "@/shared/infrastructure/unit-of-work";
 
@@ -113,6 +114,7 @@ function build() {
     bookings,
     clock,
     appUrl: env.APP_URL,
+    audit: prismaAuditLog(db),
   });
   const paymentsRef = payments;
   const reviews = reviewsUseCases({ reviews: prismaReviewRepository(db), clock });
@@ -149,6 +151,7 @@ function build() {
     /** Background work: deadlines, refunds and emails. Idempotent and safe to run concurrently. */
     async sweep() {
       const bookingReport = await bookings.sweep();
+      for (const failure of bookingReport.failures) logger.warn("sweep step failed", failure);
       const refunds = await paymentsRef.dispatchRefunds();
       const emails = await dispatchPendingEmails(prismaNotificationOutbox(db), mail, env.APP_URL);
       const reviewsPublished = await reviews.publishExpired();

@@ -1,9 +1,10 @@
 import type { BookingsUseCases, CaptureOutcome } from "@/modules/bookings";
 import type { Actor } from "@/shared/application/actor";
+import type { AuditLog } from "@/shared/application/audit";
 import { requireUser } from "@/shared/application/authorization";
 import type { Clock } from "@/shared/domain/clock";
 import { MINUTE_MS } from "@/shared/domain/clock";
-import { NotFoundError, PreconditionError } from "@/shared/domain/errors";
+import { DomainError, NotFoundError, PreconditionError } from "@/shared/domain/errors";
 import type { CheckoutSession, PaymentProvider, ProviderEvent, ProviderId } from "../domain/payment-provider";
 
 export interface PaymentRepository {
@@ -47,6 +48,7 @@ export interface PaymentsDeps {
   bookings: Pick<BookingsUseCases, "detail" | "recordCapturedPayment">;
   clock: Clock;
   appUrl: string;
+  audit: AuditLog;
 }
 
 export interface CallbackResult {
@@ -58,7 +60,26 @@ const MAX_REFUND_ATTEMPTS = 5;
 const MIN_CHECKOUT_MINUTES = 2;
 
 export function paymentsUseCases(deps: PaymentsDeps) {
-  const { provider, payments, bookings, clock } = deps;
+  const { provider, payments, bookings, clock, audit } = deps;
+
+  /**
+   * Money the provider took that does not fit the booking (a second capture, or a different amount) is
+   * never applied automatically and never retried forever: it is recorded for an administrator to refund
+   * by hand, and the provider is told the event was received.
+   */
+  async function flagUnexpectedCapture(error: DomainError, eventId: string) {
+    await audit.record({
+      actorUserId: null,
+      actorRole: "SYSTEM",
+      action: "payment.unexpectedCapture",
+      entityType: "provider_event",
+      entityId: eventId,
+      after: { code: error.code, ...(error.details ?? {}) },
+      reason: error.message,
+    });
+  }
+  const isUnexpectedCapture = (error: unknown): error is DomainError =>
+    error instanceof DomainError && (error.code === "DUPLICATE_CAPTURE" || error.code === "AMOUNT_MISMATCH");
 
   /** Confirms a capture with the bookings module — the only path to CONFIRMED. */
   async function capture(
@@ -171,7 +192,13 @@ export function paymentsUseCases(deps: PaymentsDeps) {
         return { bookingId: row.bookingId, outcome: "PENDING" };
       }
       if (p.status !== "CAPTURED") return { bookingId: row.bookingId, outcome: "PENDING" };
-      return { bookingId: row.bookingId, outcome: await capture(row, p) };
+      try {
+        return { bookingId: row.bookingId, outcome: await capture(row, p) };
+      } catch (error) {
+        if (!isUnexpectedCapture(error)) throw error;
+        await flagUnexpectedCapture(error, "callback:" + p.providerPaymentId);
+        return { bookingId: row.bookingId, outcome: "INVALID" };
+      }
     },
 
     /**
@@ -196,6 +223,11 @@ export function paymentsUseCases(deps: PaymentsDeps) {
         await payments.inboxMark(stored.id, await processEvent(parsed.event));
         return { status: 200, body: "ok" };
       } catch (error) {
+        if (isUnexpectedCapture(error)) {
+          await flagUnexpectedCapture(error, parsed.event.eventId);
+          await payments.inboxMark(stored.id, "IGNORED", error.code);
+          return { status: 200, body: "flagged" };
+        }
         await payments.inboxMark(stored.id, "FAILED", error instanceof Error ? error.message : String(error));
         return { status: 500, body: "failed" };
       }

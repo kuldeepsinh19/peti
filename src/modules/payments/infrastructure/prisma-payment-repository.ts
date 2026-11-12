@@ -97,7 +97,11 @@ export function prismaPaymentRepository(db: Db): PaymentRepository {
         >`
           SELECT r.id, r.amount_paise, r.attempts, p.provider_payment_id, p.provider
           FROM refunds r JOIN payments p ON p.id = r.payment_id
-          WHERE r.status = 'PENDING' AND p.provider_payment_id IS NOT NULL
+          WHERE p.provider_payment_id IS NOT NULL
+            AND (r.status = 'PENDING'
+                 -- A worker that crashed between claiming and recording the provider id leaves the row
+                 -- INITIATED; reclaim it after a lease. Safe because createRefund is idempotent on our id.
+                 OR (r.status = 'INITIATED' AND r.provider_refund_id IS NULL AND r.initiated_at < now() - interval '15 minutes'))
           ORDER BY r.created_at
           LIMIT ${limit}
           FOR UPDATE OF r SKIP LOCKED`;
