@@ -48,9 +48,29 @@ describe("parseEnv", () => {
     expect(issues.some((i) => i.startsWith("SANDBOX_PAYMENT_KEY_SECRET"))).toBe(true);
   });
 
-  it("accepts a complete production configuration", () => {
-    const env = parseEnv(production);
+  it("refuses production until a real SMS provider exists, and nothing else is missing", () => {
+    expect(issuesFor(production)).toEqual([
+      "SMS_DRIVER: production requires a real SMS provider (none is implemented yet; see the deployment guide)",
+    ]);
+  });
+
+  it("accepts a complete staging configuration without dev tooling", () => {
+    const env = parseEnv({ ...production, APP_ENV: "staging" });
     expect(isDevToolingEnabled(env)).toBe(false);
+  });
+
+  it("fails closed: NODE_ENV=production without APP_ENV is production", () => {
+    const issues = issuesFor({ ...base, NODE_ENV: "production" });
+    expect(issues).toContain("PAYMENT_PROVIDER: production requires a real payment provider");
+  });
+
+  it("rejects placeholder secrets outside local and test", () => {
+    const issues = issuesFor({
+      ...production,
+      APP_ENV: "staging",
+      CRON_SECRET: "replace-with-a-random-string",
+    });
+    expect(issues).toContain("CRON_SECRET: still has the placeholder value from .env.example");
   });
 
   it("refuses to start production with the sandbox payment provider", () => {
