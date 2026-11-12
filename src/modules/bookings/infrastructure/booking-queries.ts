@@ -268,6 +268,27 @@ export function prismaBookingQueries(db: Db): BookingQueries {
       }));
     },
 
+    async payoutsForOwner(userId) {
+      const rows = await db.payout.findMany({
+        where: { ownerId: userId },
+        orderBy: { createdAt: "desc" },
+        include: { booking: { select: { reference: true, outfit: { select: { title: true } } } } },
+      });
+      return rows.map((p) => ({
+        bookingId: p.bookingId,
+        reference: p.booking.reference,
+        outfitTitle: p.booking.outfit.title,
+        grossRentalPaise: p.grossRentalPaise,
+        commissionPaise: p.commissionPaise,
+        depositWithheldPaise: p.depositWithheldPaise,
+        netPaise: p.netPaise,
+        status: p.status,
+        paidAt: p.paidAt,
+        payoutReference: p.payoutReference,
+        createdAt: p.createdAt,
+      }));
+    },
+
     isParticipant: async (userId, bookingId) =>
       (await db.booking.count({
         where: { id: bookingId, OR: [{ ownerId: userId }, { renterId: userId }] },

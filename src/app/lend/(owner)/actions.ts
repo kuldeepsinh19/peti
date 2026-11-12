@@ -82,3 +82,14 @@ export async function listingStatusAction(formData: FormData): Promise<void> {
     );
   }
 }
+
+export async function savePayoutAccountAction(formData: FormData): Promise<void> {
+  const result = await runAction("savePayoutAccount", (actor) =>
+    container().users.savePayoutAccount(actor, formDataToObject(formData)),
+  );
+  revalidatePath("/lend/earnings");
+  const { redirect } = await import("next/navigation");
+  redirect(
+    result.ok ? "/lend/earnings?saved=1" : "/lend/earnings?error=" + encodeURIComponent(result.error.message),
+  );
+}

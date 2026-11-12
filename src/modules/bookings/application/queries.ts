@@ -120,7 +120,22 @@ export interface CalendarEntry {
   bookingStatus: BookingStatus | null;
 }
 
+export interface PayoutRow {
+  bookingId: string;
+  reference: string;
+  outfitTitle: string;
+  grossRentalPaise: number;
+  commissionPaise: number;
+  depositWithheldPaise: number;
+  netPaise: number;
+  status: string;
+  paidAt: Date | null;
+  payoutReference: string | null;
+  createdAt: Date;
+}
+
 export interface BookingQueries extends SweepCandidates {
+  payoutsForOwner(userId: string): Promise<PayoutRow[]>;
   forRenter(userId: string): Promise<BookingListRow[]>;
   forOwner(userId: string, statuses?: readonly BookingStatus[]): Promise<BookingListRow[]>;
   detail(bookingId: string): Promise<BookingDetail | null>;

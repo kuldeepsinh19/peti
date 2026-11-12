@@ -6,7 +6,13 @@ export type {
   BookingsDeps,
   ReportPhotoStore,
 } from "./application/ports";
-export type { BookingDetail, BookingListRow, BookingQueries, CalendarEntry } from "./application/queries";
+export type {
+  BookingDetail,
+  BookingListRow,
+  BookingQueries,
+  CalendarEntry,
+  PayoutRow,
+} from "./application/queries";
 export type { CapturedPayment, CaptureOutcome } from "./application/payment-events";
 export { DatesUnavailableError } from "./application/core";
 export { bookingsUseCases, type BookingsUseCases } from "./application/use-cases";

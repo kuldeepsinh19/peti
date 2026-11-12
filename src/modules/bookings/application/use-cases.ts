@@ -40,6 +40,7 @@ export function bookingsUseCases(deps: BookingsDeps & { queries: BookingQueries 
     removeOwnerBlock: (actor: Actor, input: unknown) => removeOwnerBlock(deps, actor, input),
 
     myRentals: (actor: Actor) => queries.forRenter(requireUser(actor).userId),
+    myPayouts: (actor: Actor) => queries.payoutsForOwner(requireUser(actor).userId),
     myLendings: (actor: Actor, statuses?: Parameters<BookingQueries["forOwner"]>[1]) =>
       queries.forOwner(requireUser(actor).userId, statuses),
 

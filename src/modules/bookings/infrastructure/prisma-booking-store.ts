@@ -1,12 +1,28 @@
 import "server-only";
 import { Prisma } from "@/generated/prisma/client";
 import type { NotificationWriter } from "@/modules/notifications";
+import { PreconditionError } from "@/shared/domain/errors";
 import { prismaAuditLog } from "@/shared/infrastructure/audit";
+import { registerConstraintError } from "@/shared/infrastructure/pg-error";
 import type { Tx } from "@/shared/infrastructure/prisma";
 import { localDateFromDb, localDateToDb } from "@/shared/domain/local-date";
 import { readPolicySnapshot } from "../domain/booking-rules";
 import type { BookingStatus } from "../domain/booking-state-machine";
 import type { BookingRecord, BookingStore } from "../application/ports";
+
+// Database guards that users can trip in normal use get a clear message instead of a generic conflict.
+registerConstraintError(
+  "bookings_one_pending_request",
+  () =>
+    new PreconditionError(
+      "DUPLICATE_REQUEST",
+      "You already have a request waiting for this outfit on that start date.",
+    ),
+);
+registerConstraintError(
+  "bookings_owner_not_renter",
+  () => new PreconditionError("OWN_OUTFIT", "You cannot rent your own outfit."),
+);
 
 interface BookingRow {
   id: string;
