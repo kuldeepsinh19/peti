@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { ActionResult } from "@/shared/contracts/action-result";
 import { Button } from "@/shared/ui/button";
+import { downscaleImage } from "@/shared/ui/downscale-image";
 import { FormMessage, SelectField, TextAreaField, TextField } from "@/shared/ui/form";
 
 type CheckoutSession =
@@ -90,13 +91,16 @@ export function ConditionReportForm({
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    const files = data.getAll("photos").filter((f) => f instanceof File && f.size > 0);
+    const files = data.getAll("photos").filter((f): f is File => f instanceof File && f.size > 0);
     if (files.length < minPhotos) {
       setError(`Add at least ${minPhotos} photographs.`);
       return;
     }
     setPending(true);
     setError(null);
+    // Shrink phone photos first so several of them fit in one request.
+    data.delete("photos");
+    for (const file of await Promise.all(files.map((f) => downscaleImage(f)))) data.append("photos", file);
     const result = await submit(data);
     setPending(false);
     if (!result.ok) {

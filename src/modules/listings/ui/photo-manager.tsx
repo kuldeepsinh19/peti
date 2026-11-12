@@ -7,6 +7,7 @@ import { marketplacePolicy } from "@/config/marketplace-policy";
 import { fileUrl } from "@/modules/media";
 import type { ActionResult } from "@/shared/contracts/action-result";
 import { Button } from "@/shared/ui/button";
+import { downscaleImage } from "@/shared/ui/downscale-image";
 import { FormMessage } from "@/shared/ui/form";
 import type { ListingPhoto } from "../application/ports";
 
@@ -33,17 +34,19 @@ export function PhotoManager({
   const full = photos.length >= marketplacePolicy.maxListingPhotos;
 
   async function onUpload() {
-    const file = input.current?.files?.[0];
-    if (!file) {
+    const chosen = input.current?.files?.[0];
+    if (!chosen) {
       setError("Choose a photograph first.");
-      return;
-    }
-    if (file.size > marketplacePolicy.maxUploadBytes) {
-      setError(`Photographs must be smaller than ${marketplacePolicy.maxUploadBytes / 1024 / 1024} MB.`);
       return;
     }
     setBusy(true);
     setError(null);
+    const file = await downscaleImage(chosen);
+    if (file.size > marketplacePolicy.maxUploadBytes) {
+      setBusy(false);
+      setError(`Photographs must be smaller than ${marketplacePolicy.maxUploadBytes / 1024 / 1024} MB.`);
+      return;
+    }
     const data = new FormData();
     data.set("outfitId", outfitId);
     data.set("photo", file);
