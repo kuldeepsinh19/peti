@@ -27,9 +27,7 @@ export interface PaymentRepository {
     payload: unknown,
   ): Promise<{ id: number; isNew: boolean; status: string }>;
   inboxMark(id: number, status: "PROCESSED" | "IGNORED" | "FAILED", error?: string): Promise<void>;
-  claimRefunds(
-    limit: number,
-  ): Promise<
+  claimRefunds(limit: number): Promise<
     Array<{
       id: string;
       amountPaise: number;
