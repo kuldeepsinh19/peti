@@ -60,9 +60,8 @@ function Hero() {
               className="object-cover"
             />
           </div>
-          <figcaption className="mt-3 flex justify-between gap-4 text-caption text-stone">
-            <span>Fig. 1 — Ivory thread-work sherwani, ready for its second sitting.</span>
-            <span className="shrink-0">Photo: ARTO SURAJ / Unsplash</span>
+          <figcaption className="mt-3 text-caption text-stone">
+            Fig. 1 — Ivory thread-work sherwani, ready for its second sitting.
           </figcaption>
         </figure>
       </Page>
