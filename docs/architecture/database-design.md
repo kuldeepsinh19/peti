@@ -124,6 +124,7 @@ transaction. Deadlocks and serialisation failures are retried twice, then report
 | `integrity_constraints`    | Extensions, EXCLUDE, CHECKs, partial indexes, triggers, search function, reconciliation view, transition seed |
 | `trigger_error_names`      | Trigger errors start with their constraint name (for error mapping)                                           |
 | `saree_length_measurement` | Garment length up to 10 m (sarees are measured end to end)                                                    |
+| `payout_net_may_be_zero`   | A payout may net to zero (it still records the commission); found by the settlement property test             |
 
 Never edit an applied migration; add a new one. Prisma refuses `migrate reset` when an AI agent runs it, and
 the test database is prepared with the non-destructive `migrate deploy`.
