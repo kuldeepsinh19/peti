@@ -34,6 +34,7 @@
     "db:test:prepare": "tsx scripts/prepare-test-db.ts",
     "jobs:sweep": "tsx scripts/sweep.ts",
     "images:fetch": "tsx scripts/fetch-images.ts",
+    "docs:screenshots": "tsx scripts/capture-screenshots.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
