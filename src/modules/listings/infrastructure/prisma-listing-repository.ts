@@ -185,8 +185,12 @@ export function prismaListingRepository(db: Db): ListingRepository {
       }));
     },
 
-    async setStatus(outfitId, status, extra = {}) {
-      await db.outfit.update({ where: { id: outfitId }, data: { status, ...extra } });
+    async setStatus(outfitId, from, status, extra = {}) {
+      const result = await db.outfit.updateMany({
+        where: { id: outfitId, status: from },
+        data: { status, ...extra },
+      });
+      return result.count === 1;
     },
 
     async addPhoto(outfitId, photo) {

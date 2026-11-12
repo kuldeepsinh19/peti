@@ -1,7 +1,13 @@
 import { marketplacePolicy } from "@/config/marketplace-policy";
 import type { Actor } from "@/shared/application/actor";
 import { requireAdmin, requireUser, requireVerifiedContact } from "@/shared/application/authorization";
-import { ForbiddenError, NotFoundError, PreconditionError, ValidationError } from "@/shared/domain/errors";
+import {
+  ConcurrencyError,
+  ForbiddenError,
+  NotFoundError,
+  PreconditionError,
+  ValidationError,
+} from "@/shared/domain/errors";
 import { parseInput } from "@/shared/contracts/validation";
 import { cmToMm, listingSlug, validateListingMoney } from "../domain/listing-rules";
 import { editNeedsReview, isEditable, nextOutfitStatus, type OutfitCommand } from "../domain/outfit-status";
@@ -51,6 +57,10 @@ function toListingData(form: ListingFormData): ListingData {
 export function listingsUseCases(deps: ListingsDeps) {
   const { listings, photos, audit, clock } = deps;
 
+  async function setStatusOrConflict(...args: Parameters<typeof listings.setStatus>) {
+    if (!(await listings.setStatus(...args))) throw new ConcurrencyError();
+  }
+
   async function validated(ownerId: string, input: unknown): Promise<ListingData> {
     const data = toListingData(parseInput(listingFormSchema, input));
     const fieldErrors: Record<string, string[]> = Object.fromEntries(
@@ -93,8 +103,9 @@ export function listingsUseCases(deps: ListingsDeps) {
         "This outfit has bookings in progress. Pause it instead, and archive it once they are complete.",
       );
     }
-    await listings.setStatus(
+    await setStatusOrConflict(
       outfitId,
+      outfit.status,
       next,
       command === "submit" ? { submittedAt: clock.now(), moderationNote: null } : {},
     );
@@ -112,7 +123,7 @@ export function listingsUseCases(deps: ListingsDeps) {
       });
     }
     const next = nextOutfitStatus(outfit.status, command, "admin");
-    await listings.setStatus(outfitId, next, {
+    await setStatusOrConflict(outfitId, outfit.status, next, {
       moderationNote: note ?? null,
       ...(command === "approve" ? { publishedAt: clock.now() } : {}),
     });
@@ -173,7 +184,11 @@ export function listingsUseCases(deps: ListingsDeps) {
       });
       // A new photograph on a live listing is new content renters will see.
       if (editNeedsReview(outfit.status, true)) {
-        await listings.setStatus(outfitId, nextOutfitStatus(outfit.status, "contentEdited", "system"));
+        await setStatusOrConflict(
+          outfitId,
+          outfit.status,
+          nextOutfitStatus(outfit.status, "contentEdited", "system"),
+        );
       }
       return photo;
     },

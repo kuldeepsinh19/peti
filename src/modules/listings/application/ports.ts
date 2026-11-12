@@ -87,11 +87,13 @@ export interface ListingRepository {
   findOwned(outfitId: string): Promise<OwnedOutfit | null>;
   getForEdit(outfitId: string): Promise<ListingEditView | null>;
   listForOwner(ownerId: string): Promise<OwnerListingRow[]>;
+  /** Compare-and-swap: changes the status only if it is still `from`; false when someone else changed it. */
   setStatus(
     outfitId: string,
+    from: OutfitStatus,
     status: OutfitStatus,
     extra?: { moderationNote?: string | null; publishedAt?: Date; submittedAt?: Date },
-  ): Promise<void>;
+  ): Promise<boolean>;
   addPhoto(outfitId: string, photo: Omit<ListingPhoto, "id" | "sortOrder">): Promise<ListingPhoto>;
   removePhoto(outfitId: string, photoId: string): Promise<ListingPhoto | null>;
   countOpenBookings(outfitId: string): Promise<number>;
