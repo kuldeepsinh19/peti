@@ -1,6 +1,7 @@
 import "server-only";
 import { prismaAdapter } from "@better-auth/prisma-adapter";
 import { betterAuth } from "better-auth";
+import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { admin, phoneNumber } from "better-auth/plugins";
 import type { Env } from "@/config/env";
@@ -41,8 +42,35 @@ export function createAuth({ env, db, mail, sms }: AuthDeps) {
     secret: env.BETTER_AUTH_SECRET,
     trustedOrigins,
     database: prismaAdapter(db, { provider: "postgresql" }),
+    // Endpoints the product does not use are switched off: phone-based password reset and phone sign-in
+    // would turn a leaked mobile number into an account-takeover target.
+    disabledPaths: [
+      "/phone-number/request-password-reset",
+      "/phone-number/reset-password",
+      "/sign-in/phone-number",
+    ],
+    hooks: {
+      // Verifying a phone number only ever attaches it to the signed-in account; it never signs anyone in.
+      before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== "/phone-number/verify") return;
+        const session = await getSessionFromCtx(ctx);
+        const body = ctx.body as { updatePhoneNumber?: unknown } | undefined;
+        if (!session || body?.updatePhoneNumber !== true) {
+          throw new APIError("FORBIDDEN", { message: "Sign in to verify a mobile number." });
+        }
+      }),
+    },
     advanced: {
       database: { generateId: "uuid" },
+      // Which headers carry the client address depends on the host; set them explicitly in production.
+      ipAddress: {
+        ipAddressHeaders: env.AUTH_IP_HEADERS?.split(",").map((h) => h.trim().toLowerCase()) ?? [
+          "x-forwarded-for",
+        ],
+        ...(env.AUTH_TRUSTED_PROXIES
+          ? { trustedProxies: env.AUTH_TRUSTED_PROXIES.split(",").map((p) => p.trim()) }
+          : {}),
+      },
       useSecureCookies: env.APP_URL.startsWith("https://"),
     },
     session: {
