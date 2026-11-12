@@ -232,6 +232,46 @@ database.
 - After a restore, run the sweep and check payments against the Razorpay dashboard: webhooks that arrived
   after the restore point are not in the database.
 
+## Public demo on Vercel
+
+The hosted demo is **not** a production deployment. It runs with `APP_ENV=test` so visitors can try the
+whole flow with the sandbox payment provider and read emails and one-time codes at `/dev/outbox`.
+
+| Piece       | Demo setting                                                                                                      |
+| ----------- | ----------------------------------------------------------------------------------------------------------------- |
+| Database    | Free Neon Postgres (Singapore) from the Vercel Marketplace; functions run in `sin1` (`vercel.json`)               |
+| Photographs | Seeded into `demo-storage/` locally, uploaded with the deployment and traced into `/api/files` (`next.config.ts`) |
+| Scheduler   | Vercel Cron calls `GET /api/cron/sweep` once a day with `Authorization: Bearer $CRON_SECRET` (Hobby limit)        |
+| Client IP   | `AUTH_IP_HEADERS=x-real-ip` (set by Vercel's edge)                                                                |
+| Uploads     | Not persisted: the serverless disk is read-only, and request bodies are capped at 4.5 MB                          |
+
+Caveats, all accepted for a demo with fictional data only:
+
+- `/dev/outbox` is public, so anyone can read any sign-in code or password-reset link and take over any
+  account. That is why the demo is seeded with `--without-admin`: there is no administrator account.
+- Test-mode auth rate limits are looser than production's.
+- Deadlines run once a day, not every few minutes.
+
+Setting it up (from the repository root, with the Vercel CLI logged in):
+
+```bash
+npx vercel link --yes --project peti
+npx vercel integration add neon --billing-plan free_v3 --meta region=sin1 --meta auth=false \
+  -e production -e preview --no-env-pull   # accept the Neon terms in the browser when asked
+npx vercel env pull --environment production .env.vercel
+# with DATABASE_URL_UNPOOLED from .env.vercel exported as DATABASE_URL:
+pnpm db:deploy
+APP_ENV=test STORAGE_FS_ROOT=./demo-storage pnpm db:seed -- --without-admin
+rm .env.vercel
+# project variables (production): APP_ENV=test, APP_URL, BETTER_AUTH_SECRET, PAYMENT_PROVIDER=sandbox,
+# SANDBOX_PAYMENT_KEY_SECRET, SANDBOX_PAYMENT_WEBHOOK_SECRET, MAIL_DRIVER=outbox, SMS_DRIVER=outbox,
+# STORAGE_DRIVER=filesystem, STORAGE_FS_ROOT=./demo-storage, AUTH_IP_HEADERS=x-real-ip, CRON_SECRET
+npx vercel deploy --prod --yes
+```
+
+`.vercelignore` keeps `.env` files out of the upload (the Vercel CLI does not read `.gitignore`) but includes
+`demo-storage/`.
+
 ## Not production-ready yet
 
 The following are missing or deliberately out of scope. Do not take real users or real money until they
