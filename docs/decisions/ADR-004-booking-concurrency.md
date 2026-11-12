@@ -58,7 +58,9 @@ for cleaning. The brief requires prevention at the database level and safety und
   with `DatesUnavailableError`, one hold exists, the invariant query is empty.
 - Block-vs-approve race: exactly one wins.
 - Boundary tests for buffers and adjacency (`[10,14)` and `[14,17)` do not overlap).
-- Mutation check: with the constraint dropped, the stress test fails.
+- Mutation check: with `calendar_holds_no_overlap` replaced by a same-named constraint that never conflicts
+  (dropping it outright would also break the `ON CONFLICT ON CONSTRAINT` insert), the stress test fails —
+  all ten concurrent approvals "win". The constraint was then restored on the test database.
 
 ## Alternatives considered
 

@@ -25,8 +25,14 @@ Summarised here; details in [security architecture](docs/architecture/security-a
 - Payments confirmed only after signature verification and a server-to-server check with the provider.
 - Uploads validated by content, re-encoded, and stripped of metadata including location.
 - Contact details shared only after a booking is paid; no identity documents collected.
-- Rate limits on sign-in, sign-up, password reset, one-time codes, booking requests and uploads.
-- Production start-up refuses the sandbox payment provider, the dev outbox and local-disk storage.
+- Rate limits on sign-in, sign-up, password reset, one-time codes, booking requests, uploads, listings,
+  disputes and reviews.
+- Production start-up refuses the sandbox payment provider, the dev outboxes and local-disk storage, and
+  fails closed when `APP_ENV` is missing.
+
+An independent review of the code was carried out on 2026-11-12. Its findings, what was fixed and what is
+still open are listed in the
+[security architecture](docs/architecture/security-architecture.md#review-findings-and-fixes).
 
 ## Supported versions
 

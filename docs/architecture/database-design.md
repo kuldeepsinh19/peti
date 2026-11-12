@@ -113,7 +113,7 @@ transaction. Deadlocks and serialisation failures are retried twice, then report
 - Prisma 7's pg adapter drops the `constraint` field of Postgres errors; names are read from the message.
 - `tests/integration/database/guards.test.ts` bypasses the application and shows each guard rejecting
   invalid data, including a two-connection test of the exclusion constraint.
-- Weakening `calendar_holds_no_overlap` makes the concurrency tests fail (10 of 10 concurrent approvals
+- Replacing `calendar_holds_no_overlap` with a same-named constraint that never conflicts makes the concurrency tests fail (10 of 10 concurrent approvals
   "win"), which shows the tests depend on the constraint.
 
 ## Migrations

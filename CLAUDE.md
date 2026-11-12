@@ -113,11 +113,14 @@ See [database-design.md](docs/architecture/database-design.md) and
 
 See [api-overview.md](docs/api/api-overview.md) and [error-handling.md](docs/api/error-handling.md).
 
-- Mutations from the UI are **Server Actions** in `src/app/**/actions.ts`; they are thin: parse input with
-  the module's Zod contract, resolve the actor, rate-limit if needed, call one use case, return
-  `ActionResult<T>`, revalidate paths.
-- Route handlers (`route.ts`) only for: auth, payment callback/webhook, uploads, file serving, cron sweep,
-  health. Webhooks read the **raw** body for signature checks.
+- Mutations from the UI are **Server Actions** (`src/app/**/actions.ts`, `src/app/_actions/`); they are thin:
+  wrap the body in `runAction` (`src/app/_lib/action.ts`), which resolves the actor, consumes an optional
+  rate-limit rule from `src/app/_lib/limits.ts`, and converts errors to `ActionResult<T>`; call one use case
+  (which parses input with the module's Zod contract); revalidate paths.
+- Photo uploads (listing photos, condition reports) are multipart Server Actions; the browser downscales
+  first (`shared/ui/downscale-image.ts`) and the server re-validates and re-encodes everything.
+- Route handlers (`route.ts`) only for: auth, payment callback/webhook, file serving, cron sweep, health.
+  Webhooks read the **raw** body for signature checks.
 - Contracts (Zod schemas + inferred types) live in `modules/<name>/application/contracts.ts` and are shared
   by forms and actions.
 
@@ -132,19 +135,20 @@ See [api-overview.md](docs/api/api-overview.md) and [error-handling.md](docs/api
 
 - Domain/application code throws `DomainError` subclasses with stable codes; infrastructure maps Postgres
   errors (`23P01`, `23514`, `40P01`, `40001`) to domain errors in `shared/infrastructure/pg-error.ts`.
-- Actions convert errors with `toActionResult`; unknown errors are logged with a request id and returned as
-  `INTERNAL_ERROR` without internals. Never leak stack traces, SQL or provider responses to users.
+- `runAction` converts errors with `toActionError`; unknown errors are logged with a short reference and
+  returned as `INTERNAL_ERROR` without internals. Never leak stack traces, SQL or provider responses to users.
 - Do not swallow errors. Do not use exceptions for control flow inside the domain where a result type is
   clearer.
 
 ## 10. Authentication and authorisation
 
-- Better Auth with database sessions. Roles on the user are only `USER` and `ADMIN`; "owner" and "renter"
-  are per-booking relationships, not roles.
+- Better Auth with database sessions. Roles on the user are only `user` and `admin` (admin plugin);
+  "owner" and "renter" are per-booking relationships, not roles.
 - **Every** use case authorises its actor server-side (owner of the outfit, participant in the booking,
   admin). `src/proxy.ts` only redirects anonymous visitors cheaply; it is never the security boundary.
   Hiding a button is never authorisation.
-- Suspended users cannot sign in, list or book. Admin actions require a reason and write an audit log.
+- Suspending a user revokes their sessions and blocks sign-in; their listings disappear from search and
+  the detail page and cannot be requested. Admin actions require a reason and write an audit log.
 - Contact details (phone, pickup address) are revealed to the counterparty only from `CONFIRMED`.
 
 ## 11. Security expectations
@@ -154,7 +158,8 @@ See [security-architecture.md](docs/architecture/security-architecture.md) and [
 - Secrets only from env; never commit `.env`; never log secrets, tokens, OTPs or full payment payloads.
 - The sandbox payment provider, dev outbox and `/dev/*` pages exist only when `APP_ENV` is `local` or
   `test`; `env.ts` refuses to boot production with them.
-- Rate-limit auth, booking requests, uploads and dispute creation.
+- Rate-limit auth (Better Auth, database-backed), booking requests (in the use case) and every action that
+  uploads or writes user text: photos, condition reports, listings, disputes, reviews, saved toggles.
 - Strip EXIF (including GPS) from every uploaded photo. Serve user files through the app with
   authorisation where they are private (condition-report photos).
 - Privacy by design: collect the minimum; listings show locality, never the street address.
@@ -203,7 +208,7 @@ snapshotted onto each booking.
 pnpm install                 # also generates the Prisma client
 docker compose up -d         # Postgres 18 (+ peti_test database)
 pnpm db:migrate              # apply migrations to DATABASE_URL (dev)
-pnpm db:seed                 # demo data (categories, localities, users, outfits, bookings)
+pnpm db:seed                 # demo data (categories, localities, users, outfits; no bookings)
 pnpm dev                     # http://localhost:3000
 pnpm check                   # lint + typecheck + boundaries + unit/component tests
 pnpm db:test:prepare         # migrate the peti_test database
