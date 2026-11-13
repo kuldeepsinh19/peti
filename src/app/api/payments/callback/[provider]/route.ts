@@ -25,8 +25,14 @@ async function handle(request: Request, provider: string, params: Record<string,
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ provider: string }> }) {
-  const form = await request.formData();
-  const fields = Object.fromEntries([...form.entries()].map(([k, v]) => [k, String(v)]));
+  let fields: Record<string, string>;
+  try {
+    const form = await request.formData();
+    fields = Object.fromEntries([...form.entries()].map(([k, v]) => [k, String(v)]));
+  } catch {
+    // Not a form post: send the renter somewhere useful instead of a bare 500.
+    return NextResponse.redirect(new URL("/account/rentals?payment=invalid", container().env.APP_URL), 303);
+  }
   return handle(request, (await params).provider, fields);
 }
 
