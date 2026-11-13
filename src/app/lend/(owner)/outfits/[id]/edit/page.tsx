@@ -8,7 +8,7 @@ import { ListingForm } from "@/modules/listings/ui/listing-form";
 import { PhotoManager } from "@/modules/listings/ui/photo-manager";
 import { outfitStatusTone } from "@/modules/listings/ui/status";
 import { DomainError } from "@/shared/domain/errors";
-import { Button } from "@/shared/ui/button";
+import { SubmitButton } from "@/shared/ui/submit-button";
 import { Notice, Tag } from "@/shared/ui/feedback";
 import { PageHeader, SectionIndex } from "@/shared/ui/layout";
 import {
@@ -74,9 +74,7 @@ function StatusButton({
     <form action={listingStatusAction}>
       <input type="hidden" name="outfitId" value={outfitId} />
       <input type="hidden" name="command" value={command} />
-      <Button type="submit" variant={variant}>
-        {label}
-      </Button>
+      <SubmitButton variant={variant}>{label}</SubmitButton>
     </form>
   );
 }

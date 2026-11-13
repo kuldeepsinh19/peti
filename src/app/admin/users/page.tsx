@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { container } from "@/composition/container";
 import { requireAdminOrNotFound } from "@/composition/session";
-import { Button } from "@/shared/ui/button";
+import { SubmitButton } from "@/shared/ui/submit-button";
 import { Notice, Tag } from "@/shared/ui/feedback";
 import { PageHeader } from "@/shared/ui/layout";
 import { Ledger } from "@/shared/ui/ledger";
@@ -35,9 +35,9 @@ export default async function AdminUsersPage({
           <span className="eyebrow text-graphite">Search name or email</span>
           <input name="q" defaultValue={q ?? ""} className={field} />
         </label>
-        <Button type="submit" size="sm" variant="secondary">
+        <SubmitButton size="sm" variant="secondary">
           Search
-        </Button>
+        </SubmitButton>
       </form>
       <Ledger
         caption="Users"
@@ -90,9 +90,9 @@ export default async function AdminUsersPage({
                     aria-label={"Reason for " + u.name}
                     className={field}
                   />
-                  <Button type="submit" size="sm" variant={u.banned ? "secondary" : "danger"}>
+                  <SubmitButton size="sm" variant={u.banned ? "secondary" : "danger"}>
                     {u.banned ? "Reinstate" : "Suspend"}
-                  </Button>
+                  </SubmitButton>
                 </form>
               ),
           },

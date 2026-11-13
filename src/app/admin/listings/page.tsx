@@ -7,7 +7,7 @@ import { outfitStatusLabel, type ModerationRow, type OutfitStatus } from "@/modu
 import { outfitStatusTone } from "@/modules/listings/ui/status";
 import { fileUrl } from "@/modules/media";
 import { formatInr } from "@/shared/domain/money";
-import { Button } from "@/shared/ui/button";
+import { SubmitButton } from "@/shared/ui/submit-button";
 import { EmptyState, Notice, Tag } from "@/shared/ui/feedback";
 import { PageHeader } from "@/shared/ui/layout";
 import { moderateListingAction } from "../actions";
@@ -47,13 +47,12 @@ function ModerationForm({
           />
         </label>
       ) : null}
-      <Button
-        type="submit"
+      <SubmitButton
         size="sm"
         variant={command === "approve" ? "primary" : command === "reinstate" ? "secondary" : "danger"}
       >
         {label}
-      </Button>
+      </SubmitButton>
     </form>
   );
 }

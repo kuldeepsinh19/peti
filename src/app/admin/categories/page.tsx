@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { container } from "@/composition/container";
 import { requireAdminOrNotFound } from "@/composition/session";
-import { Button } from "@/shared/ui/button";
+import { SubmitButton } from "@/shared/ui/submit-button";
 import { Notice, Tag } from "@/shared/ui/feedback";
 import { PageHeader, SectionIndex } from "@/shared/ui/layout";
 import { Ledger } from "@/shared/ui/ledger";
@@ -50,9 +50,9 @@ export default async function AdminCategoriesPage({
                 <input type="hidden" name="command" value="toggleCategory" />
                 <input type="hidden" name="categoryId" value={r.id} />
                 <input type="hidden" name="active" value={r.isActive ? "false" : "true"} />
-                <Button type="submit" size="sm" variant="quiet">
+                <SubmitButton size="sm" variant="quiet">
                   {r.isActive ? "Hide" : "Show"}
-                </Button>
+                </SubmitButton>
               </form>
             ),
           },
@@ -87,7 +87,7 @@ export default async function AdminCategoriesPage({
             <input name="description" maxLength={200} className={field} />
           </label>
           <div>
-            <Button type="submit">Add category</Button>
+            <SubmitButton>Add category</SubmitButton>
           </div>
         </form>
       </section>

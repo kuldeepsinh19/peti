@@ -6,7 +6,7 @@ import { requireActorOrRedirect } from "@/composition/session";
 import { statusLabel } from "@/modules/bookings";
 import { DomainError } from "@/shared/domain/errors";
 import { addDays, formatLocalDate, localDateInIndia } from "@/shared/domain/local-date";
-import { Button } from "@/shared/ui/button";
+import { SubmitButton } from "@/shared/ui/submit-button";
 import { EmptyState, Notice, Tag } from "@/shared/ui/feedback";
 import { PageHeader, SectionIndex } from "@/shared/ui/layout";
 import { calendarBlockAction } from "../../../../../_actions/bookings";
@@ -73,7 +73,7 @@ export default async function CalendarPage({
             <input name="note" maxLength={200} placeholder="Family wedding" className={field} />
           </label>
           <div className="md:col-span-3">
-            <Button type="submit">Block these dates</Button>
+            <SubmitButton>Block these dates</SubmitButton>
           </div>
         </form>
       </section>
@@ -112,9 +112,7 @@ export default async function CalendarPage({
                     <input type="hidden" name="outfitId" value={id} />
                     <input type="hidden" name="holdId" value={e.id} />
                     <input type="hidden" name="intent" value="remove" />
-                    <Button type="submit" variant="quiet">
-                      Unblock
-                    </Button>
+                    <SubmitButton variant="quiet">Unblock</SubmitButton>
                   </form>
                 ) : (
                   <Tag>Booked</Tag>

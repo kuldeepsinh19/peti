@@ -3,7 +3,7 @@ import { container } from "@/composition/container";
 import { requireActorOrRedirect } from "@/composition/session";
 import { MAX_ADDRESSES } from "@/modules/users";
 import { AddressForm } from "@/modules/users/ui/account-forms";
-import { Button } from "@/shared/ui/button";
+import { SubmitButton } from "@/shared/ui/submit-button";
 import { EmptyState, Tag } from "@/shared/ui/feedback";
 import { PageHeader, SectionIndex } from "@/shared/ui/layout";
 import { addAddressAction, removeAddressAction, setDefaultAddressAction } from "../actions";
@@ -47,16 +47,12 @@ export default async function AddressesPage() {
                   {!a.isDefault ? (
                     <form action={setDefaultAddressAction}>
                       <input type="hidden" name="addressId" value={a.id} />
-                      <Button type="submit" variant="quiet">
-                        Make default
-                      </Button>
+                      <SubmitButton variant="quiet">Make default</SubmitButton>
                     </form>
                   ) : null}
                   <form action={removeAddressAction}>
                     <input type="hidden" name="addressId" value={a.id} />
-                    <Button type="submit" variant="quiet">
-                      Remove
-                    </Button>
+                    <SubmitButton variant="quiet">Remove</SubmitButton>
                   </form>
                 </div>
               </li>

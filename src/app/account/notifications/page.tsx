@@ -3,7 +3,7 @@ import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { container } from "@/composition/container";
 import { requireActorOrRedirect } from "@/composition/session";
-import { Button } from "@/shared/ui/button";
+import { SubmitButton } from "@/shared/ui/submit-button";
 import { EmptyState } from "@/shared/ui/feedback";
 import { PageHeader } from "@/shared/ui/layout";
 import { runAction } from "../../_lib/action";
@@ -33,9 +33,7 @@ export default async function NotificationsPage() {
         actions={
           unread ? (
             <form action={markAllReadAction}>
-              <Button type="submit" variant="quiet">
-                Mark all as read
-              </Button>
+              <SubmitButton variant="quiet">Mark all as read</SubmitButton>
             </form>
           ) : null
         }

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { container } from "@/composition/container";
 import { requireActorOrRedirect } from "@/composition/session";
 import { formDataToObject } from "@/shared/contracts/validation";
-import { Button } from "@/shared/ui/button";
+import { SubmitButton } from "@/shared/ui/submit-button";
 import { EmptyState, Notice, Tag } from "@/shared/ui/feedback";
 import { PageHeader, SectionIndex } from "@/shared/ui/layout";
 import { runAction } from "../../_lib/action";
@@ -91,7 +91,7 @@ export default async function ReviewsPage({
                       <textarea name="comment" rows={3} maxLength={1000} className={field} />
                     </label>
                     <div>
-                      <Button type="submit">Submit review</Button>
+                      <SubmitButton>Submit review</SubmitButton>
                     </div>
                   </form>
                 </li>

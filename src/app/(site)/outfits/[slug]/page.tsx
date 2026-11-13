@@ -7,7 +7,8 @@ import { getActor } from "@/composition/session";
 import { fileUrl } from "@/modules/media";
 import { formatInr } from "@/shared/domain/money";
 import { NotFoundError } from "@/shared/domain/errors";
-import { Button, ButtonLink } from "@/shared/ui/button";
+import { ButtonLink } from "@/shared/ui/button";
+import { SubmitButton } from "@/shared/ui/submit-button";
 import { Notice, Tag } from "@/shared/ui/feedback";
 import { conditionLabel, measurementLabel, occasionLabel, sizeLabel } from "@/shared/ui/labels";
 import { DefinitionList, Page } from "@/shared/ui/layout";
@@ -149,9 +150,9 @@ export default async function OutfitPage({
                 <form action={toggleSavedAction}>
                   <input type="hidden" name="outfitId" value={outfit.id} />
                   <input type="hidden" name="slug" value={outfit.slug} />
-                  <Button type="submit" variant="quiet">
+                  <SubmitButton variant="quiet">
                     {saved ? "Saved — remove from your list" : "Save for later"}
-                  </Button>
+                  </SubmitButton>
                 </form>
               ) : (
                 <Link href={`/sign-in?next=/outfits/${outfit.slug}`} className="text-sm text-burgundy">

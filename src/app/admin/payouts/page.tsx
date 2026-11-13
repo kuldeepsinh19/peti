@@ -3,7 +3,7 @@ import Link from "next/link";
 import { container } from "@/composition/container";
 import { requireAdminOrNotFound } from "@/composition/session";
 import { formatInr } from "@/shared/domain/money";
-import { Button } from "@/shared/ui/button";
+import { SubmitButton } from "@/shared/ui/submit-button";
 import { EmptyState, Notice, Tag } from "@/shared/ui/feedback";
 import { PageHeader } from "@/shared/ui/layout";
 import { Ledger } from "@/shared/ui/ledger";
@@ -76,9 +76,9 @@ export default async function AdminPayoutsPage({
                   <form action={adminCommandAction}>
                     <input type="hidden" name="command" value="retryRefund" />
                     <input type="hidden" name="refundId" value={r.id} />
-                    <Button type="submit" size="sm" variant="secondary">
+                    <SubmitButton size="sm" variant="secondary">
                       Retry refund
-                    </Button>
+                    </SubmitButton>
                   </form>
                 ),
               },
@@ -135,9 +135,7 @@ export default async function AdminPayoutsPage({
                     aria-label={"Reference for " + r.reference}
                     className={field}
                   />
-                  <Button type="submit" size="sm">
-                    Mark paid
-                  </Button>
+                  <SubmitButton size="sm">Mark paid</SubmitButton>
                 </form>
               ),
           },

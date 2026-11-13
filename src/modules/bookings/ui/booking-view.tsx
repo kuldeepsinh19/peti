@@ -5,7 +5,7 @@ import { fileUrl } from "@/modules/media";
 import type { ActionResult } from "@/shared/contracts/action-result";
 import { formatLocalDate } from "@/shared/domain/local-date";
 import { formatInr } from "@/shared/domain/money";
-import { Button } from "@/shared/ui/button";
+import { SubmitButton } from "@/shared/ui/submit-button";
 import { Notice, Tag } from "@/shared/ui/feedback";
 import { conditionLabel } from "@/shared/ui/labels";
 import { DefinitionList, SectionIndex } from "@/shared/ui/layout";
@@ -63,9 +63,7 @@ function CommandForm({
       <input type="hidden" name="returnTo" value={returnTo} />
       {children}
       <div>
-        <Button type="submit" variant={variant}>
-          {label}
-        </Button>
+        <SubmitButton variant={variant}>{label}</SubmitButton>
       </div>
     </form>
   );
