@@ -25,7 +25,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ key
   return new Response(Buffer.from(object.body), {
     headers: {
       "Content-Type": object.contentType,
-      "Cache-Control": isPublic ? "public, max-age=31536000, immutable" : "private, no-store",
+      // A day, not a year: an owner who removes a photograph (or a listing an admin suspends) should stop
+      // being served from browser and CDN caches soon after.
+      "Cache-Control": isPublic ? "public, max-age=86400" : "private, no-store",
       "X-Content-Type-Options": "nosniff",
       "Content-Security-Policy": "default-src 'none'",
     },
