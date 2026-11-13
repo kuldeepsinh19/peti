@@ -79,6 +79,35 @@ describe("claim amounts", () => {
   });
 });
 
+describe("administrators who are part of a rental", () => {
+  it("act as that participant, without administrator overrides", async () => {
+    const app = buildBookingApp();
+    const s = await scenario();
+    const adminRenter = { ...s.renter, isAdmin: true };
+    const { bookingId } = await app.bookings.request(adminRenter, {
+      outfitId: s.outfit.id,
+      startDate: "2026-12-10",
+      days: 3,
+      acceptTerms: "on",
+    });
+    await app.bookings.approve(s.owner, { bookingId });
+    await app.payThroughSandbox(adminRenter, bookingId);
+    app.clock.set("2026-12-10T05:00:00Z");
+    await app.bookings.submitHandoverReport(s.owner, { bookingId, grade: "GOOD", notes: "Fine." }, photos(3));
+    await app.bookings.acknowledgeHandover(adminRenter, { bookingId });
+    // Recording the return (and choosing its date, i.e. waiving a late fee) is the owner's or a neutral
+    // administrator's job, never the renter's, even if the renter is an administrator.
+    app.clock.set("2026-12-15T12:00:00Z");
+    await expect(
+      app.bookings.recordReturn(
+        adminRenter,
+        { bookingId, grade: "EXCELLENT", notes: "Returned on time.", returnedOn: "2026-12-12" },
+        photos(3),
+      ),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+});
+
 describe("refunds the provider rejects", () => {
   it("are marked FAILED, listed for an administrator, and sent again after a retry", async () => {
     const { app, renter, admin, bookingId } = await paidBooking();

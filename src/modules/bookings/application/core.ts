@@ -24,12 +24,16 @@ export class DatesUnavailableError extends PreconditionError {
   }
 }
 
-/** The actor's relationship to a booking. Admins act as ADMIN even on bookings they are part of. */
+/**
+ * The actor's relationship to a booking. A participant is always that participant, even when they are also
+ * an administrator: nobody may use administrator overrides (late-fee waivers, settlement splits) on a
+ * rental they are part of. This matches the role the booking page shows them (`detail`).
+ */
 export function roleOn(booking: BookingRecord, actor: Actor): BookingActorRole | null {
   if (actor.kind === "system") return "SYSTEM";
-  if (actor.isAdmin) return "ADMIN";
   if (actor.userId === booking.ownerId) return "OWNER";
   if (actor.userId === booking.renterId) return "RENTER";
+  if (actor.isAdmin) return "ADMIN";
   return null;
 }
 
