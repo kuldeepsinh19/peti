@@ -28,6 +28,10 @@ function loadScript(src: string): Promise<void> {
   });
 }
 
+const CONNECTION_ERROR = "That did not reach Peti. Check your connection and try again.";
+/** Stays under the smallest request limit we deploy behind (Vercel functions accept 4.5 MB). */
+const MAX_REPORT_UPLOAD_BYTES = 4 * 1024 * 1024;
+
 /** Starts checkout. The booking is confirmed only after the provider confirms the payment to the server. */
 export function PayButton({
   label,
@@ -41,25 +45,26 @@ export function PayButton({
   async function pay() {
     setPending(true);
     setError(null);
-    const result = await start();
-    if (!result.ok) {
-      setError(result.error.message);
-      setPending(false);
-      return;
-    }
-    const session = result.data;
-    if (session.mode === "REDIRECT") {
-      window.location.assign(session.url);
-      return;
-    }
     try {
+      const result = await start();
+      if (!result.ok) {
+        setError(result.error.message);
+        setPending(false);
+        return;
+      }
+      const session = result.data;
+      if (session.mode === "REDIRECT") {
+        window.location.assign(session.url); // stay pending while the browser leaves the page
+        return;
+      }
       await loadScript(session.scriptUrl);
       if (!window.Razorpay) throw new Error("The payment page did not load.");
       new window.Razorpay({ ...session.publicConfig }).open();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Payment could not start.");
+      setPending(false);
+    } catch {
+      setError(CONNECTION_ERROR);
+      setPending(false);
     }
-    setPending(false);
   }
   return (
     <div className="flex flex-col gap-2">
@@ -98,16 +103,30 @@ export function ConditionReportForm({
     }
     setPending(true);
     setError(null);
-    // Shrink phone photos first so several of them fit in one request.
-    data.delete("photos");
-    for (const file of await Promise.all(files.map((f) => downscaleImage(f)))) data.append("photos", file);
-    const result = await submit(data);
-    setPending(false);
-    if (!result.ok) {
-      setError(Object.values(result.error.fieldErrors ?? {})[0]?.[0] ?? result.error.message);
-      return;
+    try {
+      // Shrink phone photos first so several of them fit in one request.
+      const shrunk = await Promise.all(files.map((f) => downscaleImage(f)));
+      const total = shrunk.reduce((sum, f) => sum + f.size, 0);
+      if (total > MAX_REPORT_UPLOAD_BYTES) {
+        setError(
+          `These photographs add up to ${(total / 1024 / 1024).toFixed(1)} MB; the limit is ${MAX_REPORT_UPLOAD_BYTES / 1024 / 1024} MB. Use fewer or smaller photographs.`,
+        );
+        return;
+      }
+      data.delete("photos");
+      for (const file of shrunk) data.append("photos", file);
+      const result = await submit(data);
+      if (!result.ok) {
+        setError(Object.values(result.error.fieldErrors ?? {})[0]?.[0] ?? result.error.message);
+        return;
+      }
+      router.refresh();
+    } catch {
+      // A rejected Server Action (lost connection, request too large) must not leave the form spinning.
+      setError(CONNECTION_ERROR);
+    } finally {
+      setPending(false);
     }
-    router.refresh();
   }
   return (
     <form onSubmit={onSubmit} className="grid gap-6" encType="multipart/form-data">

@@ -11,6 +11,10 @@ import { downscaleImage } from "@/shared/ui/downscale-image";
 import { FormMessage } from "@/shared/ui/form";
 import type { ListingPhoto } from "../application/ports";
 
+const CONNECTION_ERROR = "That did not reach Peti. Check your connection and try again.";
+/** The policy limit, capped below the smallest request limit we deploy behind (Vercel accepts 4.5 MB). */
+const MAX_PHOTO_UPLOAD_BYTES = Math.min(marketplacePolicy.maxUploadBytes, 4 * 1024 * 1024);
+
 /**
  * Uploads photographs one at a time through a Server Action. The server checks the file's content,
  * strips metadata (including location) and re-encodes it; nothing here is trusted.
@@ -41,34 +45,42 @@ export function PhotoManager({
     }
     setBusy(true);
     setError(null);
-    const file = await downscaleImage(chosen);
-    if (file.size > marketplacePolicy.maxUploadBytes) {
+    try {
+      const file = await downscaleImage(chosen);
+      if (file.size > MAX_PHOTO_UPLOAD_BYTES) {
+        setError(`Photographs must be smaller than ${MAX_PHOTO_UPLOAD_BYTES / 1024 / 1024} MB.`);
+        return;
+      }
+      const data = new FormData();
+      data.set("outfitId", outfitId);
+      data.set("photo", file);
+      data.set("altText", alt);
+      const result = await upload(data);
+      if (!result.ok) {
+        setError(result.error.message);
+        return;
+      }
+      setAlt("");
+      if (input.current) input.current.value = "";
+      router.refresh();
+    } catch {
+      setError(CONNECTION_ERROR);
+    } finally {
       setBusy(false);
-      setError(`Photographs must be smaller than ${marketplacePolicy.maxUploadBytes / 1024 / 1024} MB.`);
-      return;
     }
-    const data = new FormData();
-    data.set("outfitId", outfitId);
-    data.set("photo", file);
-    data.set("altText", alt);
-    const result = await upload(data);
-    setBusy(false);
-    if (!result.ok) {
-      setError(result.error.message);
-      return;
-    }
-    setAlt("");
-    if (input.current) input.current.value = "";
-    router.refresh();
   }
 
   async function onRemove(photoId: string) {
     const data = new FormData();
     data.set("outfitId", outfitId);
     data.set("photoId", photoId);
-    const result = await remove(data);
-    if (!result.ok) setError(result.error.message);
-    router.refresh();
+    try {
+      const result = await remove(data);
+      if (!result.ok) setError(result.error.message);
+      router.refresh();
+    } catch {
+      setError(CONNECTION_ERROR);
+    }
   }
 
   return (

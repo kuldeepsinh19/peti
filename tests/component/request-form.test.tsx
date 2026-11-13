@@ -93,4 +93,15 @@ describe("RequestForm", () => {
     expect(await screen.findByText("Those dates have just been taken.")).toBeInTheDocument();
     expect(within(document.body).queryByText(/Choose a start date\./)).toBeNull();
   });
+
+  it("recovers when the request never reaches the server, instead of spinning forever", async () => {
+    const { user, action } = renderForm();
+    action.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    await user.click(day(11));
+    await user.click(screen.getByRole("checkbox"));
+    const send = screen.getByRole("button", { name: "Send request" });
+    await user.click(send);
+    expect(await screen.findByText(/did not reach Peti/)).toBeInTheDocument();
+    expect(send).toBeEnabled();
+  });
 });

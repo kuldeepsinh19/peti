@@ -78,13 +78,19 @@ export function RequestForm({
     }
     setPending(true);
     setError(null);
-    const result = await action({ outfitId, startDate: toIso(start), days, note, acceptTerms: accepted });
-    setPending(false);
-    if (!result.ok) {
-      setError(Object.values(result.error.fieldErrors ?? {})[0]?.[0] ?? result.error.message);
-      return;
+    try {
+      const result = await action({ outfitId, startDate: toIso(start), days, note, acceptTerms: accepted });
+      if (!result.ok) {
+        setError(Object.values(result.error.fieldErrors ?? {})[0]?.[0] ?? result.error.message);
+        setPending(false);
+        return;
+      }
+      // Stay pending while navigating, so a second click cannot send a second request.
+      router.push(result.data.redirectTo);
+    } catch {
+      setError("That did not reach Peti. Check your connection and try again.");
+      setPending(false);
     }
-    router.push(result.data.redirectTo);
   }
 
   return (
@@ -96,7 +102,7 @@ export function RequestForm({
             {prices.map((p) => (
               <label
                 key={p.durationDays}
-                className={`cursor-pointer border px-4 py-3 text-sm ${p.durationDays === days ? "border-burgundy bg-burgundy text-paper" : "border-ink"}`}
+                className={`cursor-pointer border px-4 py-3 text-sm has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink ${p.durationDays === days ? "border-burgundy bg-burgundy text-paper" : "border-ink"}`}
               >
                 <input
                   type="radio"
