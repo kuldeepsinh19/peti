@@ -4,14 +4,19 @@ import { requireActorOrRedirect } from "@/composition/session";
 import { MAX_ADDRESSES } from "@/modules/users";
 import { AddressForm } from "@/modules/users/ui/account-forms";
 import { SubmitButton } from "@/shared/ui/submit-button";
-import { EmptyState, Tag } from "@/shared/ui/feedback";
+import { EmptyState, Notice, Tag } from "@/shared/ui/feedback";
 import { PageHeader, SectionIndex } from "@/shared/ui/layout";
 import { addAddressAction, removeAddressAction, setDefaultAddressAction } from "../actions";
 
 export const metadata: Metadata = { title: "Addresses" };
 
-export default async function AddressesPage() {
+export default async function AddressesPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const actor = await requireActorOrRedirect("/account/addresses");
+  const params = await searchParams;
   const { users } = container();
   const [addresses, localities] = await Promise.all([users.listAddresses(actor), users.listLocalities()]);
 
@@ -22,6 +27,11 @@ export default async function AddressesPage() {
         title="Addresses"
         lede="Where owners hand over outfits. Only your locality appears on listings; the full address is shared with the other person once a booking is paid."
       />
+      {typeof params.error === "string" ? (
+        <Notice tone="danger" title="That did not work" className="mt-8">
+          {params.error}
+        </Notice>
+      ) : null}
       <section aria-label="Saved addresses" className="mt-10">
         {addresses.length === 0 ? (
           <EmptyState title="No addresses yet.">Add one below before you list your first outfit.</EmptyState>

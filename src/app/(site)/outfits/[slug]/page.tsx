@@ -48,6 +48,7 @@ export default async function OutfitPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { slug } = await params;
+  const { saveError } = await searchParams;
   const { actor, outfit } = await load(slug);
   const [savedIds, reviews] = await Promise.all([
     container().search.savedIds(actor),
@@ -61,6 +62,11 @@ export default async function OutfitPage({
 
   return (
     <Page className="pt-8 lg:pt-12">
+      {typeof saveError === "string" ? (
+        <Notice tone="danger" title="Could not update your saved outfits" className="mb-8">
+          {saveError}
+        </Notice>
+      ) : null}
       {outfit.status !== "ACTIVE" ? (
         <Notice tone="warning" title="Not visible to renters" className="mb-8">
           This listing is {outfit.status.toLowerCase().replace("_", " ")}. Only you and administrators can see

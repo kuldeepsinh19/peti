@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { container } from "@/composition/container";
 import type { ActionResult } from "@/shared/contracts/action-result";
 import { formDataToObject } from "@/shared/contracts/validation";
@@ -24,16 +25,26 @@ export async function addAddressAction(input: unknown): Promise<ActionResult<{ i
   return result;
 }
 
-export async function removeAddressAction(formData: FormData): Promise<void> {
-  await runAction("removeAddress", (actor) =>
-    container().users.removeAddress(actor, formDataToObject(formData)),
-  );
+/** Address buttons are plain forms: report a failure on the page instead of silently doing nothing. */
+function backToAddresses(result: ActionResult<unknown>): never {
   revalidatePath("/account/addresses");
+  redirect(
+    result.ok ? "/account/addresses" : `/account/addresses?error=${encodeURIComponent(result.error.message)}`,
+  );
+}
+
+export async function removeAddressAction(formData: FormData): Promise<void> {
+  backToAddresses(
+    await runAction("removeAddress", (actor) =>
+      container().users.removeAddress(actor, formDataToObject(formData)),
+    ),
+  );
 }
 
 export async function setDefaultAddressAction(formData: FormData): Promise<void> {
-  await runAction("setDefaultAddress", (actor) =>
-    container().users.setDefaultAddress(actor, formDataToObject(formData)),
+  backToAddresses(
+    await runAction("setDefaultAddress", (actor) =>
+      container().users.setDefaultAddress(actor, formDataToObject(formData)),
+    ),
   );
-  revalidatePath("/account/addresses");
 }
