@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Actor } from "@/shared/application/actor";
 import type { AuditLog } from "@/shared/application/audit";
 import { requireAdmin } from "@/shared/application/authorization";
-import { NotFoundError, PreconditionError } from "@/shared/domain/errors";
+import { NotFoundError, PreconditionError, ValidationError } from "@/shared/domain/errors";
 import { parseInput } from "@/shared/contracts/validation";
 
 const BOOKING_STATUSES = [
@@ -124,6 +124,7 @@ export interface AdminRepository {
   markPayoutPaid(payoutId: string, reference: string, paidBy: string, at: Date): Promise<boolean>;
   audit(limit: number): Promise<AuditRow[]>;
   categories(): Promise<CategoryRow[]>;
+  categorySlugExists(slug: string): Promise<boolean>;
   createCategory(input: {
     slug: string;
     name: string;
@@ -288,6 +289,11 @@ export function adminUseCases({
     async createCategory(actor: Actor, input: unknown) {
       const me = requireAdmin(actor);
       const data = parseInput(categorySchema, input);
+      if (await admin.categorySlugExists(data.slug)) {
+        throw new ValidationError("That web address is already used by another category.", {
+          slug: ["Already used by another category."],
+        });
+      }
       const id = await admin.createCategory(data);
       await audit.record({
         actorUserId: me.userId,

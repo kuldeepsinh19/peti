@@ -204,6 +204,23 @@ describe("listings", () => {
   });
 });
 
+describe("category slugs", () => {
+  it("a duplicate slug is a field error, not an internal error", async () => {
+    const adminCases = adminUseCases({
+      admin: prismaAdminRepository(db),
+      audit: prismaAuditLog(db),
+      clock: buildBookingApp().clock,
+    });
+    const admin = actorFor(await createUser({ name: "Admin", role: "admin" }));
+    const category = { name: "Indo-western", slug: "indo-western", audience: "MEN", description: "" };
+    await adminCases.createCategory(admin, category);
+    await expect(adminCases.createCategory(admin, category)).rejects.toMatchObject({
+      code: "VALIDATION_FAILED",
+      fieldErrors: { slug: ["Already used by another category."] },
+    });
+  });
+});
+
 describe("administrators who are part of a rental", () => {
   it("act as that participant, without administrator overrides", async () => {
     const app = buildBookingApp();

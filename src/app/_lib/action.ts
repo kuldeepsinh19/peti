@@ -7,6 +7,7 @@ import type { UserActor } from "@/shared/application/actor";
 import type { RateLimitRule } from "@/shared/application/rate-limiter";
 import { UnauthenticatedError } from "@/shared/domain/errors";
 import { logger } from "@/shared/infrastructure/logger";
+import { mapDatabaseError } from "@/shared/infrastructure/pg-error";
 
 /**
  * Wraps a Server Action body: resolves the signed-in actor, runs one use case, and converts errors into a
@@ -26,7 +27,9 @@ export async function runAction<T>(
     if (limit) await container().rateLimiter.consume(limit, actor.userId);
     return { ok: true, data: await body(actor) };
   } catch (error) {
-    const expected = toActionError(error);
+    // Use cases outside the unit of work call the database directly; map constraint violations and
+    // deadlocks to their domain errors here too, so users get a real message rather than INTERNAL_ERROR.
+    const expected = toActionError(mapDatabaseError(error));
     if (expected) return { ok: false, error: expected };
     const reference = randomUUID().slice(0, 8);
     logger.error(`action ${name} failed`, error, { reference });

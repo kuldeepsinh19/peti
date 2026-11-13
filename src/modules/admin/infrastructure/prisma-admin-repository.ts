@@ -253,6 +253,8 @@ export function prismaAdminRepository(db: Db): AdminRepository {
       }));
     },
 
+    categorySlugExists: async (slug) => (await db.outfitCategory.count({ where: { slug } })) > 0,
+
     async createCategory(input) {
       const last = await db.outfitCategory.aggregate({ _max: { sortOrder: true } });
       const row = await db.outfitCategory.create({
