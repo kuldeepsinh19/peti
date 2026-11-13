@@ -72,7 +72,8 @@ export const openDisputeSchema = z.object({
   description: z.string().trim().min(20, "Describe what happened in at least 20 characters.").max(3000),
   claimedRupees: z.preprocess(
     (v) => (v === "" || v === undefined ? undefined : v),
-    z.coerce.number().int().min(1).optional(),
+    // Upper bound keeps the paise value inside a 32-bit integer column (₹1 crore is far above any deposit).
+    z.coerce.number().int().min(1).max(10_000_000).optional(),
   ),
 });
 

@@ -8,7 +8,7 @@ import { prismaAdminRepository } from "@/modules/admin/infrastructure/prisma-adm
 import { paymentsUseCases } from "@/modules/payments";
 import { prismaPaymentRepository } from "@/modules/payments/infrastructure/prisma-payment-repository";
 import { prismaAuditLog } from "@/shared/infrastructure/audit";
-import { buildBookingApp, scenario } from "../support/booking-app";
+import { buildBookingApp, photos, scenario } from "../support/booking-app";
 import { db, resetDatabase } from "../support/db";
 
 beforeEach(async () => {
@@ -28,6 +28,56 @@ async function paidBooking(startDate = "2026-12-10") {
   await app.payThroughSandbox(s.renter, bookingId);
   return { app, ...s, bookingId };
 }
+
+async function returnedBooking() {
+  const booked = await paidBooking("2026-12-10"); // 10–12 Dec
+  const { app, owner, renter, bookingId } = booked;
+  app.clock.set("2026-12-10T05:00:00Z");
+  await app.bookings.submitHandoverReport(
+    owner,
+    { bookingId, grade: "EXCELLENT", notes: "Perfect." },
+    photos(3),
+  );
+  await app.bookings.acknowledgeHandover(renter, { bookingId });
+  app.clock.set("2026-12-13T12:00:00Z");
+  await app.bookings.recordReturn(owner, { bookingId, grade: "GOOD", notes: "A day late." }, photos(3));
+  return booked;
+}
+
+describe("claim amounts", () => {
+  it("are only accepted on damage or missing-item disputes, and within a sane range", async () => {
+    const { app, owner, renter, bookingId } = await returnedBooking();
+    await expect(
+      app.bookings.openDispute(renter, {
+        bookingId,
+        kind: "LATE_FEE_CONTESTED",
+        description: "I returned it on time; the owner was not home to receive it.",
+        claimedRupees: "500",
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+    await expect(
+      app.bookings.openDispute(owner, {
+        bookingId,
+        kind: "DAMAGE",
+        description: "The hem is torn along twenty centimetres.",
+        claimedRupees: "99999999999",
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+  });
+
+  it("only an owner's claim can be settled by the other side accepting it", async () => {
+    const { app, owner, renter, bookingId } = await returnedBooking();
+    // The renter contests the late fee: not a claim on the deposit, so the owner cannot "accept" it.
+    await app.bookings.openDispute(renter, {
+      bookingId,
+      kind: "LATE_FEE_CONTESTED",
+      description: "I returned it on time; the owner was not home to receive it.",
+    });
+    await expect(app.bookings.acceptClaim(owner, { bookingId })).rejects.toMatchObject({
+      code: "NEEDS_ADMIN",
+    });
+  });
+});
 
 describe("refunds the provider rejects", () => {
   it("are marked FAILED, listed for an administrator, and sent again after a retry", async () => {

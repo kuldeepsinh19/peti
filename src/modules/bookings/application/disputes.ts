@@ -60,7 +60,13 @@ function assertCanOpen(
   if (booking.status === "RETURNED" && booking.inspectionDeadline && now > booking.inspectionDeadline) {
     throw new PreconditionError("WINDOW_CLOSED", "The inspection window has closed.");
   }
-  if (kind === "DAMAGE" || kind === "MISSING_ITEMS") {
+  const carriesClaim = kind === "DAMAGE" || kind === "MISSING_ITEMS";
+  if (!carriesClaim && claimedPaise) {
+    throw new ValidationError("Only damage or missing-item claims carry an amount.", {
+      claimedRupees: ["Leave this empty for this kind of problem."],
+    });
+  }
+  if (carriesClaim) {
     const maxClaim = booking.depositPaise - (booking.lateFeePaise ?? 0);
     if (!claimedPaise)
       throw new ValidationError("Enter the amount you are claiming.", { claimedRupees: ["Required."] });
@@ -162,11 +168,15 @@ export async function acceptClaim(deps: BookingsDeps, actor: Actor, input: unkno
     if (!dispute) throw new NotFoundError("Open dispute");
     if (dispute.openedByRole === role)
       throw new PreconditionError("NOT_RESPONDENT", "Only the other person can accept a claim.");
-    // Only a claim one participant made against the other can be settled by the other's acceptance. A claim
-    // opened by an administrator or the system has no single respondent (the owner could otherwise accept a
-    // damage claim in their own favour), so it is decided by an administrator.
-    const openedByParticipant = dispute.openedByRole === "RENTER" || dispute.openedByRole === "OWNER";
-    if (!openedByParticipant || dispute.openedFromStatus !== "RETURNED" || !dispute.claimedAmountPaise) {
+    // Only an owner's claim on the deposit can be settled by the renter accepting it: the amount is taken from
+    // the renter's deposit. A claim opened by an administrator or the system has no single respondent (the
+    // owner could otherwise accept a damage claim in their own favour), and a renter's dispute (a contested
+    // late fee) is not a claim on the deposit, so both are decided by an administrator.
+    if (
+      dispute.openedByRole !== "OWNER" ||
+      dispute.openedFromStatus !== "RETURNED" ||
+      !dispute.claimedAmountPaise
+    ) {
       throw new PreconditionError("NEEDS_ADMIN", "This dispute has to be decided by an administrator.");
     }
     await settleDispute(store, booking, {

@@ -100,11 +100,6 @@ export function BookingView({
   const counterpart = role === "RENTER" ? b.owner : b.renter;
   const cmd = { command, bookingId: b.id, returnTo };
   const disputeOpen = b.dispute?.status === "OPEN";
-  const isRespondent =
-    disputeOpen &&
-    b.dispute!.openedById !== null &&
-    b.dispute!.openedById !== (role === "OWNER" ? b.owner.id : b.renter.id) &&
-    role !== "ADMIN";
   const isOpener = disputeOpen && b.dispute!.openedById === (role === "OWNER" ? b.owner.id : b.renter.id);
 
   return (
@@ -569,7 +564,10 @@ export function BookingView({
                   aria-label="Message"
                 />
               </CommandForm>
-              {isRespondent && b.dispute.claimedAmountPaise && b.dispute.openedFromStatus === "RETURNED" ? (
+              {role === "RENTER" &&
+              b.dispute.openedByRole === "OWNER" &&
+              b.dispute.claimedAmountPaise &&
+              b.dispute.openedFromStatus === "RETURNED" ? (
                 <CommandForm
                   {...cmd}
                   name="acceptClaim"
