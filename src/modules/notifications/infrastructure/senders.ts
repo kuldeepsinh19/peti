@@ -31,7 +31,14 @@ export function outboxSmsSender(db: Db): SmsSender {
 }
 
 export function smtpMailSender(smtpUrl: string, from: string): MailSender {
-  const transport = nodemailer.createTransport(smtpUrl);
+  // nodemailer's defaults (2 minutes to connect, 10 minutes of socket inactivity) are far longer than the
+  // outbox transaction; a hung server must fail quickly so the attempt is recorded and retried later.
+  const transport = nodemailer.createTransport({
+    url: smtpUrl,
+    connectionTimeout: 15_000,
+    greetingTimeout: 15_000,
+    socketTimeout: 20_000,
+  });
   return {
     async send(message: EmailMessage) {
       await transport.sendMail({

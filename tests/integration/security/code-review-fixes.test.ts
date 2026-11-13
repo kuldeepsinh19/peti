@@ -5,13 +5,15 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { adminUseCases } from "@/modules/admin";
 import { prismaAdminRepository } from "@/modules/admin/infrastructure/prisma-admin-repository";
+import { dispatchPendingEmails } from "@/modules/notifications";
+import { prismaNotificationOutbox } from "@/modules/notifications/infrastructure/notification-outbox";
 import { paymentsUseCases } from "@/modules/payments";
 import { prismaPaymentRepository } from "@/modules/payments/infrastructure/prisma-payment-repository";
 import { reviewsUseCases } from "@/modules/reviews";
 import { prismaReviewRepository } from "@/modules/reviews/infrastructure/prisma-review-repository";
 import { prismaAuditLog } from "@/shared/infrastructure/audit";
 import { buildBookingApp, photos, scenario } from "../support/booking-app";
-import { db, resetDatabase } from "../support/db";
+import { createUser, db, resetDatabase } from "../support/db";
 
 beforeEach(async () => {
   await resetDatabase();
@@ -124,6 +126,36 @@ describe("reviews under concurrency", () => {
     const counts = await Promise.all([reviews.publishExpired(), reviews.publishExpired()]);
     expect(counts.reduce((a, b) => a + b, 0)).toBe(1);
     expect(await ratings(owner.userId)).toMatchObject({ ownerRatingCount: 1, ownerRatingSum: 3 });
+  });
+});
+
+describe("email outbox", () => {
+  it("tries a failing email once per run and keeps the others moving", async () => {
+    const user = await createUser();
+    await db.notification.createMany({
+      data: ["bounces", "fine"].map((subject) => ({
+        userId: user.id,
+        channel: "EMAIL" as const,
+        type: "test",
+        subject,
+        body: "Body",
+        dedupeKey: `test:${user.id}:${subject}`,
+      })),
+    });
+    const sent: string[] = [];
+    const mail = {
+      async send(m: { subject: string }) {
+        if (m.subject === "bounces") throw new Error("SMTP 451 try again later");
+        sent.push(m.subject);
+      },
+    };
+    const result = await dispatchPendingEmails(prismaNotificationOutbox(db), mail, "http://localhost");
+    expect(result).toEqual({ claimed: 2, sent: 1 });
+    expect(sent).toEqual(["fine"]);
+    expect(await db.notification.findFirstOrThrow({ where: { subject: "bounces" } })).toMatchObject({
+      status: "PENDING",
+      attempts: 1,
+    });
   });
 });
 
