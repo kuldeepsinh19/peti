@@ -247,7 +247,9 @@ export function prismaBookingStore(tx: Tx, notifications: NotificationWriter): B
         SELECT id FROM bookings
         WHERE outfit_id = ${outfitId}::uuid AND status = 'PENDING_APPROVAL'
           AND id <> ${exceptBookingId ?? "00000000-0000-0000-0000-000000000000"}::uuid
-          AND daterange(start_date, end_date + 1 + buffer_days, '[)') && daterange(${startsOn}::date, ${endsBefore}::date, '[)')`;
+          AND daterange(start_date, end_date + 1 + buffer_days, '[)') && daterange(${startsOn}::date, ${endsBefore}::date, '[)')
+        ORDER BY id`;
+      // Callers lock these in this order, so two confirmations can never deadlock on them.
       return rows.map((r) => r.id);
     },
 

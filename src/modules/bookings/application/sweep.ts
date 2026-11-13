@@ -37,8 +37,8 @@ export async function runBookingSweep(deps: BookingsDeps, candidates: SweepCandi
   };
   const attempt = async (
     key: keyof Omit<SweepReport, "errors" | "failures">,
+    bookingId: string,
     work: () => Promise<boolean>,
-    bookingId = "",
   ) => {
     try {
       if (await work()) report[key]++;
@@ -53,7 +53,7 @@ export async function runBookingSweep(deps: BookingsDeps, candidates: SweepCandi
   };
 
   for (const id of await candidates.expiredApprovals(now)) {
-    await attempt("expiredApprovals", () =>
+    await attempt("expiredApprovals", id, () =>
       deps.uow.run(async (store) => {
         const b = await loadBooking(store, id);
         if (b.status !== "PENDING_APPROVAL" || !b.expiresAt || b.expiresAt > now) return false;
@@ -67,7 +67,7 @@ export async function runBookingSweep(deps: BookingsDeps, candidates: SweepCandi
   }
 
   for (const id of await candidates.expiredPayments(now)) {
-    await attempt("expiredPayments", async () => {
+    await attempt("expiredPayments", id, async () => {
       // A payment may have succeeded at the provider without either signal reaching us yet.
       await deps.paymentReconciler?.reconcile(id);
       return deps.uow.run(async (store) => {
@@ -84,7 +84,7 @@ export async function runBookingSweep(deps: BookingsDeps, candidates: SweepCandi
   }
 
   for (const id of await candidates.inspectionsDue(now)) {
-    await attempt("autoCompleted", () =>
+    await attempt("autoCompleted", id, () =>
       deps.uow.run(async (store) => {
         const b = await loadBooking(store, id);
         if (b.status !== "RETURNED" || !b.inspectionDeadline || b.inspectionDeadline > now) return false;
@@ -111,7 +111,7 @@ export async function runBookingSweep(deps: BookingsDeps, candidates: SweepCandi
   // Candidates are rentals past their end date; each booking's own policy snapshot decides the grace period.
   const today = localDateInIndia(now);
   for (const id of await candidates.overdueRentals(today)) {
-    await attempt("autoDisputed", () =>
+    await attempt("autoDisputed", id, () =>
       deps.uow.run(async (store) => {
         const b = await loadBooking(store, id);
         if (b.status !== "ACTIVE") return false;
@@ -138,31 +138,28 @@ export async function runBookingSweep(deps: BookingsDeps, candidates: SweepCandi
   // A paid booking whose rental period ended without an acknowledged handover is escalated to an
   // administrator instead of sitting in CONFIRMED forever with the deposit held.
   for (const id of await candidates.stuckHandovers(today)) {
-    await attempt(
-      "autoDisputed",
-      () =>
-        deps.uow.run(async (store) => {
-          const b = await loadBooking(store, id);
-          if (b.status !== "CONFIRMED" || today <= b.endDate) return false;
-          if (await store.hasOpenDispute(b.id)) return false;
-          const disputeId = await store.insertDispute({
-            bookingId: b.id,
-            openedById: null,
-            openedByRole: "SYSTEM",
-            openedFromStatus: "CONFIRMED",
-            kind: "HANDOVER_FAILED",
-            description:
-              "Opened automatically: the rental period ended without the handover being acknowledged.",
-            claimedAmountPaise: null,
-          });
-          await applyTransition(store, b, "openDispute", "SYSTEM", {
-            actorUserId: null,
-            reason: "HANDOVER_FAILED",
-            metadata: { disputeId },
-          });
-          return true;
-        }),
-      id,
+    await attempt("autoDisputed", id, () =>
+      deps.uow.run(async (store) => {
+        const b = await loadBooking(store, id);
+        if (b.status !== "CONFIRMED" || today <= b.endDate) return false;
+        if (await store.hasOpenDispute(b.id)) return false;
+        const disputeId = await store.insertDispute({
+          bookingId: b.id,
+          openedById: null,
+          openedByRole: "SYSTEM",
+          openedFromStatus: "CONFIRMED",
+          kind: "HANDOVER_FAILED",
+          description:
+            "Opened automatically: the rental period ended without the handover being acknowledged.",
+          claimedAmountPaise: null,
+        });
+        await applyTransition(store, b, "openDispute", "SYSTEM", {
+          actorUserId: null,
+          reason: "HANDOVER_FAILED",
+          metadata: { disputeId },
+        });
+        return true;
+      }),
     );
   }
   return report;
