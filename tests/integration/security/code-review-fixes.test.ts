@@ -7,6 +7,8 @@ import { adminUseCases } from "@/modules/admin";
 import { prismaAdminRepository } from "@/modules/admin/infrastructure/prisma-admin-repository";
 import { paymentsUseCases } from "@/modules/payments";
 import { prismaPaymentRepository } from "@/modules/payments/infrastructure/prisma-payment-repository";
+import { reviewsUseCases } from "@/modules/reviews";
+import { prismaReviewRepository } from "@/modules/reviews/infrastructure/prisma-review-repository";
 import { prismaAuditLog } from "@/shared/infrastructure/audit";
 import { buildBookingApp, photos, scenario } from "../support/booking-app";
 import { db, resetDatabase } from "../support/db";
@@ -76,6 +78,52 @@ describe("claim amounts", () => {
     await expect(app.bookings.acceptClaim(owner, { bookingId })).rejects.toMatchObject({
       code: "NEEDS_ADMIN",
     });
+  });
+});
+
+describe("reviews under concurrency", () => {
+  async function completedRental() {
+    const booked = await returnedBooking();
+    await booked.app.bookings.confirmReturn(booked.owner, { bookingId: booked.bookingId });
+    const reviews = reviewsUseCases({ reviews: prismaReviewRepository(db), clock: booked.app.clock });
+    return { ...booked, reviews };
+  }
+  const ratings = async (userId: string) =>
+    db.userProfile.findUniqueOrThrow({
+      where: { userId },
+      select: { ownerRatingCount: true, ownerRatingSum: true, renterRatingCount: true },
+    });
+
+  it("publish both reviews when both people submit at the same moment", async () => {
+    const { reviews, owner, renter, bookingId } = await completedRental();
+    await Promise.all([
+      reviews.submit(renter, { bookingId, rating: 5, comment: "Beautiful and spotless." }),
+      reviews.submit(owner, { bookingId, rating: 4 }),
+    ]);
+    expect(await db.review.count({ where: { bookingId, visibleAt: null } })).toBe(0);
+    expect(await ratings(owner.userId)).toMatchObject({ ownerRatingCount: 1, ownerRatingSum: 5 });
+    expect(await ratings(renter.userId)).toMatchObject({ renterRatingCount: 1 });
+  });
+
+  it("turn a double submission into ALREADY_REVIEWED, not an internal error", async () => {
+    const { reviews, renter, bookingId } = await completedRental();
+    const results = await Promise.allSettled([
+      reviews.submit(renter, { bookingId, rating: 5 }),
+      reviews.submit(renter, { bookingId, rating: 5 }),
+    ]);
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    expect(results.find((r) => r.status === "rejected")).toMatchObject({
+      reason: { code: "ALREADY_REVIEWED" },
+    });
+  });
+
+  it("count a lone review once even when two sweeps publish it at the same moment", async () => {
+    const { app, reviews, owner, renter, bookingId } = await completedRental();
+    await reviews.submit(renter, { bookingId, rating: 3 });
+    app.clock.set("2027-01-10T06:30:00Z"); // well past the 14-day window
+    const counts = await Promise.all([reviews.publishExpired(), reviews.publishExpired()]);
+    expect(counts.reduce((a, b) => a + b, 0)).toBe(1);
+    expect(await ratings(owner.userId)).toMatchObject({ ownerRatingCount: 1, ownerRatingSum: 3 });
   });
 });
 

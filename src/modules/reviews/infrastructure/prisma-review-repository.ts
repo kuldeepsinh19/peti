@@ -1,4 +1,5 @@
 import "server-only";
+import { PreconditionError } from "@/shared/domain/errors";
 import type { Db, Tx } from "@/shared/infrastructure/prisma";
 import type { ReviewRepository, ReviewView } from "../application/reviews";
 
@@ -15,6 +16,24 @@ async function addToAggregates(tx: Tx, review: { subjectId: string; direction: s
         ? { ownerRatingSum: { increment: review.rating }, ownerRatingCount: { increment: 1 } }
         : { renterRatingSum: { increment: review.rating }, renterRatingCount: { increment: 1 } },
   });
+}
+
+const lockBooking = (tx: Tx, bookingId: string) =>
+  tx.$queryRaw`SELECT id FROM bookings WHERE id = ${bookingId}::uuid FOR NO KEY UPDATE`;
+
+/**
+ * Publishes a booking's hidden reviews and adds exactly the reviews this statement published to the
+ * ratings, so a review can never be counted twice (another sweep, or the second submission, finds nothing).
+ */
+async function publishBooking(tx: Tx, bookingId: string, at: Date): Promise<number> {
+  const published = await tx.$queryRaw<Array<{ subject_id: string; direction: string; rating: number }>>`
+    UPDATE reviews SET visible_at = ${at}
+    WHERE booking_id = ${bookingId}::uuid AND visible_at IS NULL
+    RETURNING subject_id, direction::text AS direction, rating`;
+  for (const p of published) {
+    await addToAggregates(tx, { subjectId: p.subject_id, direction: p.direction, rating: p.rating });
+  }
+  return published.length;
 }
 
 export function prismaReviewRepository(db: Db): ReviewRepository {
@@ -69,6 +88,12 @@ export function prismaReviewRepository(db: Db): ReviewRepository {
 
     async insertAndMaybePublish(r) {
       return db.$transaction(async (tx) => {
+        // Serialise everything that touches this booking's reviews: two people submitting at the same moment
+        // must see each other's review, and a double submit must not reach the unique index.
+        await lockBooking(tx, r.bookingId);
+        if ((await tx.review.count({ where: { bookingId: r.bookingId, authorId: r.authorId } })) > 0) {
+          throw new PreconditionError("ALREADY_REVIEWED", "You have already reviewed this rental.");
+        }
         await tx.review.create({
           data: {
             bookingId: r.bookingId,
@@ -80,28 +105,25 @@ export function prismaReviewRepository(db: Db): ReviewRepository {
             comment: r.comment,
           },
         });
-        const both = await tx.review.findMany({ where: { bookingId: r.bookingId, visibleAt: null } });
-        if (both.length < 2) return { published: false };
-        await tx.review.updateMany({
-          where: { bookingId: r.bookingId, visibleAt: null },
-          data: { visibleAt: r.at },
-        });
-        for (const review of both) await addToAggregates(tx, review);
+        const waiting = await tx.review.count({ where: { bookingId: r.bookingId, visibleAt: null } });
+        if (waiting < 2) return { published: false };
+        await publishBooking(tx, r.bookingId, r.at);
         return { published: true };
       });
     },
 
     async publishExpired(before) {
-      return db.$transaction(async (tx) => {
-        const due = await tx.review.findMany({
-          where: { visibleAt: null, booking: { completedAt: { lt: before } } },
+      const due = await db.$queryRaw<Array<{ booking_id: string }>>`
+        SELECT DISTINCT r.booking_id FROM reviews r JOIN bookings b ON b.id = r.booking_id
+        WHERE r.visible_at IS NULL AND b.completed_at < ${before}`;
+      let published = 0;
+      for (const { booking_id } of due) {
+        published += await db.$transaction(async (tx) => {
+          await lockBooking(tx, booking_id);
+          return publishBooking(tx, booking_id, new Date());
         });
-        for (const review of due) {
-          await tx.review.update({ where: { id: review.id }, data: { visibleAt: new Date() } });
-          await addToAggregates(tx, review);
-        }
-        return due.length;
-      });
+      }
+      return published;
     },
 
     async awaitingFrom(userId, since) {
