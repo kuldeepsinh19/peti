@@ -7,13 +7,14 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { signInSchema, signUpSchema } from "@/modules/users";
+import { isSameSitePath } from "@/shared/contracts/safe-path";
 import { Button } from "@/shared/ui/button";
 import { CheckboxField, FormMessage, TextField } from "@/shared/ui/form";
 import { authClient } from "./auth-client";
 
 /** Only allow same-site relative redirects after sign-in (no open redirects). */
 export function safeNext(next: string | null | undefined, fallback = "/account"): string {
-  return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : fallback;
+  return isSameSitePath(next) ? next : fallback;
 }
 
 type SignUpValues = z.input<typeof signUpSchema>;
