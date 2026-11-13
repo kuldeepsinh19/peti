@@ -66,9 +66,13 @@ export function prismaListingRepository(db: Db): ListingRepository {
       return outfit;
     },
 
-    async update(outfitId, data, status) {
-      await db.$transaction(async (tx) => {
-        await tx.outfit.update({ where: { id: outfitId }, data: { ...outfitColumns(data), status } });
+    async update(outfitId, data, from, status) {
+      return db.$transaction(async (tx) => {
+        const swapped = await tx.outfit.updateMany({
+          where: { id: outfitId, status: from },
+          data: { ...outfitColumns(data), status },
+        });
+        if (swapped.count !== 1) return false;
         await tx.outfitMeasurement.upsert({
           where: { outfitId },
           create: { outfitId, ...measurementColumns(data) },
@@ -88,6 +92,7 @@ export function prismaListingRepository(db: Db): ListingRepository {
             update: { pricePaise: p.pricePaise, isActive: true },
           });
         }
+        return true;
       });
     },
 

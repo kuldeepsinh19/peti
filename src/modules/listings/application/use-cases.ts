@@ -123,6 +123,12 @@ export function listingsUseCases(deps: ListingsDeps) {
       });
     }
     const next = nextOutfitStatus(outfit.status, command, "admin");
+    if (command === "approve" && outfit.photoCount === 0) {
+      throw new PreconditionError(
+        "LISTING_NEEDS_PHOTOS",
+        "A listing needs a photograph before it can go live.",
+      );
+    }
     await setStatusOrConflict(outfitId, outfit.status, next, {
       moderationNote: note ?? null,
       ...(command === "approve" ? { publishedAt: clock.now() } : {}),
@@ -161,7 +167,9 @@ export function listingsUseCases(deps: ListingsDeps) {
       const status = editNeedsReview(outfit.status, contentChanged)
         ? nextOutfitStatus(outfit.status, "contentEdited", "system")
         : outfit.status;
-      await listings.update(outfitId, data, status);
+      // Compare-and-swap on the status we read: an edit must never undo a suspension (or any other status
+      // change) that happened while the owner was saving.
+      if (!(await listings.update(outfitId, data, outfit.status, status))) throw new ConcurrencyError();
       return { status, sentForReview: status !== outfit.status };
     },
 
@@ -198,10 +206,14 @@ export function listingsUseCases(deps: ListingsDeps) {
       const outfit = await owned(actor, outfitId);
       if (!isEditable(outfit.status))
         throw new PreconditionError("LISTING_FROZEN", "This listing cannot be edited.");
-      if ((outfit.status === "ACTIVE" || outfit.status === "PAUSED") && outfit.photoCount <= 1) {
+      // A listing that is live, paused or waiting for review must keep a photograph (otherwise it could be
+      // approved with none).
+      const needsPhoto =
+        outfit.status === "ACTIVE" || outfit.status === "PAUSED" || outfit.status === "PENDING_REVIEW";
+      if (needsPhoto && outfit.photoCount <= 1) {
         throw new PreconditionError(
           "LISTING_NEEDS_PHOTOS",
-          "A published listing needs at least one photograph.",
+          "A listing that is live or in review needs at least one photograph.",
         );
       }
       const removed = await listings.removePhoto(outfitId, photoId);

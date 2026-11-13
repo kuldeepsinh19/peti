@@ -83,7 +83,8 @@ export interface ModerationRow {
 /** Listing writes. Every method that takes an ownerId only touches that owner's outfits. */
 export interface ListingRepository {
   create(ownerId: string, slug: string, data: ListingData): Promise<{ id: string; slug: string }>;
-  update(outfitId: string, data: ListingData, status: OutfitStatus): Promise<void>;
+  /** Saves edits and the new status, only if the status is still `from`; false (nothing written) otherwise. */
+  update(outfitId: string, data: ListingData, from: OutfitStatus, status: OutfitStatus): Promise<boolean>;
   findOwned(outfitId: string): Promise<OwnedOutfit | null>;
   getForEdit(outfitId: string): Promise<ListingEditView | null>;
   listForOwner(ownerId: string): Promise<OwnerListingRow[]>;

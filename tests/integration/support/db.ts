@@ -102,6 +102,8 @@ export interface OutfitFixture {
   depositPaise?: number;
   turnaroundDays?: number;
   prices?: Array<{ durationDays: number; pricePaise: number }>;
+  /** Number of photograph rows to attach (none by default). */
+  photos?: number;
 }
 
 export async function createOutfit(fixture: OutfitFixture = {}) {
@@ -131,8 +133,17 @@ export async function createOutfit(fixture: OutfitFixture = {}) {
       status: fixture.status ?? "ACTIVE",
       publishedAt: new Date(),
       priceOptions: { create: prices },
+      images: {
+        create: Array.from({ length: fixture.photos ?? 0 }, (_, i) => ({
+          storageKey: `outfits/outfit-${id}/${i}.jpg`,
+          altText: "Front view",
+          width: 900,
+          height: 1200,
+          sortOrder: i,
+        })),
+      },
     },
-    include: { priceOptions: true },
+    include: { priceOptions: true, images: true },
   });
 }
 

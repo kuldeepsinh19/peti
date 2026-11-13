@@ -7,13 +7,15 @@ import { adminUseCases } from "@/modules/admin";
 import { prismaAdminRepository } from "@/modules/admin/infrastructure/prisma-admin-repository";
 import { dispatchPendingEmails } from "@/modules/notifications";
 import { prismaNotificationOutbox } from "@/modules/notifications/infrastructure/notification-outbox";
+import { prismaListingRepository } from "@/modules/listings/infrastructure/prisma-listing-repository";
 import { paymentsUseCases } from "@/modules/payments";
 import { prismaPaymentRepository } from "@/modules/payments/infrastructure/prisma-payment-repository";
 import { reviewsUseCases } from "@/modules/reviews";
 import { prismaReviewRepository } from "@/modules/reviews/infrastructure/prisma-review-repository";
 import { prismaAuditLog } from "@/shared/infrastructure/audit";
 import { buildBookingApp, photos, scenario } from "../support/booking-app";
-import { createUser, db, resetDatabase } from "../support/db";
+import { actorFor, buildApp } from "../support/app";
+import { createOutfit, createUser, db, resetDatabase } from "../support/db";
 
 beforeEach(async () => {
   await resetDatabase();
@@ -155,6 +157,49 @@ describe("email outbox", () => {
     expect(await db.notification.findFirstOrThrow({ where: { subject: "bounces" } })).toMatchObject({
       status: "PENDING",
       attempts: 1,
+    });
+  });
+});
+
+describe("listings", () => {
+  it("cannot be approved without a photograph", async () => {
+    const { listings } = buildApp();
+    const admin = actorFor(await createUser({ name: "Admin", role: "admin" }));
+    const outfit = await createOutfit({ status: "PENDING_REVIEW" });
+    await expect(listings.approve(admin, { outfitId: outfit.id })).rejects.toMatchObject({
+      code: "LISTING_NEEDS_PHOTOS",
+    });
+  });
+
+  it("keep their last photograph while waiting for review", async () => {
+    const { listings } = buildApp();
+    const ownerUser = await createUser({ name: "Owner" });
+    const outfit = await createOutfit({ ownerId: ownerUser.id, status: "PENDING_REVIEW", photos: 1 });
+    await expect(
+      listings.removePhoto(actorFor(ownerUser), { outfitId: outfit.id, photoId: outfit.images[0]!.id }),
+    ).rejects.toMatchObject({ code: "LISTING_NEEDS_PHOTOS" });
+  });
+
+  it("an edit saved after a suspension cannot undo it", async () => {
+    const outfit = await createOutfit({ status: "ACTIVE", photos: 1 });
+    const repo = prismaListingRepository(db);
+    const address = await db.address.create({
+      data: {
+        userId: outfit.ownerId,
+        line1: "12 Test Society",
+        localityId: outfit.localityId,
+        pincode: "380015",
+      },
+    });
+    const edit = { ...(await repo.getForEdit(outfit.id))!, pickupAddressId: address.id };
+    // The owner read ACTIVE; an administrator suspends before the save lands.
+    await db.outfit.update({ where: { id: outfit.id }, data: { status: "SUSPENDED" } });
+    expect(await repo.update(outfit.id, { ...edit, title: "Renamed" }, "ACTIVE", "PENDING_REVIEW")).toBe(
+      false,
+    );
+    expect(await db.outfit.findUniqueOrThrow({ where: { id: outfit.id } })).toMatchObject({
+      status: "SUSPENDED",
+      title: outfit.title,
     });
   });
 });

@@ -167,7 +167,7 @@ describe("listing status writes", () => {
   it("two administrators deciding one listing at once: exactly one decision lands", async () => {
     const { listings } = buildApp();
     const admin = actorFor(await createUser({ name: "Admin", role: "admin" }));
-    const outfit = await createOutfit({ status: "PENDING_REVIEW" });
+    const outfit = await createOutfit({ status: "PENDING_REVIEW", photos: 1 });
     const results = await Promise.allSettled([
       listings.approve(admin, { outfitId: outfit.id }),
       listings.reject(admin, { outfitId: outfit.id, note: "Photos are of a different garment." }),
