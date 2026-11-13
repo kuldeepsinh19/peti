@@ -1,7 +1,7 @@
 import type { Actor } from "@/shared/application/actor";
 import { requireAdmin, requireUser } from "@/shared/application/authorization";
 import { NotFoundError, PreconditionError, ValidationError } from "@/shared/domain/errors";
-import { localDateInIndia } from "@/shared/domain/local-date";
+import { addDays, localDateInIndia } from "@/shared/domain/local-date";
 import { parseInput } from "@/shared/contracts/validation";
 import type { BookingActorRole } from "../domain/booking-state-machine";
 import { disputeMessageSchema, openDisputeSchema, resolveDisputeSchema } from "./contracts";
@@ -35,6 +35,7 @@ function assertCanOpen(
   kind: Kind,
   now: Date,
   claimedPaise: number | null,
+  handoverRecorded: boolean,
 ) {
   const kinds = ALLOWED[booking.status]?.[role];
   if (!kinds || !kinds.includes(kind)) {
@@ -44,8 +45,14 @@ function assertCanOpen(
     );
   }
   const today = localDateInIndia(now);
-  if (booking.status === "CONFIRMED" && today < booking.startDate) {
-    throw new PreconditionError("TOO_EARLY", "Handover problems can be reported from the start date.");
+  // Once the owner has recorded the handover (allowed from the day before the start), cancelling is no
+  // longer possible, so reporting a problem must be possible from that moment too.
+  const earliest = handoverRecorded ? addDays(booking.startDate, -1) : booking.startDate;
+  if (booking.status === "CONFIRMED" && today < earliest) {
+    throw new PreconditionError(
+      "TOO_EARLY",
+      "Handover problems can be reported once the handover is recorded or the rental has started.",
+    );
   }
   if (kind === "NOT_RETURNED" && today <= booking.endDate) {
     throw new PreconditionError("NOT_OVERDUE", "The rental has not ended yet.");
@@ -72,7 +79,9 @@ export async function openDispute(deps: BookingsDeps, actor: Actor, input: unkno
     const booking = await loadBooking(store, data.bookingId);
     const role = requireRole(booking, actor, ["RENTER", "OWNER", "ADMIN"]);
     const claimed = data.claimedRupees ? data.claimedRupees * 100 : null;
-    assertCanOpen(booking, role, data.kind, now, claimed);
+    const handoverRecorded =
+      booking.status === "CONFIRMED" && (await store.getConditionReport(booking.id, "HANDOVER")) !== null;
+    assertCanOpen(booking, role, data.kind, now, claimed, handoverRecorded);
     if (await store.hasOpenDispute(booking.id))
       throw new PreconditionError("DISPUTE_OPEN", "A dispute is already open.");
     const userId = requireUser(actor).userId;

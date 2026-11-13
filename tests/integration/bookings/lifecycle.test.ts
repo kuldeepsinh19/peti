@@ -265,6 +265,26 @@ describe("cancellation", () => {
       });
     }
     expect((await db.booking.findUniqueOrThrow({ where: { id: bookingId } })).status).toBe("CONFIRMED");
+
+    // …but the renter is never stuck: a problem can be reported from that moment, not only from the start.
+    await app.bookings.openDispute(renter, {
+      bookingId,
+      kind: "NOT_AS_DESCRIBED",
+      description: "The lehenga handed over is a different colour from the photographs.",
+    });
+    expect((await db.booking.findUniqueOrThrow({ where: { id: bookingId } })).status).toBe("DISPUTED");
+  });
+
+  it("a handover problem cannot be reported early when no handover was recorded", async () => {
+    const { app, renter, bookingId } = await paidBooking();
+    app.clock.set("2026-12-19T06:00:00Z"); // the day before the start, no report yet
+    await expect(
+      app.bookings.openDispute(renter, {
+        bookingId,
+        kind: "HANDOVER_FAILED",
+        description: "The owner has not replied about collecting the outfit tomorrow.",
+      }),
+    ).rejects.toMatchObject({ code: "TOO_EARLY" });
   });
 
   it("nobody but an admin can cancel from the start date, even without a handover report", async () => {

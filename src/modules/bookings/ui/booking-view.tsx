@@ -338,7 +338,7 @@ export function BookingView({
           </p>
         ) : null}
 
-        {(b.status === "CONFIRMED" && today >= b.startDate) ||
+        {(b.status === "CONFIRMED" && (today >= b.startDate || handover !== undefined)) ||
         b.status === "ACTIVE" ||
         b.status === "RETURNED" ? (
           role !== "ADMIN" ? (
