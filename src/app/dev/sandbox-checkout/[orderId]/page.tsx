@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { container } from "@/composition/container";
 import { formatInr } from "@/shared/domain/money";
 import { Notice } from "@/shared/ui/feedback";
 import { Page, PageHeader } from "@/shared/ui/layout";
+import { sandboxOrderForRenter } from "./access";
 import { CheckoutPanel } from "./checkout-panel";
 
 export const metadata: Metadata = { title: "Sandbox checkout", robots: { index: false } };
@@ -14,17 +14,9 @@ export const metadata: Metadata = { title: "Sandbox checkout", robots: { index: 
  */
 export default async function SandboxCheckoutPage({ params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await params;
-  const { sandbox, db } = container();
-  const order = sandbox ? await sandbox.order(orderId) : null;
-  if (!order) notFound();
-  const payment = await db.payment.findFirst({
-    where: { provider: "sandbox", providerOrderId: orderId },
-    select: {
-      bookingId: true,
-      booking: { select: { reference: true, outfit: { select: { title: true } } } },
-    },
-  });
-  if (!payment) notFound();
+  const checkout = await sandboxOrderForRenter(orderId);
+  if (!checkout) notFound();
+  const { order, payment } = checkout;
   return (
     <Page className="max-w-3xl pb-16">
       <PageHeader

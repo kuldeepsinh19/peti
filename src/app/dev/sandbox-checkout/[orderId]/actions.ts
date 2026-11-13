@@ -1,6 +1,7 @@
 "use server";
 
 import { container } from "@/composition/container";
+import { sandboxOrderForRenter } from "./access";
 
 type SandboxOutcome = Parameters<NonNullable<ReturnType<typeof container>["sandbox"]>["simulate"]>[1];
 
@@ -24,6 +25,7 @@ export async function completeSandboxCheckout(
   const { sandbox, env, devTooling } = container();
   if (!devTooling || !sandbox) throw new Error("The sandbox provider is not enabled.");
   if (!OUTCOMES.includes(outcome as SandboxOutcome)) throw new Error("Unknown outcome.");
+  if (!(await sandboxOrderForRenter(orderId))) throw new Error("Checkout not found.");
   const sim = await sandbox.simulate(orderId, outcome as SandboxOutcome);
   const webhookStatuses: number[] = [];
   for (const w of sim.webhooks) {
