@@ -36,8 +36,9 @@ const ADMIN: Record<AdminCommand, string> = {
 /** Form endpoint for admin commands. Authorisation happens in the use case, not here. */
 export async function adminCommandAction(formData: FormData): Promise<void> {
   const command = String(formData.get("command")) as AdminCommand;
+  // Own keys only: "constructor" or "toString" must never dispatch to a prototype method.
+  if (!Object.hasOwn(ADMIN, command)) return;
   const path = ADMIN[command];
-  if (!path) return;
   const result = await runAction("admin." + command, async (actor): Promise<void> => {
     await container().admin[command](actor, formDataToObject(formData));
   });
