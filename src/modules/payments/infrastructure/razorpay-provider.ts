@@ -208,13 +208,16 @@ export function razorpayProvider(config: RazorpayConfig): PaymentProvider {
     },
 
     async createRefund(input) {
-      // Idempotency: look for an earlier refund carrying our reference before creating a new one.
+      // Idempotency: look for an earlier refund carrying our reference before creating a new one. A failed
+      // one does not count, so an administrator's retry creates a fresh refund instead of reusing the failure.
       const existing = (await call(() =>
         client.payments.fetchMultipleRefund(input.providerPaymentId),
       )) as unknown as {
         items: Array<{ id: string; status: string; notes?: Record<string, string> }>;
       };
-      const match = existing.items.find((r) => r.notes?.reference === input.reference);
+      const match = existing.items.find(
+        (r) => r.notes?.reference === input.reference && r.status !== "failed",
+      );
       const refund =
         match ??
         ((await call(() =>

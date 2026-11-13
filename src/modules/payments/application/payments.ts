@@ -244,6 +244,16 @@ export function paymentsUseCases(deps: PaymentsDeps) {
             amountPaise: r.amountPaise,
             reference: r.id,
           });
+          if (result.status === "FAILED") {
+            // The provider refused it: mark FAILED so an administrator sees it and can retry, rather than
+            // leaving it INITIATED with a provider id, where nothing would ever pick it up again.
+            await payments.failRefundAttempt(
+              r.id,
+              "The payment provider reported the refund as failed.",
+              true,
+            );
+            continue;
+          }
           await payments.completeRefund(r.id, result.providerRefundId, result.status === "PROCESSED");
           sent++;
         } catch (error) {
