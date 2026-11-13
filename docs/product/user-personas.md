@@ -231,9 +231,9 @@ resolves disputes, marks payouts as paid and watches for problems.
 
 ## Who is not a target user in the MVP
 
-| Group                                        | Why not                                                               |
-| -------------------------------------------- | --------------------------------------------------------------------- |
-| Rental shops, boutiques and designers        | Vendor listings are out of scope; Peti is C2C.                        |
-| People outside Ahmedabad                     | No platform logistics; handover is in person in one city.             |
-| Renters wanting same-day or next-hour rental | Bookings start from tomorrow at the earliest and need owner approval. |
-| Owners wanting Peti to store or clean items  | Peti never takes custody of garments.                                 |
+| Group                                       | Why not                                                       |
+| ------------------------------------------- | ------------------------------------------------------------- |
+| Rental shops, boutiques and designers       | Vendor listings are out of scope; Peti is C2C.                |
+| People outside Ahmedabad                    | No platform logistics; handover is in person in one city.     |
+| Renters wanting same-day or next-day rental | Bookings start at least 2 days ahead and need owner approval. |
+| Owners wanting Peti to store or clean items | Peti never takes custody of garments.                         |

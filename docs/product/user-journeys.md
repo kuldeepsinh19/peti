@@ -153,12 +153,12 @@ stateDiagram-v2
    they are sent to finish verification (A-U5).
 3. They review the rental terms snapshot (cancellation tiers, late fee, inspection window, deposit rules) and
    accept. The request is created: **`∅ → PENDING_APPROVAL`**. Price and policy are frozen. The page shows the
-   owner's response deadline (24 hours, or 18:00 IST the day before the start if earlier).
+   owner's response deadline (24 hours, or 12:00 IST the day before the start if earlier).
 4. The owner is notified and opens `/lend/requests`. They see dates, duration, their earnings after
    commission, and the renter's public profile and reviews.
 5. The owner approves: **`PENDING_APPROVAL → AWAITING_PAYMENT`**. The calendar hold for the rental days plus
-   buffer is taken in the same step. The payment deadline is set (12 hours, capped at 12 hours before the
-   start).
+   buffer is taken in the same step. The payment deadline is set (12 hours, capped at 22:00 IST the day before
+   the start).
 6. The renter is notified and opens the booking at `/account/rentals/[id]`, then selects "Pay". They go to the
    provider's checkout (in local and test environments, `/dev/sandbox-checkout/[orderId]`).
 7. After payment, the provider's signed callback and/or webhook reaches Peti. Peti verifies the signature and

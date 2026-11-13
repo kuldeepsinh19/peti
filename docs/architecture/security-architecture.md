@@ -139,6 +139,40 @@ in `tests/integration/security/review-fixes.test.ts`.
 The review also checked and found sound: authorisation and IDOR scoping, the payment confirmation path,
 raw SQL, file handling, settlement arithmetic, contact-detail redaction and phone-number changes.
 
+## Code review 2026-11-13
+
+A second review, split into bookings and payments, the app and UI layer, and listings, search, admin and
+infrastructure, looked for new correctness bugs. Each fix has a regression test, mostly in
+`tests/integration/security/code-review-fixes.test.ts`.
+
+| Area          | Finding                                                                                                         | Status                                                                                                 |
+| ------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Security      | Open redirect after sign-in: browsers strip tabs and newlines, so `/<tab>/evil.example` became `//evil.example` | **Fixed.** One same-origin check (`isSameSitePath`) refuses control characters, spaces and backslashes |
+| Security      | Anyone who knew an order id could open or complete someone else's sandbox checkout                              | **Fixed.** Only the paying renter                                                                      |
+| Security      | The admin form dispatched any key, including prototype methods such as `constructor`                            | **Fixed.** Own keys only                                                                               |
+| Money         | A refund the provider rejected was stored as in progress and never retried; Razorpay reused the failure         | **Fixed.** Marked `FAILED`, listed for retry; failed provider refunds are not reused                   |
+| Money         | Admins could use administrator overrides on their own rentals (record their own return on time)                 | **Fixed.** A participant always acts as that participant                                               |
+| Bookings      | After the handover was recorded on the day before the start, the renter could neither cancel nor dispute        | **Fixed.** Disputes open from the handover report                                                      |
+| Bookings      | A renter's contested late fee could carry an amount the owner then "accepted" from the renter's deposit         | **Fixed.** Amounts only on damage and missing-item claims; only an owner's claim can be accepted       |
+| Bookings      | Sweep failures without a booking id; unordered batches; overlapping requests locked in no fixed order           | **Fixed**                                                                                              |
+| Reviews       | Overlapping sweeps counted a rating twice; simultaneous reviews stayed hidden; a double submit was a 500        | **Fixed.** Row lock per booking, `UPDATE … RETURNING`, `ALREADY_REVIEWED`                              |
+| Notifications | One 50-email transaction: a slow SMTP send rolled back every result and the batch was re-sent forever           | **Fixed.** One short transaction per email, SMTP timeouts, a failing email tried once per run          |
+| Listings      | A listing could be approved with no photo; an edit could undo a concurrent suspension                           | **Fixed.** Photo required; edits are compare-and-swap                                                  |
+| UI            | Failed uploads and requests spun forever; buttons could be double-submitted; some buttons failed silently       | **Fixed.** Error handling, `SubmitButton`, 4 MB upload checks, error notices                           |
+| Platform      | Constraint violations outside the unit of work became `INTERNAL_ERROR`; malformed payment callback gave 500     | **Fixed**                                                                                              |
+| Platform      | Public listing photos cached as immutable for a year, so removed photos lingered                                | **Fixed.** One day                                                                                     |
+| Admin         | An admin action and its audit row are written in separate transactions                                          | **Open.** A crash between them loses the audit row                                                     |
+| Admin         | Booking overrides by an administrator do not all require a written reason                                       | **Open**                                                                                               |
+| Listings      | Adding a photo and sending a live listing back to review are not atomic                                         | **Open, low impact**                                                                                   |
+| Bookings      | The "completed" notification wording ignores the settlement (a fully forfeited deposit still says refunded)     | **Open, low impact**                                                                                   |
+| Search        | A page number past the last page reports zero results instead of the real total                                 | **Open, low impact**                                                                                   |
+| Operations    | On the free Vercel plan the sweep runs once a day, so deadlines can lag by up to a day                          | **Accepted for the demo.** A paid plan or an external scheduler fixes it                               |
+
+The review also found that the documents described deadlines differently from the code. The code's values,
+which are frozen onto each booking, are now the documented ones: starts at least 2 days ahead, owner
+response by 12:00 IST the day before, payment by 22:00 IST the day before. The promised "opportunistic
+expiry before approval" did not exist; the documentation no longer claims it.
+
 ## Open items before taking real users
 
 1. A real SMS provider with DLT registration, and a per-number OTP limit (H3, L4).
