@@ -1,3 +1,4 @@
+import { HOUR_MS } from "@/shared/domain/clock";
 import { addDays, localDateInIndia } from "@/shared/domain/local-date";
 import { applyTransition, loadBooking, settleMoney } from "./core";
 import type { BookingsDeps } from "./ports";
@@ -10,6 +11,13 @@ export interface SweepCandidates {
   /** CONFIRMED bookings whose rental period ended without the handover being acknowledged. */
   stuckHandovers(today: string): Promise<string[]>;
 }
+
+/**
+ * A renter who authorised a payment before the deadline keeps the booking while Peti is still trying to
+ * capture it (ADR-006): the capture is retried on every sweep, and only after this long is the booking
+ * expired and the authorisation left for the provider to return.
+ */
+export const CAPTURE_GRACE_MS = HOUR_MS;
 
 export interface SweepReport {
   expiredApprovals: number;
@@ -73,6 +81,9 @@ export async function runBookingSweep(deps: BookingsDeps, candidates: SweepCandi
       return deps.uow.run(async (store) => {
         const b = await loadBooking(store, id);
         if (b.status !== "AWAITING_PAYMENT" || !b.expiresAt || b.expiresAt > now) return false;
+        const payment = await store.getPayment(b.id);
+        const capturing = payment?.status === "AUTHORIZED";
+        if (capturing && now.getTime() - b.expiresAt.getTime() < CAPTURE_GRACE_MS) return false;
         await store.abandonPayment(b.id);
         await applyTransition(store, b, "expirePayment", "SYSTEM", {
           actorUserId: null,

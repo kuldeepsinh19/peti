@@ -77,7 +77,9 @@ it to the payer when the capture window (24 hours) ends.
 for the payment: if it was captured after all (a lost response, or a concurrent caller), the capture is
 recorded; if it can no longer be captured, the claim is released so the renter can pay again; otherwise the
 error is stored (`capture_attempts`, `last_capture_error`) and the sweep retries every 15 minutes. While a
-payment is `AUTHORIZED`, starting checkout again is refused (`PAYMENT_PROCESSING`).
+payment is `AUTHORIZED`, starting checkout again is refused (`PAYMENT_PROCESSING`). A booking whose payment is
+`AUTHORIZED` at the payment deadline is kept for one more hour while the capture is retried; after that it
+expires and the authorisation is left for the provider to return.
 
 **Record** (`recordCapturedPayment`) is the **only** path to `CONFIRMED`:
 

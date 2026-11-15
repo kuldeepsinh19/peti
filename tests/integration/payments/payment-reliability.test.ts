@@ -7,6 +7,7 @@ import type { PaymentProvider } from "@/modules/payments/domain/payment-provider
 import { PaymentProviderError } from "@/modules/payments/domain/payment-provider";
 import { prismaAdminRepository } from "@/modules/admin/infrastructure/prisma-admin-repository";
 import { prismaPaymentRepository } from "@/modules/payments/infrastructure/prisma-payment-repository";
+import { HOUR_MS, MINUTE_MS } from "@/shared/domain/clock";
 import { buildBookingApp, reconciliation, scenario } from "../support/booking-app";
 import { db, resetDatabase } from "../support/db";
 
@@ -177,6 +178,51 @@ describe("explicit capture", () => {
     await expect(app.payments.startCheckout(booking.renter, booking.bookingId)).resolves.toMatchObject({
       mode: "REDIRECT",
     });
+  });
+});
+
+describe("an authorisation that is still being captured at the payment deadline", () => {
+  /** The renter pays in time, but every capture call fails until `provider.up` is set. */
+  async function authorisedButNotCaptured() {
+    const provider = { up: false };
+    const app = buildBookingApp(undefined, {
+      wrapProvider: (p): PaymentProvider => ({
+        ...p,
+        async capturePayment(id, amount) {
+          if (!provider.up) throw new PaymentProviderError("TRANSIENT", "Razorpay request failed");
+          return p.capturePayment(id, amount);
+        },
+      }),
+    });
+    const booking = await approvedBooking(app);
+    const orderId = await orderFor(app, booking);
+    const sim = await app.sandbox.simulate(orderId, "pay-webhook-only");
+    await app.payments.handleWebhook(sim.webhooks[0]!.body, sim.webhooks[0]!.headers);
+    return { app, booking, provider, paymentId: sim.paymentIds[0]! };
+  }
+  const status = async (bookingId: string) =>
+    (await db.booking.findUniqueOrThrow({ where: { id: bookingId } })).status;
+
+  it("keeps the booking for an hour while the capture is retried, then confirms it", async () => {
+    const { app, booking, provider } = await authorisedButNotCaptured();
+    app.clock.advance(12 * HOUR_MS + 10 * MINUTE_MS); // past the 12-hour payment window
+    expect((await app.bookings.sweep()).expiredPayments).toBe(0);
+    expect(await status(booking.bookingId)).toBe("AWAITING_PAYMENT");
+
+    provider.up = true;
+    await app.bookings.sweep(); // the pre-expiry reconcile captures it
+    expect(await status(booking.bookingId)).toBe("CONFIRMED");
+  });
+
+  it("expires the booking after the hour, and never captures the authorisation", async () => {
+    const { app, booking, paymentId } = await authorisedButNotCaptured();
+    app.clock.advance(13 * HOUR_MS + 10 * MINUTE_MS);
+    expect((await app.bookings.sweep()).expiredPayments).toBe(1);
+    expect(await status(booking.bookingId)).toBe("EXPIRED");
+    expect((await db.payment.findUniqueOrThrow({ where: { bookingId: booking.bookingId } })).status).toBe(
+      "ABANDONED",
+    );
+    expect(await sandboxStatus(paymentId)).toBe("authorized");
   });
 });
 
