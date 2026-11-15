@@ -5,6 +5,8 @@ import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/a
 import { nextCookies } from "better-auth/next-js";
 import { admin, phoneNumber } from "better-auth/plugins";
 import type { Env } from "@/config/env";
+import type { RateLimiter } from "@/shared/application/rate-limiter";
+import { RateLimitedError } from "@/shared/domain/errors";
 import type { Db } from "@/shared/infrastructure/prisma";
 import {
   type MailSender,
@@ -13,19 +15,22 @@ import {
   verifyEmailMessage,
 } from "@/modules/notifications";
 import { INDIAN_MOBILE } from "@/modules/users";
+import { accountAttempts } from "../application/attempt-limits";
 
 interface AuthDeps {
   env: Env;
   db: Db;
   mail: MailSender;
   sms: SmsSender;
+  /** Application limiter, for per-account limits that do not depend on the client address. */
+  rateLimiter: RateLimiter;
 }
 
 /**
  * Better Auth configuration (ADR-001): email + password, database sessions, email verification, password
  * reset, phone OTP verification, admin roles/bans and database-backed rate limiting.
  */
-export function createAuth({ env, db, mail, sms }: AuthDeps) {
+export function createAuth({ env, db, mail, sms, rateLimiter }: AuthDeps) {
   const trustedOrigins = [
     env.APP_URL,
     ...(env.AUTH_TRUSTED_ORIGINS?.split(",")
@@ -50,13 +55,31 @@ export function createAuth({ env, db, mail, sms }: AuthDeps) {
       "/sign-in/phone-number",
     ],
     hooks: {
-      // Verifying a phone number only ever attaches it to the signed-in account; it never signs anyone in.
       before: createAuthMiddleware(async (ctx) => {
-        if (ctx.path !== "/phone-number/verify") return;
-        const session = await getSessionFromCtx(ctx);
-        const body = ctx.body as { updatePhoneNumber?: unknown } | undefined;
-        if (!session || body?.updatePhoneNumber !== true) {
+        const phonePath = ctx.path === "/phone-number/verify" || ctx.path === "/phone-number/send-otp";
+        const session = phonePath ? await getSessionFromCtx(ctx) : null;
+        // Phone numbers are only ever verified for, and attached to, the signed-in account: sending or
+        // checking a code never signs anyone in, and anonymous requests cannot be used to flood a number.
+        if (phonePath && !session) {
           throw new APIError("FORBIDDEN", { message: "Sign in to verify a mobile number." });
+        }
+        if (ctx.path === "/phone-number/verify") {
+          const body = ctx.body as { updatePhoneNumber?: unknown } | undefined;
+          if (body?.updatePhoneNumber !== true) {
+            throw new APIError("FORBIDDEN", { message: "Sign in to verify a mobile number." });
+          }
+        }
+        // Per-account limits: unlike Better Auth's per-IP limits, a client cannot escape them by changing
+        // (or spoofing) its address.
+        for (const attempt of accountAttempts(ctx.path, ctx.body, session?.user.id ?? null, scale)) {
+          try {
+            await rateLimiter.consume(attempt.rule, attempt.subject);
+          } catch (error) {
+            if (error instanceof RateLimitedError) {
+              throw new APIError("TOO_MANY_REQUESTS", { message: "Too many attempts. Try again later." });
+            }
+            throw error;
+          }
         }
       }),
     },

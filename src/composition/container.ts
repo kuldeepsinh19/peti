@@ -61,7 +61,8 @@ function build() {
       ? smtpMailSender(env.SMTP_URL, env.MAIL_FROM)
       : outboxMailSender(db);
   const sms: SmsSender = outboxSmsSender(db);
-  const auth = createAuth({ env, db, mail, sms });
+  const rateLimiter = postgresRateLimiter(db, clock);
+  const auth = createAuth({ env, db, mail, sms, rateLimiter });
 
   const storage: ObjectStorage =
     env.STORAGE_DRIVER === "s3"
@@ -75,7 +76,6 @@ function build() {
         })
       : filesystemStorage(env.STORAGE_FS_ROOT);
   const images = sharpImageProcessor(marketplacePolicy.maxUploadBytes);
-  const rateLimiter = postgresRateLimiter(db, clock);
 
   // Payment provider registry. The sandbox exists only where dev tooling is enabled (local/test); env.ts
   // additionally refuses to boot production with it.
