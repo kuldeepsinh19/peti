@@ -9,7 +9,8 @@ import { usersUseCases } from "@/modules/users";
 import { prismaUserRepository } from "@/modules/users/infrastructure/prisma-user-repository";
 import { prismaAuditLog } from "@/shared/infrastructure/audit";
 import { buildBookingApp, photos, scenario } from "../support/booking-app";
-import { db, resetDatabase } from "../support/db";
+import { actorFor } from "../support/app";
+import { createLocality, createUser, db, resetDatabase } from "../support/db";
 
 beforeEach(async () => {
   await resetDatabase();
@@ -77,5 +78,58 @@ describe("payouts need the owner's valid UPI ID (S-12)", () => {
     });
     const entry = await db.auditLog.findFirstOrThrow({ where: { action: "payout.markPaid" } });
     expect(entry.after).toMatchObject({ upiVpa: "owner.one@okbank" });
+  });
+});
+
+describe("private condition-report photos (access control, previously untested)", () => {
+  it("are visible to the owner, the renter and administrators only", async () => {
+    const app = buildBookingApp();
+    const s = await scenario();
+    const { bookingId } = await app.bookings.request(s.renter, {
+      outfitId: s.outfit.id,
+      startDate: "2026-12-10",
+      days: 3,
+      acceptTerms: "on",
+    });
+    await app.bookings.approve(s.owner, { bookingId });
+    await app.payThroughSandbox(s.renter, bookingId);
+    app.clock.set("2026-12-10T05:00:00Z");
+    await app.bookings.submitHandoverReport(s.owner, { bookingId, grade: "GOOD", notes: "Fine." }, photos(3));
+    const { storageKey } = await db.conditionReportPhoto.findFirstOrThrow();
+    const stranger = actorFor(await createUser({ name: "Stranger" }));
+
+    expect(await app.bookings.canViewReportPhoto(s.owner, storageKey)).toBe(true);
+    expect(await app.bookings.canViewReportPhoto(s.renter, storageKey)).toBe(true);
+    expect(await app.bookings.canViewReportPhoto(s.admin, storageKey)).toBe(true);
+    expect(await app.bookings.canViewReportPhoto(stranger, storageKey)).toBe(false);
+    expect(await app.bookings.canViewReportPhoto(stranger, "reports/unknown/0.jpg")).toBe(false);
+  });
+});
+
+describe("addresses (ownership, previously untested)", () => {
+  it("cannot be removed or made default by another user", async () => {
+    const users = usersUseCases({ users: prismaUserRepository(db) });
+    const [ownerUser, otherUser, locality] = await Promise.all([
+      createUser({ name: "Owner" }),
+      createUser({ name: "Other" }),
+      createLocality(),
+    ]);
+    const owner = actorFor(ownerUser);
+    const other = actorFor(otherUser);
+    const address = await users.addAddress(owner, {
+      line1: "12 Test Society",
+      localityId: locality.id,
+      pincode: "380015",
+    });
+    await expect(users.removeAddress(other, { addressId: address.id })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+    await expect(users.setDefaultAddress(other, { addressId: address.id })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+    expect(await db.address.findUniqueOrThrow({ where: { id: address.id } })).toMatchObject({
+      deletedAt: null,
+    });
+    expect((await users.listAddresses(other)).length).toBe(0);
   });
 });
