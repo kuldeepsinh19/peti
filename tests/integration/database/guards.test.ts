@@ -284,4 +284,101 @@ describe("money", () => {
     );
     expect(info.constraint).toBe("security_deposits_status_consistent");
   });
+
+  describe("payment reliability (ADR-006)", () => {
+    async function capturedBooking() {
+      const outfit = await createOutfit();
+      const renter = await createUser();
+      const booking = await insertBookingRow({
+        outfitId: outfit.id,
+        ownerId: outfit.ownerId,
+        renterId: renter.id,
+      });
+      const payment = await db.payment.create({
+        data: {
+          bookingId: booking.id,
+          provider: "sandbox",
+          providerOrderId: `order_${booking.id}`,
+          providerPaymentId: `pay_${booking.id}`,
+          amountPaise: 950_000,
+          status: "CAPTURED",
+          capturedAt: new Date(),
+        },
+      });
+      return { booking, payment };
+    }
+    const reversal = (bookingId: string, paymentId: string, extra: Record<string, unknown> = {}) =>
+      db.refund.create({
+        data: {
+          bookingId,
+          paymentId,
+          reason: "UNEXPECTED_CAPTURE_REVERSAL",
+          amountPaise: 950_000,
+          rentalFeePortionPaise: 0,
+          depositPortionPaise: 0,
+          reversedProviderPaymentId: "pay_second",
+          initiatedByRole: "SYSTEM",
+          ...extra,
+        },
+      });
+
+    it("a reversal names the provider payment it returns and carries no fee or deposit portion", async () => {
+      const { booking, payment } = await capturedBooking();
+      expect(
+        await pgFailure(reversal(booking.id, payment.id, { reversedProviderPaymentId: null })),
+      ).toMatchObject({ constraint: "refunds_reversal_target" });
+      expect(
+        await pgFailure(
+          reversal(booking.id, payment.id, { rentalFeePortionPaise: 450_000, depositPortionPaise: 500_000 }),
+        ),
+      ).toMatchObject({ constraint: "refunds_amounts_valid" });
+      expect(
+        await pgFailure(
+          db.refund.create({
+            data: {
+              bookingId: booking.id,
+              paymentId: payment.id,
+              reason: "CANCELLATION",
+              amountPaise: 100,
+              rentalFeePortionPaise: 100,
+              depositPortionPaise: 0,
+              reversedProviderPaymentId: "pay_second",
+              initiatedByRole: "SYSTEM",
+            },
+          }),
+        ),
+      ).toMatchObject({ constraint: "refunds_reversal_target" });
+    });
+
+    it("queues at most one reversal per provider payment, and none counts towards the booking's money", async () => {
+      const { booking, payment } = await capturedBooking();
+      await reversal(booking.id, payment.id);
+      expect((await pgFailure(reversal(booking.id, payment.id))).sqlState).toBe("23505");
+      await reversal(booking.id, payment.id, { reversedProviderPaymentId: "pay_third" });
+
+      // Reversals never touch the booking's own refunded total (the reconciliation is proven end to end in
+      // tests/integration/payments/payment-reliability.test.ts).
+      expect((await db.payment.findUniqueOrThrow({ where: { id: payment.id } })).refundedPaise).toBe(0);
+      const unexpected = await db.$queryRaw<Array<{ n: bigint }>>`
+        SELECT count(*) AS n FROM v_unexpected_captures WHERE booking_id = ${booking.id}::uuid`;
+      expect(Number(unexpected[0]!.n)).toBe(2);
+    });
+
+    it("a payout reported as failed must say why, and only a failed one may", async () => {
+      const { booking } = await capturedBooking();
+      const base = {
+        bookingId: booking.id,
+        ownerId: booking.ownerId,
+        grossRentalPaise: 450_000,
+        commissionPaise: 67_500,
+        netPaise: 382_500,
+      };
+      expect(await pgFailure(db.payout.create({ data: { ...base, status: "FAILED" } }))).toMatchObject({
+        constraint: "payouts_failure_consistent",
+      });
+      expect(
+        await pgFailure(db.payout.create({ data: { ...base, failureReason: "bounced" } })),
+      ).toMatchObject({ constraint: "payouts_failure_consistent" });
+    });
+  });
 });

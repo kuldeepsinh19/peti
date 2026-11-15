@@ -430,52 +430,52 @@ enum ActorRole {
 }
 
 model Booking {
-  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id              String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   /// Human-friendly reference shown to users, e.g. PT-7F3K2Q.
-  reference          String               @unique
-  outfitId           String               @map("outfit_id") @db.Uuid
-  ownerId            String               @map("owner_id") @db.Uuid
-  renterId           String               @map("renter_id") @db.Uuid
+  reference       String               @unique
+  outfitId        String               @map("outfit_id") @db.Uuid
+  ownerId         String               @map("owner_id") @db.Uuid
+  renterId        String               @map("renter_id") @db.Uuid
   /// Inclusive rental days.
-  startDate          DateTime             @map("start_date") @db.Date
-  endDate            DateTime             @map("end_date") @db.Date
-  rentalDays         Int                  @map("rental_days") @db.SmallInt
-  bufferDays         Int                  @map("buffer_days") @db.SmallInt
-  status             BookingStatus        @default(PENDING_APPROVAL)
-  statusChangedAt    DateTime             @default(now()) @map("status_changed_at") @db.Timestamptz(3)
-  version            Int                  @default(0)
+  startDate       DateTime             @map("start_date") @db.Date
+  endDate         DateTime             @map("end_date") @db.Date
+  rentalDays      Int                  @map("rental_days") @db.SmallInt
+  bufferDays      Int                  @map("buffer_days") @db.SmallInt
+  status          BookingStatus        @default(PENDING_APPROVAL)
+  statusChangedAt DateTime             @default(now()) @map("status_changed_at") @db.Timestamptz(3)
+  version         Int                  @default(0)
   /// Deadline of the current state (approval or payment window), if any.
-  expiresAt          DateTime?            @map("expires_at") @db.Timestamptz(3)
-  closedReason       BookingClosedReason? @map("closed_reason")
+  expiresAt       DateTime?            @map("expires_at") @db.Timestamptz(3)
+  closedReason    BookingClosedReason? @map("closed_reason")
 
   // Pricing snapshot — immutable after insert (see payment-architecture.md).
-  priceOptionId      String?              @map("price_option_id") @db.Uuid
-  rentalFeePaise     Int                  @map("rental_fee_paise")
-  depositPaise       Int                  @map("deposit_paise")
-  commissionRateBps  Int                  @map("commission_rate_bps")
-  commissionPaise    Int                  @map("commission_paise")
-  renterTotalPaise   Int                  @map("renter_total_paise")
-  ownerPayoutPaise   Int                  @map("owner_payout_paise")
-  lateFeePerDayPaise Int                  @map("late_fee_per_day_paise")
+  priceOptionId      String?   @map("price_option_id") @db.Uuid
+  rentalFeePaise     Int       @map("rental_fee_paise")
+  depositPaise       Int       @map("deposit_paise")
+  commissionRateBps  Int       @map("commission_rate_bps")
+  commissionPaise    Int       @map("commission_paise")
+  renterTotalPaise   Int       @map("renter_total_paise")
+  ownerPayoutPaise   Int       @map("owner_payout_paise")
+  lateFeePerDayPaise Int       @map("late_fee_per_day_paise")
   // Rental agreement: the terms and policy both parties accepted.
-  termsVersion       String               @map("terms_version")
-  policySnapshot     Json                 @map("policy_snapshot")
-  renterAcceptedAt   DateTime             @map("renter_accepted_at") @db.Timestamptz(3)
-  ownerAcceptedAt    DateTime?            @map("owner_accepted_at") @db.Timestamptz(3)
-  renterNote         String?              @map("renter_note")
+  termsVersion       String    @map("terms_version")
+  policySnapshot     Json      @map("policy_snapshot")
+  renterAcceptedAt   DateTime  @map("renter_accepted_at") @db.Timestamptz(3)
+  ownerAcceptedAt    DateTime? @map("owner_accepted_at") @db.Timestamptz(3)
+  renterNote         String?   @map("renter_note")
 
-  approvedAt         DateTime?            @map("approved_at") @db.Timestamptz(3)
-  confirmedAt        DateTime?            @map("confirmed_at") @db.Timestamptz(3)
-  handedOverAt       DateTime?            @map("handed_over_at") @db.Timestamptz(3)
-  returnedAt         DateTime?            @map("returned_at") @db.Timestamptz(3)
-  returnedOn         DateTime?            @map("returned_on") @db.Date
-  lateDays           Int?                 @map("late_days") @db.SmallInt
-  lateFeePaise       Int?                 @map("late_fee_paise")
-  inspectionDeadline DateTime?            @map("inspection_deadline") @db.Timestamptz(3)
-  completedAt        DateTime?            @map("completed_at") @db.Timestamptz(3)
-  cancelledAt        DateTime?            @map("cancelled_at") @db.Timestamptz(3)
-  createdAt          DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt          DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+  approvedAt         DateTime? @map("approved_at") @db.Timestamptz(3)
+  confirmedAt        DateTime? @map("confirmed_at") @db.Timestamptz(3)
+  handedOverAt       DateTime? @map("handed_over_at") @db.Timestamptz(3)
+  returnedAt         DateTime? @map("returned_at") @db.Timestamptz(3)
+  returnedOn         DateTime? @map("returned_on") @db.Date
+  lateDays           Int?      @map("late_days") @db.SmallInt
+  lateFeePaise       Int?      @map("late_fee_paise")
+  inspectionDeadline DateTime? @map("inspection_deadline") @db.Timestamptz(3)
+  completedAt        DateTime? @map("completed_at") @db.Timestamptz(3)
+  cancelledAt        DateTime? @map("cancelled_at") @db.Timestamptz(3)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   outfit           Outfit                 @relation(fields: [outfitId, ownerId], references: [id, ownerId])
   owner            User                   @relation("BookingOwner", fields: [ownerId], references: [id])
@@ -487,6 +487,7 @@ model Booking {
   refunds          Refund[]
   deposit          SecurityDeposit?
   payout           Payout?
+  paymentDisputes  PaymentDispute[]
   conditionReports ConditionReport[]
   reviews          Review[]
   disputes         Dispute[]
@@ -542,6 +543,8 @@ enum RefundReason {
   DISPUTE_RESOLUTION
   LATE_CAPTURE_REVERSAL
   ADMIN_ADJUSTMENT
+  /// A capture that cannot belong to the booking (a second payment on the order, or a wrong amount).
+  UNEXPECTED_CAPTURE_REVERSAL
 }
 
 enum RefundStatus {
@@ -578,6 +581,8 @@ enum PayoutStatus {
   PENDING
   PAID
   CANCELLED
+  /// Recorded as paid, then reported back as failed (a bounced transfer); can be paid again.
+  FAILED
 }
 
 /// One per booking = one provider order for rental fee + deposit.
@@ -595,11 +600,17 @@ model Payment {
   capturedAt        DateTime?        @map("captured_at") @db.Timestamptz(3)
   lastFailureCode   String?          @map("last_failure_code")
   lastFailureReason String?          @map("last_failure_reason")
+  /// Explicit capture (ADR-006): attempts and the last provider error, retried by the sweep.
+  captureAttempts   Int              @default(0) @map("capture_attempts")
+  lastCaptureError  String?          @map("last_capture_error")
+  /// Last time the sweep compared this payment with the provider.
+  lastReconciledAt  DateTime?        @map("last_reconciled_at") @db.Timestamptz(3)
   createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt         DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
   booking           Booking          @relation(fields: [bookingId], references: [id])
   refunds           Refund[]
   deposit           SecurityDeposit?
+  disputes          PaymentDispute[]
 
   @@unique([provider, providerOrderId])
   @@unique([provider, providerPaymentId])
@@ -608,26 +619,29 @@ model Payment {
 
 /// Refund rows are their own outbox: inserted PENDING in the business transaction, sent after commit.
 model Refund {
-  id                    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  paymentId             String       @map("payment_id") @db.Uuid
-  bookingId             String       @map("booking_id") @db.Uuid
-  reason                RefundReason
-  amountPaise           Int          @map("amount_paise")
-  rentalFeePortionPaise Int          @map("rental_fee_portion_paise")
-  depositPortionPaise   Int          @map("deposit_portion_paise")
-  status                RefundStatus @default(PENDING)
-  providerRefundId      String?      @unique @map("provider_refund_id")
-  attempts              Int          @default(0)
-  lastError             String?      @map("last_error")
-  initiatedByRole       ActorRole    @map("initiated_by_role")
-  initiatedByUserId     String?      @map("initiated_by_user_id") @db.Uuid
-  initiatedAt           DateTime?    @map("initiated_at") @db.Timestamptz(3)
-  processedAt           DateTime?    @map("processed_at") @db.Timestamptz(3)
-  createdAt             DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt             DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
-  payment               Payment      @relation(fields: [paymentId], references: [id])
-  booking               Booking      @relation(fields: [bookingId], references: [id])
-  initiatedBy           User?        @relation(fields: [initiatedByUserId], references: [id])
+  id                        String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  paymentId                 String       @map("payment_id") @db.Uuid
+  bookingId                 String       @map("booking_id") @db.Uuid
+  reason                    RefundReason
+  amountPaise               Int          @map("amount_paise")
+  rentalFeePortionPaise     Int          @map("rental_fee_portion_paise")
+  depositPortionPaise       Int          @map("deposit_portion_paise")
+  status                    RefundStatus @default(PENDING)
+  providerRefundId          String?      @unique @map("provider_refund_id")
+  /// Set only for UNEXPECTED_CAPTURE_REVERSAL: the provider payment being returned, which is not the
+  /// booking's own capture and never counts towards payments.refunded_paise.
+  reversedProviderPaymentId String?      @map("reversed_provider_payment_id")
+  attempts                  Int          @default(0)
+  lastError                 String?      @map("last_error")
+  initiatedByRole           ActorRole    @map("initiated_by_role")
+  initiatedByUserId         String?      @map("initiated_by_user_id") @db.Uuid
+  initiatedAt               DateTime?    @map("initiated_at") @db.Timestamptz(3)
+  processedAt               DateTime?    @map("processed_at") @db.Timestamptz(3)
+  createdAt                 DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                 DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  payment                   Payment      @relation(fields: [paymentId], references: [id])
+  booking                   Booking      @relation(fields: [bookingId], references: [id])
+  initiatedBy               User?        @relation(fields: [initiatedByUserId], references: [id])
 
   @@index([bookingId])
   @@map("refunds")
@@ -669,6 +683,35 @@ model SecurityDeposit {
   @@map("security_deposits")
 }
 
+enum PaymentDisputeStatus {
+  OPEN
+  WON
+  LOST
+  CLOSED
+}
+
+/// A chargeback raised by the payer's bank through the payment provider. While one is OPEN for a
+/// booking's payment, the owner's payout is on hold.
+model PaymentDispute {
+  id                String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider          String
+  providerDisputeId String               @map("provider_dispute_id")
+  providerPaymentId String               @map("provider_payment_id")
+  paymentId         String?              @map("payment_id") @db.Uuid
+  bookingId         String?              @map("booking_id") @db.Uuid
+  status            PaymentDisputeStatus @default(OPEN)
+  amountPaise       Int                  @map("amount_paise")
+  reasonCode        String?              @map("reason_code")
+  createdAt         DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+  payment           Payment?             @relation(fields: [paymentId], references: [id])
+  booking           Booking?             @relation(fields: [bookingId], references: [id])
+
+  @@unique([provider, providerDisputeId])
+  @@index([bookingId, status])
+  @@map("payment_disputes")
+}
+
 /// What the platform owes the owner for one booking. Marked PAID by an admin with a reference.
 model Payout {
   id                   String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -680,6 +723,8 @@ model Payout {
   netPaise             Int          @map("net_paise")
   status               PayoutStatus @default(PENDING)
   payoutReference      String?      @map("payout_reference")
+  /// Why a payout recorded as paid came back (status FAILED).
+  failureReason        String?      @map("failure_reason")
   paidAt               DateTime?    @map("paid_at") @db.Timestamptz(3)
   paidById             String?      @map("paid_by") @db.Uuid
   notes                String?
