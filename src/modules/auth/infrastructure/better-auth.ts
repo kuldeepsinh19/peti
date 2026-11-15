@@ -4,7 +4,7 @@ import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { admin, phoneNumber } from "better-auth/plugins";
-import type { Env } from "@/config/env";
+import { type Env, list } from "@/config/env";
 import type { RateLimiter } from "@/shared/application/rate-limiter";
 import { RateLimitedError } from "@/shared/domain/errors";
 import type { Db } from "@/shared/infrastructure/prisma";
@@ -85,14 +85,15 @@ export function createAuth({ env, db, mail, sms, rateLimiter }: AuthDeps) {
     },
     advanced: {
       database: { generateId: "uuid" },
-      // Which headers carry the client address depends on the host; set them explicitly in production.
+      // Which header carries the client address depends on the host, and only a trusted proxy can vouch
+      // for it. env.ts requires it to be configured outside local and test; there is no default there.
       ipAddress: {
-        ipAddressHeaders: env.AUTH_IP_HEADERS?.split(",").map((h) => h.trim().toLowerCase()) ?? [
-          "x-forwarded-for",
-        ],
-        ...(env.AUTH_TRUSTED_PROXIES
-          ? { trustedProxies: env.AUTH_TRUSTED_PROXIES.split(",").map((p) => p.trim()) }
-          : {}),
+        ipAddressHeaders: list(env.AUTH_IP_HEADERS).length
+          ? list(env.AUTH_IP_HEADERS).map((h) => h.toLowerCase())
+          : env.APP_ENV === "local" || env.APP_ENV === "test"
+            ? ["x-forwarded-for"]
+            : [],
+        ...(list(env.AUTH_TRUSTED_PROXIES).length ? { trustedProxies: list(env.AUTH_TRUSTED_PROXIES) } : {}),
       },
       useSecureCookies: env.APP_URL.startsWith("https://"),
     },

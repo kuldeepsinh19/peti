@@ -23,6 +23,7 @@ const production = {
   S3_ACCESS_KEY_ID: "id",
   S3_SECRET_ACCESS_KEY: "secret",
   CRON_SECRET: "cron",
+  AUTH_IP_HEADERS: "x-real-ip",
 };
 
 function issuesFor(source: Record<string, string | undefined>): string[] {
@@ -88,6 +89,39 @@ describe("parseEnv", () => {
   it("only accepts Razorpay test-mode keys", () => {
     const issues = issuesFor({ ...production, RAZORPAY_KEY_ID: "rzp_live_abc" });
     expect(issues.some((i) => i.includes("test-mode keys"))).toBe(true);
+  });
+
+  describe("client address trust (audit S-02)", () => {
+    const staging = { ...production, APP_ENV: "staging" };
+
+    it("requires the proxy's client-address header outside local and test", () => {
+      expect(issuesFor({ ...staging, AUTH_IP_HEADERS: undefined })).toContain(
+        "AUTH_IP_HEADERS: required: the header your proxy sets with the client address",
+      );
+    });
+
+    it("only trusts X-Forwarded-For together with the proxies allowed to extend it", () => {
+      expect(issuesFor({ ...staging, AUTH_IP_HEADERS: "x-forwarded-for" })).toContain(
+        "AUTH_TRUSTED_PROXIES: required when AUTH_IP_HEADERS includes x-forwarded-for",
+      );
+      expect(
+        issuesFor({
+          ...staging,
+          AUTH_IP_HEADERS: "X-Forwarded-For",
+          AUTH_TRUSTED_PROXIES: "10.0.0.0/8, 192.0.2.10",
+        }),
+      ).toEqual([]);
+    });
+
+    it("rejects trusted proxies that are not addresses or ranges", () => {
+      expect(issuesFor({ ...staging, AUTH_TRUSTED_PROXIES: "10.0.0.0/8,my-load-balancer" })).toContain(
+        'AUTH_TRUSTED_PROXIES: "my-load-balancer" is not an IP address or CIDR range',
+      );
+    });
+
+    it("keeps working locally without any proxy configuration", () => {
+      expect(issuesFor(base)).toEqual([]);
+    });
   });
 
   it("rejects a short auth secret", () => {

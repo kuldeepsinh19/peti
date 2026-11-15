@@ -15,6 +15,16 @@ const optionalString = z
   .transform((v) => (v === "" ? undefined : v))
   .optional();
 
+/** Splits a comma-separated setting into trimmed, non-empty entries. */
+export const list = (value: string | undefined): string[] =>
+  value
+    ?.split(",")
+    .map((v) => v.trim())
+    .filter(Boolean) ?? [];
+
+const ipOrCidr = z.union([z.ipv4(), z.ipv6(), z.cidrv4(), z.cidrv6()]);
+const isIpOrCidr = (value: string) => ipOrCidr.safeParse(value).success;
+
 const booleanString = z
   .enum(["true", "false", "1", "0"])
   .optional()
@@ -95,6 +105,21 @@ export const envSchema = z
       if (!env.CRON_SECRET) issue("CRON_SECRET", "required in production");
       if (env.RAZORPAY_KEY_ID?.startsWith("rzp_live_"))
         issue("RAZORPAY_KEY_ID", "live Razorpay keys are not supported by this MVP; use test-mode keys");
+    }
+    // Client addresses come from headers, which only a trusted proxy can vouch for. Outside local and test
+    // the deployment must say which header its proxy sets; X-Forwarded-For can be extended by any client,
+    // so it is only accepted together with the proxies allowed to append to it.
+    if (env.APP_ENV !== "local" && env.APP_ENV !== "test") {
+      const headers = list(env.AUTH_IP_HEADERS).map((h) => h.toLowerCase());
+      if (headers.length === 0) {
+        issue("AUTH_IP_HEADERS", "required: the header your proxy sets with the client address");
+      } else if (headers.includes("x-forwarded-for") && list(env.AUTH_TRUSTED_PROXIES).length === 0) {
+        issue("AUTH_TRUSTED_PROXIES", "required when AUTH_IP_HEADERS includes x-forwarded-for");
+      }
+      for (const proxy of list(env.AUTH_TRUSTED_PROXIES)) {
+        if (!isIpOrCidr(proxy))
+          issue("AUTH_TRUSTED_PROXIES", `"${proxy}" is not an IP address or CIDR range`);
+      }
     }
     // Placeholder values from .env.example must never reach a shared environment.
     if (env.APP_ENV !== "local" && env.APP_ENV !== "test") {
