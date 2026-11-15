@@ -4,7 +4,7 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { parseEnv, type Env } from "@/config/env";
-import { DISABLED_PATHS, createAuth } from "@/modules/auth/infrastructure/better-auth";
+import { DEMO_DISABLED_PATHS, DISABLED_PATHS, createAuth } from "@/modules/auth/infrastructure/better-auth";
 import { systemClock } from "@/shared/domain/clock";
 import { postgresRateLimiter } from "@/shared/infrastructure/rate-limiter";
 import { db, resetDatabase } from "../support/db";
@@ -105,5 +105,56 @@ describe("endpoints the product does not use (S-05, H2)", () => {
         expect({ path, method, status: res.status }).toEqual({ path, method, status: 404 });
       }
     }
+  });
+});
+
+describe("public demo: no self-service account management", () => {
+  const demoEnv = {
+    APP_ENV: "demo",
+    SANDBOX_PAYMENT_KEY_SECRET: "a-real-random-sandbox-key",
+    SANDBOX_PAYMENT_WEBHOOK_SECRET: "a-real-random-sandbox-webhook",
+    CRON_SECRET: "a-real-random-cron-secret",
+    AUTH_IP_HEADERS: "x-real-ip",
+    BETTER_AUTH_SECRET: "a-demo-secret-that-is-long-enough-123456",
+  };
+
+  it("refuses sign-up, password reset and phone verification, so shared accounts cannot be taken over", async () => {
+    const { call } = authFor(demoEnv);
+    expect(
+      (
+        await call("/sign-up/email", {
+          name: "Real Person",
+          email: "real@example.in",
+          password: "a-long-password-1",
+        })
+      ).status,
+    ).toBe(404);
+    expect(
+      (await call("/request-password-reset", { email: "rohan@peti.local", redirectTo: "/reset-password" }))
+        .status,
+    ).toBe(404);
+    expect((await call("/reset-password", { newPassword: "taken-over-123", token: "x" })).status).toBe(404);
+    expect((await call("/phone-number/send-otp", { phoneNumber: "+919000000006" })).status).toBe(404);
+    for (const path of DEMO_DISABLED_PATHS) {
+      expect({ path, status: (await call(path, {})).status }).toEqual({ path, status: 404 });
+    }
+    expect(await db.user.count()).toBe(0);
+    expect(await db.devOutboxMessage.count()).toBe(0);
+  });
+
+  it("still lets the shared demo accounts sign in", async () => {
+    const { call: signUpLocally } = authFor();
+    await signUpLocally("/sign-up/email", {
+      name: "Rohan",
+      email: "rohan@peti.local",
+      password: "peti-demo-password",
+    });
+    const { call } = authFor(demoEnv);
+    const res = await call(
+      "/sign-in/email",
+      { email: "rohan@peti.local", password: "peti-demo-password" },
+      { "x-real-ip": "203.0.113.5" },
+    );
+    expect(res.status).toBe(200);
   });
 });

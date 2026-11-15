@@ -1,5 +1,5 @@
 import "server-only";
-import { getEnv, isDevToolingEnabled } from "@/config/env";
+import { allowsSandboxPayments, getEnv } from "@/config/env";
 import { marketplacePolicy } from "@/config/marketplace-policy";
 import { adminUseCases } from "@/modules/admin";
 import { prismaAdminRepository } from "@/modules/admin/infrastructure/prisma-admin-repository";
@@ -54,7 +54,6 @@ function build() {
   const env = getEnv();
   const db = getPrisma();
   const clock = systemClock;
-  const devTooling = isDevToolingEnabled(env);
 
   const mail: MailSender =
     env.MAIL_DRIVER === "smtp" && env.SMTP_URL
@@ -77,13 +76,13 @@ function build() {
       : filesystemStorage(env.STORAGE_FS_ROOT);
   const images = sharpImageProcessor(marketplacePolicy.maxUploadBytes);
 
-  // Payment provider registry. The sandbox exists only where dev tooling is enabled (local/test); env.ts
+  // Payment provider registry. The sandbox exists only in local, test and the public demo; env.ts
   // additionally refuses to boot production with it.
   let sandbox: SandboxProvider | null = null;
   let provider: PaymentProvider;
   if (env.PAYMENT_PROVIDER === "sandbox") {
-    if (!devTooling)
-      throw new Error("The sandbox payment provider is only available when APP_ENV is local or test.");
+    if (!allowsSandboxPayments(env))
+      throw new Error("The sandbox payment provider is only available when APP_ENV is local, test or demo.");
     sandbox = sandboxProvider(db, {
       keySecret: env.SANDBOX_PAYMENT_KEY_SECRET!,
       webhookSecret: env.SANDBOX_PAYMENT_WEBHOOK_SECRET!,
@@ -128,7 +127,6 @@ function build() {
     auth,
     storage,
     images,
-    devTooling,
     rateLimiter,
     sandbox,
     /** Private photos (condition reports): administrators and the two people in the rental only. */

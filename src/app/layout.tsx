@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { allowsSelfServiceAccounts } from "@/config/env";
 import { site } from "@/config/site";
 import { getActor } from "@/composition/session";
 import { SiteFooter } from "./_components/site-footer";
@@ -29,6 +30,11 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         >
           Skip to content
         </a>
+        {allowsSelfServiceAccounts() ? null : (
+          <p className="bg-olive-deep px-4 py-2 text-center text-caption text-paper">
+            Demonstration: fictional people and outfits, sandbox payments only. Do not enter real details.
+          </p>
+        )}
         <SiteHeader viewer={viewer} />
         <main id="main" className="flex-1">
           {children}

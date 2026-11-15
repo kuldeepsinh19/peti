@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { allowsSelfServiceAccounts } from "@/config/env";
 import { SignUpForm } from "@/modules/auth/ui/auth-forms";
 import { SectionIndex } from "@/shared/ui/layout";
+import { DemoAccountsOnly } from "../demo-notice";
 
 export const metadata: Metadata = { title: "Join Peti" };
+export const dynamic = "force-dynamic";
 
 export default function SignUpPage() {
   return (
@@ -16,7 +19,7 @@ export default function SignUpPage() {
         We will email you a link to confirm your address. To request or list an outfit you will also verify
         your mobile number. We never ask for identity documents.
       </p>
-      <SignUpForm />
+      {allowsSelfServiceAccounts() ? <SignUpForm /> : <DemoAccountsOnly />}
       <p className="text-sm text-graphite">
         Already have an account? <Link href="/sign-in">Sign in</Link>
       </p>

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { container } from "@/composition/container";
+import { isDevToolingEnabled } from "@/config/env";
 import { EmptyState } from "@/shared/ui/feedback";
 import { Page, PageHeader } from "@/shared/ui/layout";
 
@@ -13,6 +15,8 @@ const time = new Intl.DateTimeFormat("en-IN", {
 
 /** Emails and SMS captured by the outbox adapters in local/test environments (the layout 404s elsewhere). */
 export default async function DevOutboxPage() {
+  // Every email and one-time code is shown here: never on a shared or public deployment.
+  if (!isDevToolingEnabled()) notFound();
   const messages = await container().db.devOutboxMessage.findMany({
     orderBy: { createdAt: "desc" },
     take: 50,

@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { allowsSelfServiceAccounts } from "@/config/env";
 import { SignInForm } from "@/modules/auth/ui/auth-forms";
 import { Notice } from "@/shared/ui/feedback";
 import { SectionIndex } from "@/shared/ui/layout";
+import { DemoAccounts } from "../demo-notice";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -24,10 +26,13 @@ export default async function SignInPage({
           Sign in with your new password.
         </Notice>
       ) : null}
+      {allowsSelfServiceAccounts() ? null : <DemoAccounts />}
       <SignInForm next={next} />
-      <p className="text-sm text-graphite">
-        New to Peti? <Link href="/sign-up">Create an account</Link>
-      </p>
+      {allowsSelfServiceAccounts() ? (
+        <p className="text-sm text-graphite">
+          New to Peti? <Link href="/sign-up">Create an account</Link>
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -28,3 +28,16 @@ export const occasions = [
 ] as const;
 
 export type OccasionValue = (typeof occasions)[number]["value"];
+
+/**
+ * The shared, fictional accounts of the public demo (APP_ENV=demo), created by `pnpm db:seed`. Their
+ * password is published on purpose; nothing real is ever stored in the demo.
+ */
+export const demoAccounts = {
+  password: "peti-demo-password",
+  accounts: [
+    { email: "rohan@peti.local", role: "Renter" },
+    { email: "aarav@peti.local", role: "Owner" },
+    { email: "meera@peti.local", role: "Owner" },
+  ],
+} as const;

@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { allowsSelfServiceAccounts } from "@/config/env";
 import { ForgotPasswordForm } from "@/modules/auth/ui/auth-forms";
 import { SectionIndex } from "@/shared/ui/layout";
+import { DemoAccountsOnly } from "../demo-notice";
 
 export const metadata: Metadata = { title: "Reset your password" };
+export const dynamic = "force-dynamic";
 
 export default function ForgotPasswordPage() {
   return (
@@ -13,7 +16,7 @@ export default function ForgotPasswordPage() {
       <p className="text-graphite">
         Enter the email you signed up with and we will send you a link to choose a new one.
       </p>
-      <ForgotPasswordForm />
+      {allowsSelfServiceAccounts() ? <ForgotPasswordForm /> : <DemoAccountsOnly />}
       <p className="text-sm text-graphite">
         Remembered it? <Link href="/sign-in">Sign in</Link>
       </p>

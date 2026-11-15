@@ -1,3 +1,5 @@
+import { notFound } from "next/navigation";
+import { isDevToolingEnabled } from "@/config/env";
 import type { Metadata } from "next";
 import { formatInr, rupees } from "@/shared/domain/money";
 import { Button, ButtonLink } from "@/shared/ui/button";
@@ -35,6 +37,7 @@ const sampleRows = [
 ];
 
 export default function DesignSystemPage() {
+  if (!isDevToolingEnabled()) notFound();
   return (
     <Page className="pb-24">
       <PageHeader

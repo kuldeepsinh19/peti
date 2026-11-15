@@ -1,6 +1,7 @@
 "use server";
 
 import { container } from "@/composition/container";
+import { allowsSandboxPayments } from "@/config/env";
 import { sandboxOrderForRenter } from "./access";
 
 type SandboxOutcome = Parameters<NonNullable<ReturnType<typeof container>["sandbox"]>["simulate"]>[1];
@@ -22,8 +23,8 @@ export async function completeSandboxCheckout(
   orderId: string,
   outcome: string,
 ): Promise<{ callback: Record<string, string> | null; callbackUrl: string; webhookStatuses: number[] }> {
-  const { sandbox, env, devTooling } = container();
-  if (!devTooling || !sandbox) throw new Error("The sandbox provider is not enabled.");
+  const { sandbox, env } = container();
+  if (!allowsSandboxPayments(env) || !sandbox) throw new Error("The sandbox provider is not enabled.");
   if (!OUTCOMES.includes(outcome as SandboxOutcome)) throw new Error("Unknown outcome.");
   if (!(await sandboxOrderForRenter(orderId))) throw new Error("Checkout not found.");
   const sim = await sandbox.simulate(orderId, outcome as SandboxOutcome);

@@ -4,7 +4,7 @@ import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { admin, phoneNumber } from "better-auth/plugins";
-import { type Env, list } from "@/config/env";
+import { type Env, allowsSelfServiceAccounts, list } from "@/config/env";
 import type { RateLimiter } from "@/shared/application/rate-limiter";
 import { RateLimitedError } from "@/shared/domain/errors";
 import type { Db } from "@/shared/infrastructure/prisma";
@@ -63,6 +63,21 @@ export const DISABLED_PATHS = [
   "/delete-user",
 ] as const;
 
+/**
+ * Also off in the public demo (APP_ENV=demo): visitors share the seeded, already verified demo accounts.
+ * Without sign-up, password reset and phone verification nobody can take one over or lock others out,
+ * and no real person's details or contact data enter the demo.
+ */
+export const DEMO_DISABLED_PATHS = [
+  "/sign-up/email",
+  "/request-password-reset",
+  "/reset-password",
+  "/send-verification-email",
+  "/verify-email",
+  "/phone-number/send-otp",
+  "/phone-number/verify",
+] as const;
+
 export function createAuth({ env, db, mail, sms, rateLimiter }: AuthDeps) {
   const trustedOrigins = [
     env.APP_URL,
@@ -80,7 +95,7 @@ export function createAuth({ env, db, mail, sms, rateLimiter }: AuthDeps) {
     secret: env.BETTER_AUTH_SECRET,
     trustedOrigins,
     database: prismaAdapter(db, { provider: "postgresql" }),
-    disabledPaths: [...DISABLED_PATHS],
+    disabledPaths: [...DISABLED_PATHS, ...(allowsSelfServiceAccounts(env) ? [] : DEMO_DISABLED_PATHS)],
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
         const phonePath = ctx.path === "/phone-number/verify" || ctx.path === "/phone-number/send-otp";

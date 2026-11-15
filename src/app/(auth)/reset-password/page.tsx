@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { allowsSelfServiceAccounts } from "@/config/env";
 import { ResetPasswordForm } from "@/modules/auth/ui/auth-forms";
 import { Notice } from "@/shared/ui/feedback";
 import { SectionIndex } from "@/shared/ui/layout";
+import { DemoAccountsOnly } from "../demo-notice";
 
 export const metadata: Metadata = { title: "Choose a new password" };
 
@@ -17,7 +19,9 @@ export default async function ResetPasswordPage({
     <div className="flex flex-col gap-8">
       <SectionIndex>Password recovery</SectionIndex>
       <h1 className="text-display-md">Choose a new password</h1>
-      {token && !params.error ? (
+      {!allowsSelfServiceAccounts() ? (
+        <DemoAccountsOnly />
+      ) : token && !params.error ? (
         <ResetPasswordForm token={token} />
       ) : (
         <Notice tone="danger" title="This link is not valid">

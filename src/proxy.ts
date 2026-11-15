@@ -1,6 +1,6 @@
 import { getSessionCookie } from "better-auth/cookies";
 import { type NextRequest, NextResponse } from "next/server";
-import { isDevToolingEnabled } from "@/config/env";
+import { devRouteAllowed } from "@/config/env";
 
 /**
  * Cheap redirect for anonymous visitors to signed-in areas. This only checks that a session cookie
@@ -8,10 +8,12 @@ import { isDevToolingEnabled } from "@/config/env";
  * authorises the actor on the server.
  */
 export function proxy(request: NextRequest) {
-  // Development tooling (dev outbox, sandbox checkout, design system) does not exist outside local/test.
-  // Checked here as well as in the /dev layout, so no rendering path can reach it.
+  // Development tooling (dev outbox, design system) exists only in local/test; the sandbox checkout also in
+  // the public demo. Checked here as well as in the /dev layout and pages, so no rendering path reaches it.
   if (request.nextUrl.pathname.startsWith("/dev")) {
-    return isDevToolingEnabled() ? NextResponse.next() : new NextResponse("Not found", { status: 404 });
+    return devRouteAllowed(request.nextUrl.pathname)
+      ? NextResponse.next()
+      : new NextResponse("Not found", { status: 404 });
   }
   if (!getSessionCookie(request)) {
     const url = new URL("/sign-in", request.url);

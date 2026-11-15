@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { InvalidEnvironmentError, isDevToolingEnabled, parseEnv } from "@/config/env";
+import {
+  InvalidEnvironmentError,
+  allowsSandboxPayments,
+  allowsSelfServiceAccounts,
+  devRouteAllowed,
+  isDevToolingEnabled,
+  parseEnv,
+} from "@/config/env";
 
 const base = {
   DATABASE_URL: "postgresql://peti:peti@localhost:5432/peti",
@@ -121,6 +128,57 @@ describe("parseEnv", () => {
 
     it("keeps working locally without any proxy configuration", () => {
       expect(issuesFor(base)).toEqual([]);
+    });
+  });
+
+  describe("public demo (APP_ENV=demo)", () => {
+    const demo = {
+      ...base,
+      APP_ENV: "demo",
+      SANDBOX_PAYMENT_KEY_SECRET: "a-real-random-sandbox-key",
+      SANDBOX_PAYMENT_WEBHOOK_SECRET: "a-real-random-sandbox-webhook",
+      CRON_SECRET: "a-real-random-cron-secret",
+      AUTH_IP_HEADERS: "x-real-ip",
+    };
+
+    it("allows sandbox payments but no developer tooling and no self-service accounts", () => {
+      const env = parseEnv(demo);
+      expect(allowsSandboxPayments(env)).toBe(true);
+      expect(isDevToolingEnabled(env)).toBe(false);
+      expect(allowsSelfServiceAccounts(env)).toBe(false);
+    });
+
+    it("exposes the sandbox checkout but never the developer outbox", () => {
+      const env = parseEnv(demo);
+      expect(devRouteAllowed("/dev/sandbox-checkout/order_sb_1", env)).toBe(true);
+      expect(devRouteAllowed("/dev/outbox", env)).toBe(false);
+      expect(devRouteAllowed("/dev/design-system", env)).toBe(false);
+      expect(devRouteAllowed("/dev/sandbox-checkout-evil", env)).toBe(false);
+    });
+
+    it("requires a cron secret, the client-address header and the sandbox provider", () => {
+      const issues = issuesFor({ ...demo, CRON_SECRET: undefined, AUTH_IP_HEADERS: undefined });
+      expect(issues).toContain("CRON_SECRET: required in the demo");
+      expect(issues.some((i) => i.startsWith("AUTH_IP_HEADERS"))).toBe(true);
+      expect(issuesFor({ ...demo, ...production, APP_ENV: "demo" })).toContain(
+        "PAYMENT_PROVIDER: the demo uses the sandbox provider only",
+      );
+    });
+
+    it("rejects the placeholder secrets from .env.example", () => {
+      expect(issuesFor({ ...demo, SANDBOX_PAYMENT_KEY_SECRET: "replace-with-a-random-string" })).toContain(
+        "SANDBOX_PAYMENT_KEY_SECRET: still has the placeholder value from .env.example",
+      );
+    });
+
+    it("keeps everything on in local and test", () => {
+      const env = parseEnv(base);
+      expect([allowsSandboxPayments(env), isDevToolingEnabled(env), allowsSelfServiceAccounts(env)]).toEqual([
+        true,
+        true,
+        true,
+      ]);
+      expect(devRouteAllowed("/dev/outbox", env)).toBe(true);
     });
   });
 

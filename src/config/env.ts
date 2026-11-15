@@ -7,7 +7,11 @@ import { z } from "zod";
  * previews and the e2e server, so it cannot decide whether the sandbox payment provider or the dev
  * outbox may run.
  */
-const appEnv = z.enum(["local", "test", "staging", "production"]);
+/**
+ * `demo` is a public demonstration with fictional data: sandbox payments work, but there is no developer
+ * outbox and no self-service account management (sign-up, password reset, phone verification).
+ */
+const appEnv = z.enum(["local", "test", "demo", "staging", "production"]);
 
 const optionalString = z
   .string()
@@ -121,6 +125,12 @@ export const envSchema = z
           issue("AUTH_TRUSTED_PROXIES", `"${proxy}" is not an IP address or CIDR range`);
       }
     }
+    // A public demo pays through the sandbox only and must be able to run its scheduler securely.
+    if (env.APP_ENV === "demo") {
+      if (env.PAYMENT_PROVIDER !== "sandbox")
+        issue("PAYMENT_PROVIDER", "the demo uses the sandbox provider only");
+      if (!env.CRON_SECRET) issue("CRON_SECRET", "required in the demo");
+    }
     // Placeholder values from .env.example must never reach a shared environment.
     if (env.APP_ENV !== "local" && env.APP_ENV !== "test") {
       for (const key of [
@@ -169,7 +179,31 @@ export function getEnv(): Env {
   return cached;
 }
 
-/** Development conveniences (dev outbox, sandbox checkout, design-system page) are only routable here. */
+/**
+ * Development tooling (the dev outbox, which shows every email and one-time code, and the design-system
+ * page) exists only on developer machines and in automated tests, never on a shared or public deployment.
+ */
 export function isDevToolingEnabled(env: Env = getEnv()): boolean {
   return env.APP_ENV === "local" || env.APP_ENV === "test";
+}
+
+/** The sandbox payment provider and its checkout page: development, tests and the public demo. */
+export function allowsSandboxPayments(env: Env = getEnv()): boolean {
+  return isDevToolingEnabled(env) || env.APP_ENV === "demo";
+}
+
+/**
+ * Sign-up, password reset and phone verification. Off in the public demo: their emails and codes cannot
+ * be delivered there, and visitors share the seeded demo accounts, which must not be taken over or locked.
+ */
+export function allowsSelfServiceAccounts(env: Env = getEnv()): boolean {
+  return env.APP_ENV !== "demo";
+}
+
+/** Which /dev routes exist: the sandbox checkout follows sandbox payments, everything else dev tooling. */
+export function devRouteAllowed(pathname: string, env: Env = getEnv()): boolean {
+  if (pathname === "/dev/sandbox-checkout" || pathname.startsWith("/dev/sandbox-checkout/")) {
+    return allowsSandboxPayments(env);
+  }
+  return isDevToolingEnabled(env);
 }
