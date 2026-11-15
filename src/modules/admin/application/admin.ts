@@ -4,6 +4,7 @@ import type { AuditLog } from "@/shared/application/audit";
 import { requireAdmin } from "@/shared/application/authorization";
 import { NotFoundError, PreconditionError, ValidationError } from "@/shared/domain/errors";
 import { parseInput } from "@/shared/contracts/validation";
+import { UPI_VPA } from "@/modules/users";
 
 const BOOKING_STATUSES = [
   "PENDING_APPROVAL",
@@ -118,9 +119,15 @@ export interface AdminRepository {
   bookings(status: string | undefined): Promise<AdminBookingRow[]>;
   openDisputes(): Promise<AdminBookingRow[]>;
   payouts(status: string | undefined): Promise<AdminPayoutRow[]>;
-  findPayout(
-    payoutId: string,
-  ): Promise<{ id: string; status: string; bookingId: string; netPaise: number } | null>;
+  /** `upiVpa` is the owner's current payout UPI ID, or null when they have not added one. */
+  findPayout(payoutId: string): Promise<{
+    id: string;
+    status: string;
+    bookingId: string;
+    netPaise: number;
+    upiVpa: string | null;
+  } | null>;
+  /** Marks a PENDING payout paid, only if its owner still has a payout account; false otherwise. */
   markPayoutPaid(payoutId: string, reference: string, paidBy: string, at: Date): Promise<boolean>;
   audit(limit: number): Promise<AuditRow[]>;
   categories(): Promise<CategoryRow[]>;
@@ -254,6 +261,14 @@ export function adminUseCases({
       if (!payout) throw new NotFoundError("Payout");
       if (payout.status !== "PENDING")
         throw new PreconditionError("PAYOUT_NOT_PENDING", "This payout is not pending.");
+      // Money is only ever sent to a valid UPI ID the owner gave us (FR-PROF-06); otherwise a payout could
+      // be recorded as paid with nowhere it could have gone.
+      if (!payout.upiVpa || !UPI_VPA.test(payout.upiVpa)) {
+        throw new PreconditionError(
+          "NO_PAYOUT_ACCOUNT",
+          "The owner has not added a valid UPI ID yet, so this payout cannot be sent or marked paid.",
+        );
+      }
       if (!(await admin.markPayoutPaid(payoutId, reference, me.userId, clock.now()))) {
         throw new PreconditionError("PAYOUT_NOT_PENDING", "This payout changed. Please reload.");
       }
@@ -263,7 +278,7 @@ export function adminUseCases({
         action: "payout.markPaid",
         entityType: "payout",
         entityId: payoutId,
-        after: { status: "PAID", reference, netPaise: payout.netPaise },
+        after: { status: "PAID", reference, netPaise: payout.netPaise, upiVpa: payout.upiVpa },
       });
     },
 

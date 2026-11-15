@@ -130,14 +130,15 @@ administrator refunds such payments by hand.
 
 ### Reviews and administration
 
-| Code                   | Meaning                                            | Raised in                                |
-| ---------------------- | -------------------------------------------------- | ---------------------------------------- |
-| `NOT_COMPLETED`        | Reviewing a rental that is not complete            | `modules/reviews/application/reviews.ts` |
-| `REVIEW_WINDOW_CLOSED` | More than 14 days after completion                 | `modules/reviews/application/reviews.ts` |
-| `ALREADY_REVIEWED`     | One review per person per rental                   | `modules/reviews/application/reviews.ts` |
-| `SELF_SUSPEND`         | An administrator suspending their own account      | `modules/admin/application/admin.ts`     |
-| `ADMIN_TARGET`         | Suspending another administrator                   | `modules/admin/application/admin.ts`     |
-| `PAYOUT_NOT_PENDING`   | Marking a payout paid when it is no longer pending | `modules/admin/application/admin.ts`     |
+| Code                   | Meaning                                                           | Raised in                                |
+| ---------------------- | ----------------------------------------------------------------- | ---------------------------------------- |
+| `NOT_COMPLETED`        | Reviewing a rental that is not complete                           | `modules/reviews/application/reviews.ts` |
+| `REVIEW_WINDOW_CLOSED` | More than 14 days after completion                                | `modules/reviews/application/reviews.ts` |
+| `ALREADY_REVIEWED`     | One review per person per rental                                  | `modules/reviews/application/reviews.ts` |
+| `SELF_SUSPEND`         | An administrator suspending their own account                     | `modules/admin/application/admin.ts`     |
+| `ADMIN_TARGET`         | Suspending another administrator                                  | `modules/admin/application/admin.ts`     |
+| `PAYOUT_NOT_PENDING`   | Marking a payout paid when it is no longer pending                | `modules/admin/application/admin.ts`     |
+| `NO_PAYOUT_ACCOUNT`    | Marking a payout paid while the owner has no valid UPI ID on file | `modules/admin/application/admin.ts`     |
 
 ## From error to ActionResult
 

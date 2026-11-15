@@ -123,6 +123,8 @@ export default async function AdminPayoutsPage({
             cell: (r) =>
               r.status === "PAID" ? (
                 <span className="numeral">{r.payoutReference}</span>
+              ) : !r.upiVpa ? (
+                <span className="text-sm text-graphite">Waiting for the owner&rsquo;s UPI ID</span>
               ) : (
                 <form action={adminCommandAction} className="flex items-end gap-2">
                   <input type="hidden" name="command" value="markPayoutPaid" />

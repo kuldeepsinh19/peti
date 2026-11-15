@@ -182,15 +182,32 @@ export function prismaAdminRepository(db: Db): AdminRepository {
       }));
     },
 
-    findPayout: (payoutId) =>
-      db.payout.findUnique({
+    async findPayout(payoutId) {
+      const p = await db.payout.findUnique({
         where: { id: payoutId },
-        select: { id: true, status: true, bookingId: true, netPaise: true },
-      }),
+        select: {
+          id: true,
+          status: true,
+          bookingId: true,
+          netPaise: true,
+          owner: { select: { payoutAccount: { select: { upiVpa: true } } } },
+        },
+      });
+      return p
+        ? {
+            id: p.id,
+            status: p.status,
+            bookingId: p.bookingId,
+            netPaise: p.netPaise,
+            upiVpa: p.owner.payoutAccount?.upiVpa ?? null,
+          }
+        : null;
+    },
 
     async markPayoutPaid(payoutId, reference, paidBy, at) {
+      // The payout account must still exist when the payment is recorded, not only when it was checked.
       const result = await db.payout.updateMany({
-        where: { id: payoutId, status: "PENDING" },
+        where: { id: payoutId, status: "PENDING", owner: { payoutAccount: { isNot: null } } },
         data: { status: "PAID", payoutReference: reference, paidById: paidBy, paidAt: at },
       });
       return result.count === 1;

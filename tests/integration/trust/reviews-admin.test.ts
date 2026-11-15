@@ -92,6 +92,10 @@ describe("administration", () => {
     expect(await db.session.count({ where: { userId: owner.userId } })).toBe(0);
     expect((await db.user.findUniqueOrThrow({ where: { id: owner.userId } })).banned).toBe(true);
 
+    // Payouts need the owner's UPI ID (code-review-fixes / phase-1 tests cover its absence).
+    await db.ownerPayoutAccount.create({
+      data: { userId: owner.userId, upiVpa: "owner.one@okbank", accountHolderName: "Owner One" },
+    });
     const [payout] = await adminCases.payouts(admin, "PENDING");
     await expect(
       adminCases.markPayoutPaid(admin, { payoutId: payout!.id, reference: "x" }),

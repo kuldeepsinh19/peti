@@ -35,12 +35,11 @@ export type AddressInput = z.infer<typeof addressSchema>;
 
 export const addressIdSchema = z.object({ addressId: z.uuid() });
 
+/** A UPI virtual payment address (name@bank). Payouts are only ever sent to one that matches. */
+export const UPI_VPA = /^[a-z0-9._-]{2,64}@[a-z][a-z0-9.-]{1,40}$/;
+
 export const payoutAccountSchema = z.object({
-  upiVpa: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .regex(/^[a-z0-9._-]{2,64}@[a-z][a-z0-9.-]{1,40}$/, "Enter a UPI ID such as name@bank."),
+  upiVpa: z.string().trim().toLowerCase().regex(UPI_VPA, "Enter a UPI ID such as name@bank."),
   accountHolderName: trimmed(2, 80, "Account holder name"),
 });
 export type PayoutAccountInput = z.infer<typeof payoutAccountSchema>;
