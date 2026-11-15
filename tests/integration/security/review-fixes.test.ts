@@ -28,8 +28,8 @@ async function paidBooking(startDate = "2026-12-10") {
   return { app, ...s, bookingId, orderId: paid.orderId };
 }
 
-describe("money the provider took that does not fit the booking", () => {
-  it("flags a second capture for an administrator instead of applying it or retrying forever", async () => {
+describe("money the provider took that does not fit the booking (S-04, ADR-006)", () => {
+  it("never captures a second authorisation on a paid booking, and never retries it forever", async () => {
     const { app, bookingId, orderId } = await paidBooking();
     const first = await db.payment.findUniqueOrThrow({ where: { bookingId } });
 
@@ -37,15 +37,58 @@ describe("money the provider took that does not fit the booking", () => {
     const webhook = second.webhooks[0]!;
     expect(await app.payments.handleWebhook(webhook.body, webhook.headers)).toEqual({
       status: 200,
-      body: "flagged",
+      body: "ok",
     });
     // A provider retry of the same event is a duplicate, not another failure.
-    expect(await app.payments.handleWebhook(webhook.body, webhook.headers)).toMatchObject({ status: 200 });
-    expect((await app.payments.handleCallback(second.callback!)).outcome).toBe("INVALID");
+    expect(await app.payments.handleWebhook(webhook.body, webhook.headers)).toEqual({
+      status: 200,
+      body: "duplicate",
+    });
+    expect((await app.payments.handleCallback(second.callback!)).outcome).toBe("DECLINED");
 
-    expect(await db.auditLog.count({ where: { action: "payment.unexpectedCapture" } })).toBe(2);
+    // Left uncaptured: the provider returns an authorisation nobody captures to the payer.
+    expect((await app.sandbox.provider.fetchPayment(second.paymentIds[0]!)).status).toBe("AUTHORIZED");
+    expect(await db.auditLog.count({ where: { action: "payment.authorizationDeclined" } })).toBe(2);
     const after = await db.payment.findUniqueOrThrow({ where: { bookingId } });
     expect(after.providerPaymentId).toBe(first.providerPaymentId);
+    expect(after.refundedPaise).toBe(0);
+    expect((await db.booking.findUniqueOrThrow({ where: { id: bookingId } })).status).toBe("CONFIRMED");
+  });
+
+  it("queues a full refund of a second payment captured outside Peti, exactly once", async () => {
+    const { app, bookingId, orderId } = await paidBooking();
+    const first = await db.payment.findUniqueOrThrow({ where: { bookingId } });
+
+    const stray = await app.sandbox.simulate(orderId, "pay-captured");
+    const strayId = stray.paymentIds[0]!;
+    const webhook = stray.webhooks[0]!;
+    expect(await app.payments.handleWebhook(webhook.body, webhook.headers)).toEqual({
+      status: 200,
+      body: "ok",
+    });
+    expect((await app.payments.handleCallback(stray.callback!)).outcome).toBe("UNEXPECTED_CAPTURE_REVERSED");
+
+    const reversals = await db.refund.findMany({ where: { reason: "UNEXPECTED_CAPTURE_REVERSAL" } });
+    expect(reversals).toHaveLength(1);
+    expect(reversals[0]).toMatchObject({
+      reversedProviderPaymentId: strayId,
+      amountPaise: first.amountPaise,
+      status: "PENDING",
+    });
+    expect(await db.auditLog.count({ where: { action: "payment.reversalQueued" } })).toBe(1);
+
+    // The dispatcher refunds the stray payment, never the booking's own.
+    expect(await app.payments.dispatchRefunds()).toEqual({ claimed: 1, sent: 1 });
+    const sent = await db.refund.findUniqueOrThrow({ where: { id: reversals[0]!.id } });
+    expect(sent.status).toBe("PROCESSED");
+    const providerRefund = await db.sandboxProviderObject.findUniqueOrThrow({
+      where: { id: sent.providerRefundId! },
+    });
+    expect(providerRefund.data).toMatchObject({ paymentId: strayId, amountPaise: first.amountPaise });
+
+    const after = await db.payment.findUniqueOrThrow({ where: { bookingId } });
+    expect(after.providerPaymentId).toBe(first.providerPaymentId);
+    expect(after.refundedPaise).toBe(0);
     expect((await db.booking.findUniqueOrThrow({ where: { id: bookingId } })).status).toBe("CONFIRMED");
   });
 });

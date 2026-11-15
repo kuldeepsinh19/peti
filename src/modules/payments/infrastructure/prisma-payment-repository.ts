@@ -1,7 +1,7 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
 import type { Db } from "@/shared/infrastructure/prisma";
-import type { PaymentRepository } from "../application/payments";
+import type { PaymentRef, PaymentRepository } from "../application/payments";
 import type { ProviderId } from "../domain/payment-provider";
 
 /** Strips anything that could identify the payer before a webhook payload is stored. */
@@ -10,6 +10,26 @@ function redact(payload: unknown): Prisma.InputJsonValue {
   for (const key of ["email", "contact", "vpa", "card", "bank", "wallet", "prefill"]) delete json[key];
   return json as Prisma.InputJsonValue;
 }
+
+const REF = {
+  id: true,
+  bookingId: true,
+  provider: true,
+  status: true,
+  amountPaise: true,
+  providerOrderId: true,
+  providerPaymentId: true,
+} as const;
+
+const toRef = (p: {
+  id: string;
+  bookingId: string;
+  provider: string;
+  status: string;
+  amountPaise: number;
+  providerOrderId: string | null;
+  providerPaymentId: string | null;
+}): PaymentRef => ({ ...p, provider: p.provider as ProviderId });
 
 export function prismaPaymentRepository(db: Db): PaymentRepository {
   return {
@@ -28,26 +48,35 @@ export function prismaPaymentRepository(db: Db): PaymentRepository {
       await db.payment.update({ where: { id: paymentId }, data: { providerOrderId } });
     },
 
-    findByOrder: (provider, providerOrderId) =>
-      db.payment.findUnique({
-        where: { provider_providerOrderId: { provider, providerOrderId } },
-        select: { id: true, bookingId: true, status: true, amountPaise: true },
-      }),
-
-    async orderForBooking(bookingId) {
+    async findByOrder(provider, providerOrderId) {
       const p = await db.payment.findUnique({
-        where: { bookingId },
-        select: { provider: true, providerOrderId: true },
+        where: { provider_providerOrderId: { provider, providerOrderId } },
+        select: REF,
       });
-      return p?.providerOrderId
-        ? { provider: p.provider as ProviderId, providerOrderId: p.providerOrderId }
-        : null;
+      return p ? toRef(p) : null;
     },
 
-    async recordAuthorized(paymentId, providerPaymentId) {
+    async findForBooking(bookingId) {
+      const p = await db.payment.findUnique({ where: { bookingId }, select: REF });
+      return p ? toRef(p) : null;
+    },
+
+    async recordCaptureFailure(paymentId, error) {
+      await db.payment.update({
+        where: { id: paymentId },
+        data: { captureAttempts: { increment: 1 }, lastCaptureError: error.slice(0, 500) },
+      });
+    },
+
+    async releaseClaim(paymentId, providerPaymentId, error) {
       await db.payment.updateMany({
-        where: { id: paymentId, status: "CREATED" },
-        data: { status: "AUTHORIZED", providerPaymentId },
+        where: { id: paymentId, status: "AUTHORIZED", providerPaymentId },
+        data: {
+          status: "CREATED",
+          providerPaymentId: null,
+          captureAttempts: { increment: 1 },
+          lastCaptureError: error.slice(0, 500),
+        },
       });
     },
 
@@ -95,9 +124,11 @@ export function prismaPaymentRepository(db: Db): PaymentRepository {
             provider: string;
           }>
         >`
-          SELECT r.id, r.amount_paise, r.attempts, p.provider_payment_id, p.provider
+          -- A reversal refunds the stray provider payment it names, never the booking's own payment.
+          SELECT r.id, r.amount_paise, r.attempts, p.provider,
+                 COALESCE(r.reversed_provider_payment_id, p.provider_payment_id) AS provider_payment_id
           FROM refunds r JOIN payments p ON p.id = r.payment_id
-          WHERE p.provider_payment_id IS NOT NULL
+          WHERE COALESCE(r.reversed_provider_payment_id, p.provider_payment_id) IS NOT NULL
             AND (r.status = 'PENDING'
                  -- A worker that crashed between claiming and recording the provider id leaves the row
                  -- INITIATED; reclaim it after a lease. Safe because createRefund is idempotent on our id.

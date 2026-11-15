@@ -299,6 +299,13 @@ export function prismaBookingStore(tx: Tx, notifications: NotificationWriter): B
       });
     },
 
+    async claimAuthorization(paymentId, providerPaymentId) {
+      await tx.payment.update({
+        where: { id: paymentId },
+        data: { status: "AUTHORIZED", providerPaymentId, lastCaptureError: null },
+      });
+    },
+
     async abandonPayment(bookingId) {
       await tx.payment.updateMany({
         where: { bookingId, status: { in: ["CREATED", "AUTHORIZED"] } },
@@ -331,6 +338,21 @@ export function prismaBookingStore(tx: Tx, notifications: NotificationWriter): B
         where: { id: r.paymentId },
         data: { refundedPaise: { increment: r.amountPaise } },
       });
+    },
+
+    async insertReversal(r) {
+      // ON CONFLICT on the partial unique index: a webhook, a callback and a reconciliation run racing for
+      // the same stray capture queue its reversal exactly once.
+      const inserted = await tx.$queryRaw<Array<{ id: string }>>`
+        INSERT INTO refunds (id, payment_id, booking_id, reason, status, amount_paise,
+                             rental_fee_portion_paise, deposit_portion_paise, initiated_by_role,
+                             reversed_provider_payment_id, created_at, updated_at)
+        VALUES (gen_random_uuid(), ${r.paymentId}::uuid, ${r.bookingId}::uuid, 'UNEXPECTED_CAPTURE_REVERSAL',
+                'PENDING', ${r.amountPaise}, 0, 0, 'SYSTEM', ${r.reversedProviderPaymentId}, now(), now())
+        ON CONFLICT (reversed_provider_payment_id) WHERE reversed_provider_payment_id IS NOT NULL
+        DO NOTHING
+        RETURNING id`;
+      return inserted.length === 1;
     },
 
     async insertPayout(p) {

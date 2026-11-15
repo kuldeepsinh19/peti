@@ -348,7 +348,7 @@ describe("deadlines", () => {
     expect((await db.booking.findUniqueOrThrow({ where: { id: bookingId } })).status).toBe("CONFIRMED");
   });
 
-  it("refunds a capture that arrives after expiry, without reviving the booking", async () => {
+  async function expiredWithOrder() {
     const app = buildBookingApp();
     const { outfit, owner, renter } = await scenario();
     const { bookingId } = await app.bookings.request(renter, request(outfit.id));
@@ -357,7 +357,31 @@ describe("deadlines", () => {
     const orderId = (session as { url: string }).url.split("/").pop()!;
     app.clock.advance(13 * HOUR_MS);
     await app.bookings.sweep(); // provider has no payment yet → expires
+    return { app, bookingId, orderId };
+  }
+
+  it("never captures an authorisation that arrives after expiry", async () => {
+    const { app, bookingId, orderId } = await expiredWithOrder();
     const sim = await app.sandbox.simulate(orderId, "pay-webhook-only");
+    expect(await app.payments.handleWebhook(sim.webhooks[0]!.body, sim.webhooks[0]!.headers)).toEqual({
+      status: 200,
+      body: "ok",
+    });
+    const b = await db.booking.findUniqueOrThrow({
+      where: { id: bookingId },
+      include: { refunds: true, payment: true },
+    });
+    expect(b.status).toBe("EXPIRED");
+    expect(b.payment?.status).toBe("ABANDONED");
+    expect(b.refunds).toEqual([]);
+    // Nobody captures it, so the provider returns it to the payer: no money ever reaches Peti.
+    expect((await app.sandbox.provider.fetchPayment(sim.paymentIds[0]!)).status).toBe("AUTHORIZED");
+  });
+
+  it("refunds a capture that arrives after expiry, without reviving the booking", async () => {
+    const { app, bookingId, orderId } = await expiredWithOrder();
+    // Captured without Peti (from the provider dashboard): the money exists and must go back.
+    const sim = await app.sandbox.simulate(orderId, "pay-captured");
     expect(await app.payments.handleWebhook(sim.webhooks[0]!.body, sim.webhooks[0]!.headers)).toEqual({
       status: 200,
       body: "ok",

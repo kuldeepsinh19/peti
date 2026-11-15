@@ -1,9 +1,12 @@
 import "server-only";
 import Razorpay from "razorpay";
 import type {
+  CreateOrderInput,
   PaymentProvider,
+  ProviderEvent,
   ProviderPayment,
   ProviderPaymentStatus,
+  ProviderRefund,
   WebhookParseResult,
 } from "../domain/payment-provider";
 import { PaymentProviderError } from "../domain/payment-provider";
@@ -11,14 +14,17 @@ import { checkoutSignature, hmacSha256Hex, signaturesMatch } from "../domain/sig
 
 /**
  * Razorpay adapter (test mode only — env.ts rejects anything but rzp_test_ keys). Implements the
- * documented Orders → Checkout → signed callback and signed webhook flow. Not exercised against Razorpay
- * in CI; signature handling is unit-tested with computed vectors.
+ * documented Orders (manual capture) → Checkout → signed callback → capture, signed webhooks, refunds and
+ * dispute events. Never exercised against Razorpay: no credentials exist yet. The request builder and the
+ * webhook parsing are unit-tested; the SDK calls are typed against razorpay@2.9.8.
  */
 export interface RazorpayConfig {
   keyId: string;
   keySecret: string;
   webhookSecret: string;
 }
+
+type RzpRefund = { id: string; status: string };
 
 type RzpPayment = {
   id: string;
@@ -35,7 +41,8 @@ const STATUS: Record<string, ProviderPaymentStatus> = {
   created: "CREATED",
   authorized: "AUTHORIZED",
   captured: "CAPTURED",
-  refunded: "CAPTURED",
+  // Captured and then returned in full: never applicable to a booking (audit L9).
+  refunded: "REFUNDED",
   failed: "FAILED",
 };
 
@@ -51,6 +58,48 @@ function toPayment(p: RzpPayment): ProviderPayment {
   };
 }
 
+/**
+ * How long an authorised payment can still be captured. It covers the 12-hour payment window plus time for
+ * a retry; anything Peti does not capture by then is returned to the payer by Razorpay automatically.
+ */
+export const MANUAL_CAPTURE_WINDOW_MINUTES = 24 * 60;
+
+/**
+ * The Orders API request (pure, so it can be tested without the SDK). Capture is manual (ADR-006): the
+ * order-level setting overrides the dashboard, so a second or wrong-amount payment is never captured.
+ */
+export function buildOrderRequest(input: CreateOrderInput) {
+  return {
+    amount: input.amountPaise,
+    currency: "INR",
+    receipt: input.reference,
+    notes: { ...input.notes },
+    payment: {
+      capture: "manual" as const,
+      capture_options: {
+        manual_expiry_period: MANUAL_CAPTURE_WINDOW_MINUTES,
+        refund_speed: "normal" as const,
+      },
+    },
+  };
+}
+
+const REFUND_STATUS: Record<string, ProviderRefund["status"]> = {
+  processed: "PROCESSED",
+  failed: "FAILED",
+};
+const toRefund = (r: { id: string; status: string }): ProviderRefund => ({
+  providerRefundId: r.id,
+  status: REFUND_STATUS[r.status] ?? "PENDING",
+});
+
+const DISPUTE_EVENTS: Record<string, Extract<ProviderEvent, { type: `DISPUTE_${string}` }>["type"]> = {
+  "payment.dispute.created": "DISPUTE_OPENED",
+  "payment.dispute.won": "DISPUTE_WON",
+  "payment.dispute.lost": "DISPUTE_LOST",
+  "payment.dispute.closed": "DISPUTE_CLOSED",
+};
+
 /** Pure parsing and verification, separated from the SDK so it can be unit-tested. */
 export function parseRazorpayWebhook(
   rawBody: string,
@@ -65,13 +114,19 @@ export function parseRazorpayWebhook(
       event: string;
       payload: {
         payment?: { entity: RzpPayment };
-        refund?: { entity: { id: string; payment_id: string; amount: number } };
+        refund?: {
+          entity: { id: string; payment_id: string; amount: number; notes?: Record<string, string> | [] };
+        };
+        dispute?: {
+          entity: { id: string; payment_id: string; amount: number; reason_code?: string };
+        };
       };
     };
     const eventId = headers["x-razorpay-event-id"];
     if (!eventId) return { ok: false, reason: "MALFORMED" };
     const payment = body.payload.payment?.entity;
     const refund = body.payload.refund?.entity;
+    const dispute = body.payload.dispute?.entity;
     const base = { eventId, providerEventType: body.event };
     if ((body.event === "payment.captured" || body.event === "order.paid") && payment) {
       return {
@@ -122,6 +177,25 @@ export function parseRazorpayWebhook(
           providerRefundId: refund.id,
           providerPaymentId: refund.payment_id,
           amountPaise: refund.amount,
+          // Matching by our reference settles a refund whose provider id was never stored (audit S-06).
+          reference:
+            refund.notes && !Array.isArray(refund.notes) && typeof refund.notes.reference === "string"
+              ? refund.notes.reference
+              : null,
+        },
+      };
+    }
+    const disputeType = DISPUTE_EVENTS[body.event];
+    if (disputeType && dispute) {
+      return {
+        ok: true,
+        event: {
+          ...base,
+          type: disputeType,
+          providerDisputeId: dispute.id,
+          providerPaymentId: dispute.payment_id,
+          amountPaise: dispute.amount,
+          reasonCode: dispute.reason_code ?? null,
         },
       };
     }
@@ -162,14 +236,9 @@ export function razorpayProvider(config: RazorpayConfig): PaymentProvider {
     id: "razorpay",
 
     async createOrder(input) {
-      const order = await call(() =>
-        client.orders.create({
-          amount: input.amountPaise,
-          currency: "INR",
-          receipt: input.reference,
-          notes: { ...input.notes },
-        }),
-      );
+      // The SDK's type marks automatic_expiry_period as required even for manual capture; the API does not.
+      const body = buildOrderRequest(input) as unknown as Parameters<typeof client.orders.create>[0];
+      const order = await call(() => client.orders.create(body));
       return { providerOrderId: order.id };
     },
 
@@ -199,12 +268,23 @@ export function razorpayProvider(config: RazorpayConfig): PaymentProvider {
       return toPayment((await call(() => client.payments.fetch(providerPaymentId))) as unknown as RzpPayment);
     },
 
-    async findCapturedPaymentForOrder(providerOrderId) {
+    async listOrderPayments(providerOrderId) {
       const list = (await call(() => client.orders.fetchPayments(providerOrderId))) as unknown as {
         items: RzpPayment[];
       };
-      const captured = list.items.find((p) => p.status === "captured");
-      return captured ? toPayment(captured) : null;
+      return list.items.map(toPayment);
+    },
+
+    async capturePayment(providerPaymentId, amountPaise) {
+      return toPayment(
+        (await call(() =>
+          client.payments.capture(providerPaymentId, amountPaise, "INR"),
+        )) as unknown as RzpPayment,
+      );
+    },
+
+    async fetchRefund(providerRefundId) {
+      return toRefund((await call(() => client.refunds.fetch(providerRefundId))) as unknown as RzpRefund);
     },
 
     async createRefund(input) {
@@ -226,11 +306,7 @@ export function razorpayProvider(config: RazorpayConfig): PaymentProvider {
             notes: { reference: input.reference },
           }),
         )) as unknown as { id: string; status: string });
-      return {
-        providerRefundId: refund.id,
-        status:
-          refund.status === "processed" ? "PROCESSED" : refund.status === "failed" ? "FAILED" : "PENDING",
-      };
+      return toRefund(refund);
     },
   };
 }

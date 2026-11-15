@@ -6,7 +6,12 @@ import { addOwnerBlock, removeOwnerBlock } from "./calendar";
 import { acknowledgeHandover, confirmReturn, recordReturn, submitHandoverReport } from "./rental";
 import { approveBooking, cancelBooking, rejectBooking, withdrawRequest } from "./decisions";
 import { acceptClaim, addDisputeMessage, openDispute, resolveDispute, withdrawDispute } from "./disputes";
-import { type CapturedPayment, recordCapturedPayment } from "./payment-events";
+import {
+  type AuthorizedPayment,
+  type CapturedPayment,
+  claimAuthorization,
+  recordCapturedPayment,
+} from "./payment-events";
 import type { BookingsDeps } from "./ports";
 import type { BookingDetail, BookingQueries } from "./queries";
 import { requestBooking } from "./request-booking";
@@ -34,6 +39,7 @@ export function bookingsUseCases(deps: BookingsDeps & { queries: BookingQueries 
     withdrawDispute: (actor: Actor, input: unknown) => withdrawDispute(deps, actor, input),
     resolveDispute: (actor: Actor, input: unknown) => resolveDispute(deps, actor, input),
     addDisputeMessage: (actor: Actor, input: unknown) => addDisputeMessage(deps, actor, input),
+    claimAuthorization: (authorized: AuthorizedPayment) => claimAuthorization(deps, authorized),
     recordCapturedPayment: (captured: CapturedPayment) => recordCapturedPayment(deps, captured),
     sweep: () => runBookingSweep(deps, queries),
     addOwnerBlock: (actor: Actor, input: unknown) => addOwnerBlock(deps, actor, input),

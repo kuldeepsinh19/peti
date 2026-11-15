@@ -175,6 +175,8 @@ export interface BookingStore {
     method: string | null,
     at: Date,
   ): Promise<void>;
+  /** Marks an authorisation as the booking's payment (caller holds the payment row lock). */
+  claimAuthorization(paymentId: string, providerPaymentId: string): Promise<void>;
   abandonPayment(bookingId: string): Promise<void>;
   createHeldDeposit(bookingId: string, paymentId: string, amountPaise: number): Promise<void>;
   settleDeposit(
@@ -198,6 +200,17 @@ export interface BookingStore {
     initiatedByRole: BookingActorRole;
     initiatedByUserId: string | null;
   }): Promise<void>;
+  /**
+   * Queues a refund of a provider payment that was captured but cannot be applied to the booking (ADR-006).
+   * Idempotent per provider payment; false when it was already queued. Leaves payments.refunded_paise alone:
+   * that money was never the booking's.
+   */
+  insertReversal(reversal: {
+    paymentId: string;
+    bookingId: string;
+    reversedProviderPaymentId: string;
+    amountPaise: number;
+  }): Promise<boolean>;
   insertPayout(payout: {
     bookingId: string;
     ownerId: string;

@@ -4,8 +4,25 @@ import type { AuditLog } from "@/shared/application/audit";
 import { requireUser } from "@/shared/application/authorization";
 import type { Clock } from "@/shared/domain/clock";
 import { MINUTE_MS } from "@/shared/domain/clock";
-import { DomainError, NotFoundError, PreconditionError } from "@/shared/domain/errors";
-import type { CheckoutSession, PaymentProvider, ProviderEvent, ProviderId } from "../domain/payment-provider";
+import { NotFoundError, PreconditionError } from "@/shared/domain/errors";
+import type {
+  CheckoutSession,
+  PaymentProvider,
+  ProviderEvent,
+  ProviderId,
+  ProviderPayment,
+} from "../domain/payment-provider";
+
+/** Our payments row, as the pipeline needs it. */
+export interface PaymentRef {
+  id: string;
+  bookingId: string;
+  provider: ProviderId;
+  status: string;
+  amountPaise: number;
+  providerOrderId: string | null;
+  providerPaymentId: string | null;
+}
 
 export interface PaymentRepository {
   ensurePayment(
@@ -14,12 +31,12 @@ export interface PaymentRepository {
     amountPaise: number,
   ): Promise<{ id: string; status: string; providerOrderId: string | null; provider: string }>;
   setOrderId(paymentId: string, providerOrderId: string): Promise<void>;
-  findByOrder(
-    provider: ProviderId,
-    providerOrderId: string,
-  ): Promise<{ id: string; bookingId: string; status: string; amountPaise: number } | null>;
-  orderForBooking(bookingId: string): Promise<{ provider: ProviderId; providerOrderId: string } | null>;
-  recordAuthorized(paymentId: string, providerPaymentId: string): Promise<void>;
+  findByOrder(provider: ProviderId, providerOrderId: string): Promise<PaymentRef | null>;
+  findForBooking(bookingId: string): Promise<PaymentRef | null>;
+  /** A capture call failed while the authorisation can still be captured: the sweep retries it. */
+  recordCaptureFailure(paymentId: string, error: string): Promise<void>;
+  /** The claimed authorisation can no longer be captured: the booking may claim another one. */
+  releaseClaim(paymentId: string, providerPaymentId: string, error: string): Promise<void>;
   recordFailure(paymentId: string, code: string | undefined, reason: string | undefined): Promise<void>;
   inboxInsert(
     provider: ProviderId,
@@ -45,49 +62,35 @@ export interface PaymentRepository {
 export interface PaymentsDeps {
   provider: PaymentProvider;
   payments: PaymentRepository;
-  bookings: Pick<BookingsUseCases, "detail" | "recordCapturedPayment">;
+  bookings: Pick<BookingsUseCases, "detail" | "claimAuthorization" | "recordCapturedPayment">;
   clock: Clock;
   appUrl: string;
   audit: AuditLog;
 }
 
+/**
+ * - PENDING: nothing to apply yet (not authorised, or the capture call failed and will be retried);
+ * - DECLINED: an authorisation Peti will not capture (the provider returns it to the payer);
+ * - IGNORED: a payment in a state that never applies to a booking (already refunded).
+ */
+export type ApplyOutcome = CaptureOutcome | "PENDING" | "DECLINED" | "IGNORED";
+
 export interface CallbackResult {
   bookingId: string | null;
-  outcome: CaptureOutcome | "PENDING" | "INVALID";
+  outcome: CaptureOutcome | "PENDING" | "DECLINED" | "INVALID";
 }
 
 const MAX_REFUND_ATTEMPTS = 5;
 const MIN_CHECKOUT_MINUTES = 2;
+const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error)).slice(0, 500);
 
 export function paymentsUseCases(deps: PaymentsDeps) {
-  const { provider, payments, bookings, clock, audit } = deps;
+  const { provider, payments, bookings, clock } = deps;
 
-  /**
-   * Money the provider took that does not fit the booking (a second capture, or a different amount) is
-   * never applied automatically and never retried forever: it is recorded for an administrator to refund
-   * by hand, and the provider is told the event was received.
-   */
-  async function flagUnexpectedCapture(error: DomainError, eventId: string) {
-    await audit.record({
-      actorUserId: null,
-      actorRole: "SYSTEM",
-      action: "payment.unexpectedCapture",
-      entityType: "provider_event",
-      entityId: eventId,
-      after: { code: error.code, ...(error.details ?? {}) },
-      reason: error.message,
-    });
-  }
-  const isUnexpectedCapture = (error: unknown): error is DomainError =>
-    error instanceof DomainError && (error.code === "DUPLICATE_CAPTURE" || error.code === "AMOUNT_MISMATCH");
-
-  /** Confirms a capture with the bookings module — the only path to CONFIRMED. */
-  async function capture(
-    paymentRow: { bookingId: string },
-    p: { providerPaymentId: string; amountPaise: number; currency: string; method: string | null },
-  ) {
+  /** Records a capture with the bookings module, the only path to CONFIRMED (or to a reversal). */
+  function recordCapture(row: PaymentRef, p: ProviderPayment) {
     return bookings.recordCapturedPayment({
-      bookingId: paymentRow.bookingId,
+      bookingId: row.bookingId,
       provider: provider.id,
       providerPaymentId: p.providerPaymentId,
       amountPaise: p.amountPaise,
@@ -96,18 +99,95 @@ export function paymentsUseCases(deps: PaymentsDeps) {
     });
   }
 
+  /**
+   * Claims an authorisation for the booking (at most one per booking, exact amount, booking still waiting
+   * for payment), then captures it, outside any database transaction. A failed capture call is checked
+   * against the provider: it may have succeeded for a concurrent caller or an earlier attempt.
+   */
+  async function claimAndCapture(row: PaymentRef, p: ProviderPayment): Promise<ApplyOutcome> {
+    const claim = await bookings.claimAuthorization({
+      bookingId: row.bookingId,
+      provider: provider.id,
+      providerPaymentId: p.providerPaymentId,
+      amountPaise: p.amountPaise,
+      currency: p.currency,
+    });
+    if (claim === "DECLINED") return "DECLINED";
+    if (claim === "ALREADY_CAPTURED") return "ALREADY_CONFIRMED";
+    try {
+      return await recordCapture(row, await provider.capturePayment(p.providerPaymentId, p.amountPaise));
+    } catch (error) {
+      const current = await provider.fetchPayment(p.providerPaymentId).catch(() => null);
+      if (current?.status === "CAPTURED") return recordCapture(row, current);
+      if (current && current.status !== "AUTHORIZED") {
+        await payments.releaseClaim(row.id, p.providerPaymentId, errorText(error));
+      } else {
+        await payments.recordCaptureFailure(row.id, errorText(error));
+      }
+      return "PENDING";
+    }
+  }
+
+  /**
+   * One pipeline for every report of a payment: browser callback (re-fetched from the provider), signed
+   * webhook, or reconciliation. Never trusts the browser: the callback only names the payment to fetch.
+   */
+  async function applyProviderPayment(row: PaymentRef, p: ProviderPayment): Promise<ApplyOutcome> {
+    switch (p.status) {
+      case "CAPTURED":
+        return recordCapture(row, p);
+      case "AUTHORIZED":
+        return claimAndCapture(row, p);
+      case "REFUNDED":
+        return "IGNORED";
+      default:
+        return "PENDING";
+    }
+  }
+
+  /**
+   * Asks the provider for every payment made on the order and applies them: captured money first (it is
+   * confirmed, refunded as late, or reversed), then authorisations while the booking can still be paid,
+   * the one already claimed first, so a capture retry never loses its place to a newer attempt.
+   */
+  async function reconcileOrder(row: PaymentRef): Promise<ApplyOutcome[]> {
+    if (!row.providerOrderId || row.provider !== provider.id) return [];
+    const attempts = await provider.listOrderPayments(row.providerOrderId);
+    const outcomes: ApplyOutcome[] = [];
+    for (const p of attempts.filter((a) => a.status === "CAPTURED")) {
+      outcomes.push(await applyProviderPayment(row, p));
+    }
+    const paid = outcomes.some((o) => o === "CONFIRMED" || o === "ALREADY_CONFIRMED");
+    if (paid || (row.status !== "CREATED" && row.status !== "AUTHORIZED")) return outcomes;
+    const authorised = attempts
+      .filter((a) => a.status === "AUTHORIZED")
+      .sort(
+        (a, b) =>
+          Number(b.providerPaymentId === row.providerPaymentId) -
+          Number(a.providerPaymentId === row.providerPaymentId),
+      );
+    for (const p of authorised) {
+      const outcome = await applyProviderPayment(row, p);
+      outcomes.push(outcome);
+      if (outcome !== "DECLINED") break;
+    }
+    return outcomes;
+  }
+
   async function processEvent(event: ProviderEvent): Promise<"PROCESSED" | "IGNORED"> {
     switch (event.type) {
-      case "PAYMENT_CAPTURED": {
-        const row = await payments.findByOrder(provider.id, event.providerOrderId);
-        if (!row) return "IGNORED";
-        await capture(row, event);
-        return "PROCESSED";
-      }
+      case "PAYMENT_CAPTURED":
       case "PAYMENT_AUTHORIZED": {
         const row = await payments.findByOrder(provider.id, event.providerOrderId);
-        if (!row || row.status !== "CREATED") return "IGNORED";
-        await payments.recordAuthorized(row.id, event.providerPaymentId);
+        if (!row) return "IGNORED";
+        await applyProviderPayment(row, {
+          providerPaymentId: event.providerPaymentId,
+          providerOrderId: event.providerOrderId,
+          status: event.type === "PAYMENT_CAPTURED" ? "CAPTURED" : "AUTHORIZED",
+          amountPaise: event.amountPaise,
+          currency: event.currency,
+          method: event.method,
+        });
         return "PROCESSED";
       }
       case "PAYMENT_FAILED": {
@@ -149,10 +229,14 @@ export function paymentsUseCases(deps: PaymentsDeps) {
         );
       }
       const payment = await payments.ensurePayment(booking.id, provider.id, booking.money.renterTotalPaise);
-      if (
-        payment.provider !== provider.id ||
-        (payment.status !== "CREATED" && payment.status !== "AUTHORIZED")
-      ) {
+      if (payment.status === "AUTHORIZED") {
+        // A payment is already authorised and being captured: a second one would only be returned.
+        throw new PreconditionError(
+          "PAYMENT_PROCESSING",
+          "We have received your payment and are confirming it. Refresh this page in a minute.",
+        );
+      }
+      if (payment.provider !== provider.id || payment.status !== "CREATED") {
         throw new PreconditionError("NOT_PAYABLE", "This booking cannot be paid again.");
       }
       let orderId = payment.providerOrderId;
@@ -177,7 +261,8 @@ export function paymentsUseCases(deps: PaymentsDeps) {
 
     /**
      * Browser callback. Authenticated by signature only (the provider's POST is cross-site, so there is no
-     * session). A signature proves authorisation, not capture, so the payment is re-fetched from the provider.
+     * session). A signature proves the checkout finished, not that money moved, so the payment is fetched
+     * from the provider and goes through the same pipeline as a webhook.
      */
     async handleCallback(params: Readonly<Record<string, string | undefined>>): Promise<CallbackResult> {
       const verified = provider.verifyCallback(params);
@@ -187,18 +272,8 @@ export function paymentsUseCases(deps: PaymentsDeps) {
       const p = await provider.fetchPayment(verified.providerPaymentId);
       if (p.providerOrderId !== verified.providerOrderId)
         return { bookingId: row.bookingId, outcome: "INVALID" };
-      if (p.status === "AUTHORIZED") {
-        await payments.recordAuthorized(row.id, p.providerPaymentId);
-        return { bookingId: row.bookingId, outcome: "PENDING" };
-      }
-      if (p.status !== "CAPTURED") return { bookingId: row.bookingId, outcome: "PENDING" };
-      try {
-        return { bookingId: row.bookingId, outcome: await capture(row, p) };
-      } catch (error) {
-        if (!isUnexpectedCapture(error)) throw error;
-        await flagUnexpectedCapture(error, "callback:" + p.providerPaymentId);
-        return { bookingId: row.bookingId, outcome: "INVALID" };
-      }
+      const outcome = await applyProviderPayment(row, p);
+      return { bookingId: row.bookingId, outcome: outcome === "IGNORED" ? "INVALID" : outcome };
     },
 
     /**
@@ -223,12 +298,7 @@ export function paymentsUseCases(deps: PaymentsDeps) {
         await payments.inboxMark(stored.id, await processEvent(parsed.event));
         return { status: 200, body: "ok" };
       } catch (error) {
-        if (isUnexpectedCapture(error)) {
-          await flagUnexpectedCapture(error, parsed.event.eventId);
-          await payments.inboxMark(stored.id, "IGNORED", error.code);
-          return { status: 200, body: "flagged" };
-        }
-        await payments.inboxMark(stored.id, "FAILED", error instanceof Error ? error.message : String(error));
+        await payments.inboxMark(stored.id, "FAILED", errorText(error));
         return { status: 500, body: "failed" };
       }
     },
@@ -257,11 +327,7 @@ export function paymentsUseCases(deps: PaymentsDeps) {
           await payments.completeRefund(r.id, result.providerRefundId, result.status === "PROCESSED");
           sent++;
         } catch (error) {
-          await payments.failRefundAttempt(
-            r.id,
-            error instanceof Error ? error.message : String(error),
-            r.attempts + 1 >= MAX_REFUND_ATTEMPTS,
-          );
+          await payments.failRefundAttempt(r.id, errorText(error), r.attempts + 1 >= MAX_REFUND_ATTEMPTS);
         }
       }
       return { claimed: claimed.length, sent };
@@ -269,10 +335,8 @@ export function paymentsUseCases(deps: PaymentsDeps) {
 
     /** Before an unpaid booking expires, ask the provider whether the order was paid after all. */
     async reconcile(bookingId: string) {
-      const order = await payments.orderForBooking(bookingId);
-      if (!order || order.provider !== provider.id) return;
-      const paid = await provider.findCapturedPaymentForOrder(order.providerOrderId);
-      if (paid) await capture({ bookingId }, paid);
+      const row = await payments.findForBooking(bookingId);
+      if (row) await reconcileOrder(row);
     },
   };
 }

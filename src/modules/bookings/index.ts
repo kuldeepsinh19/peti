@@ -13,7 +13,12 @@ export type {
   CalendarEntry,
   PayoutRow,
 } from "./application/queries";
-export type { CapturedPayment, CaptureOutcome } from "./application/payment-events";
+export type {
+  AuthorizedPayment,
+  CapturedPayment,
+  CaptureOutcome,
+  ClaimOutcome,
+} from "./application/payment-events";
 export { DatesUnavailableError } from "./application/core";
 export { bookingsUseCases, type BookingsUseCases } from "./application/use-cases";
 export {
