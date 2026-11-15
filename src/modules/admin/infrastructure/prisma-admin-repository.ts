@@ -250,7 +250,9 @@ export function prismaAdminRepository(db: Db): AdminRepository {
     async retryRefund(refundId) {
       const result = await db.refund.updateMany({
         where: { id: refundId, status: "FAILED" },
-        data: { status: "PENDING", attempts: 0 },
+        // Forget the failed attempt: a late webhook about it must not match the retry. The failed provider
+        // id stays in the audit log.
+        data: { status: "PENDING", attempts: 0, providerRefundId: null },
       });
       return result.count === 1;
     },

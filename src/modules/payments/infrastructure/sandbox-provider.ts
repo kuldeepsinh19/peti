@@ -39,6 +39,8 @@ interface RefundData {
   paymentId: string;
   amountPaise: number;
   reference: string;
+  /** Absent on refunds stored before refunds could stay pending: those were processed at once. */
+  status?: ProviderRefund["status"];
 }
 
 const id = (prefix: string) => `${prefix}_${randomBytes(9).toString("base64url")}`;
@@ -74,6 +76,8 @@ const STATUS: Record<PaymentData["status"], ProviderPayment["status"]> = {
 };
 
 export function sandboxProvider(db: Db, secrets: { keySecret: string; webhookSecret: string }) {
+  /** How the next refund is answered (tests switch it to simulate slow or failing refunds). */
+  let nextRefundStatus: ProviderRefund["status"] = "PROCESSED";
   const get = async <T>(objectId: string, kind: string) => {
     const row = await db.sandboxProviderObject.findUnique({ where: { id: objectId } });
     return row && row.kind === kind ? (row.data as unknown as T) : null;
@@ -245,22 +249,32 @@ export function sandboxProvider(db: Db, secrets: { keySecret: string; webhookSec
     },
 
     async createRefund(input): Promise<ProviderRefund> {
+      // Idempotent on our reference, like the real adapter: a failed refund does not count.
       const existing = await db.sandboxProviderObject.findMany({ where: { kind: "refund" } });
-      const match = existing.find((r) => (r.data as unknown as RefundData).reference === input.reference);
-      if (match) return { providerRefundId: match.id, status: "PROCESSED" };
+      const match = existing.find((r) => {
+        const data = r.data as unknown as RefundData;
+        return data.reference === input.reference && data.status !== "FAILED";
+      });
+      if (match) {
+        return {
+          providerRefundId: match.id,
+          status: (match.data as unknown as RefundData).status ?? "PROCESSED",
+        };
+      }
       const refundId = id("rfnd_sb");
       await put(refundId, "refund", {
         paymentId: input.providerPaymentId,
         amountPaise: input.amountPaise,
         reference: input.reference,
+        status: nextRefundStatus,
       } satisfies RefundData);
-      return { providerRefundId: refundId, status: "PROCESSED" };
+      return { providerRefundId: refundId, status: nextRefundStatus };
     },
 
     async fetchRefund(providerRefundId) {
       const r = await get<RefundData>(providerRefundId, "refund");
       if (!r) throw new PaymentProviderError("REJECTED", "Unknown sandbox refund");
-      return { providerRefundId, status: "PROCESSED" };
+      return { providerRefundId, status: r.status ?? "PROCESSED" };
     },
   };
 
@@ -345,7 +359,20 @@ export function sandboxProvider(db: Db, secrets: { keySecret: string; webhookSec
     ) => signedWebhook(`payment.dispute.${status}`, { ...d, reasonCode: d.reasonCode ?? null }),
   };
 
-  return { provider, simulate, order, webhooks };
+  /** Test controls for refunds: answer the next ones as pending or failed, and settle one later. */
+  const refunds = {
+    respondWith(status: ProviderRefund["status"]) {
+      nextRefundStatus = status;
+    },
+    async settle(refundId: string, status: "PROCESSED" | "FAILED") {
+      const r = await get<RefundData>(refundId, "refund");
+      if (!r) throw new Error("Unknown sandbox refund");
+      await put(refundId, "refund", { ...r, status } satisfies RefundData);
+      return r;
+    },
+  };
+
+  return { provider, simulate, order, webhooks, refunds };
 }
 
 export type SandboxProvider = ReturnType<typeof sandboxProvider>;

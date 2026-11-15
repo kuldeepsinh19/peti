@@ -151,9 +151,10 @@ function build() {
       const bookingReport = await bookings.sweep();
       for (const failure of bookingReport.failures) logger.warn("sweep step failed", failure);
       const refunds = await paymentsRef.dispatchRefunds();
+      const refundsReconciled = await paymentsRef.reconcileRefunds();
       const emails = await dispatchPendingEmails(prismaNotificationOutbox(db), mail, env.APP_URL);
       const reviewsPublished = await reviews.publishExpired();
-      return { bookings: bookingReport, refunds, emails, reviewsPublished };
+      return { bookings: bookingReport, refunds, refundsReconciled, emails, reviewsPublished };
     },
   };
 }

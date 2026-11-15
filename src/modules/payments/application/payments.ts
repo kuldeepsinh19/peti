@@ -56,7 +56,21 @@ export interface PaymentRepository {
   >;
   completeRefund(id: string, providerRefundId: string, processed: boolean): Promise<void>;
   failRefundAttempt(id: string, error: string, giveUp: boolean): Promise<void>;
-  markRefundByProviderId(providerRefundId: string, status: "PROCESSED" | "FAILED"): Promise<void>;
+  /**
+   * Applies the provider's final word on a refund, matched by provider refund id, or by our reference
+   * (refunds.id) while the provider id was never stored. False when nothing changed. Audited.
+   */
+  settleRefund(
+    match: { providerRefundId: string; reference: string | null },
+    status: "PROCESSED" | "FAILED",
+    source: "webhook" | "reconciliation",
+  ): Promise<boolean>;
+  /** Refunds sent to the provider and still pending, not checked since `checkedBefore`, oldest first. */
+  refundsAwaitingProvider(
+    checkedBefore: Date,
+    limit: number,
+  ): Promise<Array<{ id: string; providerRefundId: string }>>;
+  markRefundChecked(id: string): Promise<void>;
 }
 
 export interface PaymentsDeps {
@@ -81,6 +95,8 @@ export interface CallbackResult {
 }
 
 const MAX_REFUND_ATTEMPTS = 5;
+/** A refund still pending this long after it was sent (or last checked) is asked about directly. */
+const REFUND_CHECK_AFTER_MINUTES = 30;
 const MIN_CHECKOUT_MINUTES = 2;
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error)).slice(0, 500);
 
@@ -199,9 +215,10 @@ export function paymentsUseCases(deps: PaymentsDeps) {
       }
       case "REFUND_PROCESSED":
       case "REFUND_FAILED":
-        await payments.markRefundByProviderId(
-          event.providerRefundId,
+        await payments.settleRefund(
+          { providerRefundId: event.providerRefundId, reference: event.reference },
           event.type === "REFUND_PROCESSED" ? "PROCESSED" : "FAILED",
+          "webhook",
         );
         return "PROCESSED";
       default:
@@ -331,6 +348,37 @@ export function paymentsUseCases(deps: PaymentsDeps) {
         }
       }
       return { claimed: claimed.length, sent };
+    },
+
+    /**
+     * Settles refunds whose webhook never arrived by asking the provider directly. Refunds the provider
+     * still reports as pending are checked again later (normal-speed refunds take days).
+     */
+    async reconcileRefunds(limit = 20) {
+      const checkedBefore = new Date(clock.now().getTime() - REFUND_CHECK_AFTER_MINUTES * MINUTE_MS);
+      const due = await payments.refundsAwaitingProvider(checkedBefore, limit);
+      let settled = 0;
+      let errors = 0;
+      for (const r of due) {
+        try {
+          const result = await provider.fetchRefund(r.providerRefundId);
+          if (result.status === "PENDING") {
+            await payments.markRefundChecked(r.id);
+          } else if (
+            await payments.settleRefund(
+              { providerRefundId: r.providerRefundId, reference: null },
+              result.status,
+              "reconciliation",
+            )
+          ) {
+            settled++;
+          }
+        } catch {
+          // Provider unreachable: the refund stays due and is checked on the next run.
+          errors++;
+        }
+      }
+      return { checked: due.length, settled, errors };
     },
 
     /** Before an unpaid booking expires, ask the provider whether the order was paid after all. */
