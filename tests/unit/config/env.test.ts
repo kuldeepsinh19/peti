@@ -56,10 +56,29 @@ describe("parseEnv", () => {
     expect(issues.some((i) => i.startsWith("SANDBOX_PAYMENT_KEY_SECRET"))).toBe(true);
   });
 
-  it("refuses production until a real SMS provider exists, and nothing else is missing", () => {
+  it("refuses production with the SMS dev outbox, and nothing else is missing", () => {
     expect(issuesFor(production)).toEqual([
-      "SMS_DRIVER: production requires a real SMS provider (none is implemented yet; see the deployment guide)",
+      "SMS_DRIVER: production requires a real SMS provider (SMS_DRIVER=msg91; see sms-otp.md)",
     ]);
+  });
+
+  it("accepts production with the MSG91 SMS provider, which needs its key and template", () => {
+    const msg91 = { ...production, SMS_DRIVER: "msg91" };
+    expect(issuesFor(msg91)).toEqual([
+      "MSG91_AUTH_KEY: required when SMS_DRIVER=msg91",
+      "MSG91_OTP_TEMPLATE_ID: required when SMS_DRIVER=msg91",
+    ]);
+    const env = parseEnv({ ...msg91, MSG91_AUTH_KEY: "key", MSG91_OTP_TEMPLATE_ID: "tpl" });
+    expect(env).toMatchObject({ SMS_DRIVER: "msg91", MSG91_OTP_VARIABLE: "OTP" });
+    // The variable name becomes a JSON key in the provider request: letters, digits and underscores only.
+    expect(
+      issuesFor({
+        ...msg91,
+        MSG91_AUTH_KEY: "key",
+        MSG91_OTP_TEMPLATE_ID: "tpl",
+        MSG91_OTP_VARIABLE: "mobiles ",
+      }),
+    ).toHaveLength(1);
   });
 
   it("accepts a complete staging configuration without dev tooling", () => {

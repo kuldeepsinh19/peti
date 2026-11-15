@@ -67,7 +67,16 @@ export const envSchema = z
     MAIL_DRIVER: z.enum(["outbox", "smtp"]).default("outbox"),
     MAIL_FROM: z.string().default("Peti <no-reply@peti.local>"),
     SMTP_URL: optionalString,
-    SMS_DRIVER: z.enum(["outbox"]).default("outbox"),
+    // "msg91" is implemented from MSG91's documentation but has never been run against it (sms-otp.md).
+    SMS_DRIVER: z.enum(["outbox", "msg91"]).default("outbox"),
+    MSG91_AUTH_KEY: optionalString,
+    /** MSG91 template (flow) id of the DLT-approved verification template. */
+    MSG91_OTP_TEMPLATE_ID: optionalString,
+    /** The template variable that receives the code, without the ## markers. */
+    MSG91_OTP_VARIABLE: z
+      .string()
+      .regex(/^[A-Za-z][A-Za-z0-9_]{0,31}$/)
+      .default("OTP"),
 
     CRON_SECRET: optionalString,
   })
@@ -91,6 +100,11 @@ export const envSchema = z
       }
     }
     if (env.MAIL_DRIVER === "smtp" && !env.SMTP_URL) issue("SMTP_URL", "required when MAIL_DRIVER=smtp");
+    if (env.SMS_DRIVER === "msg91") {
+      for (const key of ["MSG91_AUTH_KEY", "MSG91_OTP_TEMPLATE_ID"] as const) {
+        if (!env[key]) issue(key, "required when SMS_DRIVER=msg91");
+      }
+    }
 
     // Production must never run the sandbox provider, the dev outbox or local-disk storage.
     if (env.APP_ENV === "production") {
@@ -100,10 +114,7 @@ export const envSchema = z
         issue("SANDBOX_PAYMENT_KEY_SECRET", "sandbox payment secrets must not be set in production");
       if (env.MAIL_DRIVER === "outbox") issue("MAIL_DRIVER", "production requires real email delivery");
       if (env.SMS_DRIVER === "outbox") {
-        issue(
-          "SMS_DRIVER",
-          "production requires a real SMS provider (none is implemented yet; see the deployment guide)",
-        );
+        issue("SMS_DRIVER", "production requires a real SMS provider (SMS_DRIVER=msg91; see sms-otp.md)");
       }
       if (env.STORAGE_DRIVER !== "s3") issue("STORAGE_DRIVER", "production requires object storage");
       if (!env.CRON_SECRET) issue("CRON_SECRET", "required in production");

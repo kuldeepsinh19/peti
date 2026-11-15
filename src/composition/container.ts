@@ -22,6 +22,7 @@ import {
   type SmsSender,
 } from "@/modules/notifications";
 import { prismaInboxRepository } from "@/modules/notifications/infrastructure/inbox-repository";
+import { msg91SmsSender } from "@/modules/notifications/infrastructure/msg91-sms-sender";
 import { prismaNotificationOutbox } from "@/modules/notifications/infrastructure/notification-outbox";
 import { prismaNotificationWriter } from "@/modules/notifications/infrastructure/notification-writer";
 import {
@@ -60,7 +61,14 @@ function build() {
     env.MAIL_DRIVER === "smtp" && env.SMTP_URL
       ? smtpMailSender(env.SMTP_URL, env.MAIL_FROM)
       : outboxMailSender(db);
-  const sms: SmsSender = outboxSmsSender(db);
+  const sms: SmsSender =
+    env.SMS_DRIVER === "msg91" && env.MSG91_AUTH_KEY && env.MSG91_OTP_TEMPLATE_ID
+      ? msg91SmsSender({
+          authKey: env.MSG91_AUTH_KEY,
+          otpTemplateId: env.MSG91_OTP_TEMPLATE_ID,
+          otpVariable: env.MSG91_OTP_VARIABLE,
+        })
+      : outboxSmsSender(db);
   const rateLimiter = postgresRateLimiter(db, clock);
   const auth = createAuth({ env, db, mail, sms, rateLimiter });
 
