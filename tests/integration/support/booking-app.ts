@@ -3,6 +3,7 @@ import { prismaBookingQueries } from "@/modules/bookings/infrastructure/booking-
 import { prismaBookingStore } from "@/modules/bookings/infrastructure/prisma-booking-store";
 import { prismaNotificationWriter } from "@/modules/notifications/infrastructure/notification-writer";
 import { paymentsUseCases, type PaymentsUseCases } from "@/modules/payments";
+import type { PaymentProvider } from "@/modules/payments/domain/payment-provider";
 import { prismaPaymentRepository } from "@/modules/payments/infrastructure/prisma-payment-repository";
 import { sandboxProvider, type SandboxOutcome } from "@/modules/payments/infrastructure/sandbox-provider";
 import type { RateLimiter } from "@/shared/application/rate-limiter";
@@ -18,7 +19,10 @@ export const SANDBOX_SECRETS = { keySecret: "test-key-secret", webhookSecret: "t
 const noLimits: RateLimiter = { consume: async () => {} };
 
 /** Bookings + payments wired exactly as in production, against the test database and sandbox provider. */
-export function buildBookingApp(start = "2026-12-01T06:30:00Z") {
+export function buildBookingApp(
+  start = "2026-12-01T06:30:00Z",
+  opts: { wrapProvider?: (provider: PaymentProvider) => PaymentProvider } = {},
+) {
   const clock = fixedClock(start); // 12:00 IST on 1 Dec 2026
   const sandbox = sandboxProvider(db, SANDBOX_SECRETS);
   let payments: PaymentsUseCases | null = null;
@@ -38,7 +42,7 @@ export function buildBookingApp(start = "2026-12-01T06:30:00Z") {
     paymentReconciler: { reconcile: (id) => payments?.reconcile(id) ?? Promise.resolve() },
   });
   payments = paymentsUseCases({
-    provider: sandbox.provider,
+    provider: opts.wrapProvider ? opts.wrapProvider(sandbox.provider) : sandbox.provider,
     payments: prismaPaymentRepository(db),
     bookings,
     clock,
