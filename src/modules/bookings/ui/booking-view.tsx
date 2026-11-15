@@ -144,6 +144,23 @@ export function BookingView({
             We will confirm the booking as soon as the payment provider does.
           </Notice>
         ) : null}
+        {flash?.payment === "late_capture_refunded" ? (
+          <Notice title="Payment refunded">
+            The payment arrived after this booking stopped waiting for it, so the full amount is being
+            refunded to you.
+          </Notice>
+        ) : null}
+        {flash?.payment === "unexpected_capture_reversed" ? (
+          <Notice title="Second payment refunded">
+            This booking was already paid. The extra payment is being refunded to you in full.
+          </Notice>
+        ) : null}
+        {flash?.payment === "declined" ? (
+          <Notice tone="danger" title="Payment not taken">
+            We could not apply that payment to this booking, so it was not taken. If your bank has blocked the
+            amount, it releases it automatically.
+          </Notice>
+        ) : null}
         {flash?.payment === "invalid" || flash?.payment === "error" ? (
           <Notice tone="danger" title="We could not verify that payment">
             If money left your account, it will be confirmed or refunded automatically.

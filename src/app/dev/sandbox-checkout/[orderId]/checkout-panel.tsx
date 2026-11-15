@@ -11,6 +11,21 @@ const OUTCOMES = [
   { value: "pay-webhook-only", label: "Pay — webhook only", note: "As if the renter closed the browser." },
   { value: "pay-callback-only", label: "Pay — callback only", note: "As if the webhook were delayed." },
   { value: "pay-duplicate-webhook", label: "Pay — webhook delivered twice", note: "Tests idempotency." },
+  {
+    value: "pay-twice",
+    label: "Pay twice on one order",
+    note: "Two authorisations: Peti captures one and leaves the other to be returned.",
+  },
+  {
+    value: "pay-captured",
+    label: "Captured outside Peti",
+    note: "As if captured from the provider dashboard: confirmed, or refunded if it is a second payment.",
+  },
+  {
+    value: "pay-wrong-amount",
+    label: "Pay the wrong amount",
+    note: "Never captured: the booking stays awaiting payment.",
+  },
   { value: "fail", label: "Payment fails", note: "The booking stays awaiting payment." },
 ] as const;
 

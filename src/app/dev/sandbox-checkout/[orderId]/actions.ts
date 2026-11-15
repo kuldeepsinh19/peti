@@ -11,6 +11,9 @@ const OUTCOMES: readonly SandboxOutcome[] = [
   "pay-webhook-only",
   "pay-callback-only",
   "pay-duplicate-webhook",
+  "pay-twice",
+  "pay-captured",
+  "pay-wrong-amount",
   "fail",
 ];
 
