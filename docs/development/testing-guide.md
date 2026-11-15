@@ -154,7 +154,7 @@ audited payouts).
 
 One test per finding of the independent review
 ([security architecture](../architecture/security-architecture.md#review-findings-and-fixes)): a second
-capture is flagged for an admin rather than applied or retried; a refund stuck `INITIATED` is reclaimed only
+authorisation is never captured and a stray capture is refunded rather than applied; a refund stuck `INITIATED` is reclaimed only
 after its 15-minute lease; a paid booking whose period ended without a handover becomes an admin-only
 dispute; suspended owners' listings disappear from search and detail and cannot be requested; listing status
 writes are compare-and-swap; two concurrent email dispatchers send each email once, and failures stop after

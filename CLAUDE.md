@@ -22,6 +22,11 @@ Non-negotiables:
 - Never claim a user is identity-verified. Identity verification is a port with no real adapter; status
   stays `UNVERIFIED`. Never collect Aadhaar numbers or ID documents.
 - Never mark a payment as succeeded without a signature-verified, provider-confirmed capture.
+- Peti captures payments explicitly, one per booking ([ADR-006](docs/decisions/ADR-006-payment-reliability.md)).
+  Every report of a payment goes through `applyProviderPayment`; a payment that does not fit its booking is
+  declined or reversed through the refund outbox, never applied and never dropped.
+- Never describe an integration as working unless it has been run against the real provider. Razorpay and
+  MSG91 have not been.
 - Never invent business data (metrics, testimonials, user counts) in UI copy, seed data or docs.
 
 ## 2. Stack
@@ -119,7 +124,8 @@ See [api-overview.md](docs/api/api-overview.md) and [error-handling.md](docs/api
   (which parses input with the module's Zod contract); revalidate paths.
 - Photo uploads (listing photos, condition reports) are multipart Server Actions; the browser downscales
   first (`shared/ui/downscale-image.ts`) and the server re-validates and re-encodes everything.
-- Route handlers (`route.ts`) only for: auth, payment callback/webhook, file serving, cron sweep, health.
+- Route handlers (`route.ts`) only for: auth, payment callback/webhook, file serving, cron sweep, health
+  and the money-health monitor.
   Webhooks read the **raw** body for signature checks.
 - Contracts (Zod schemas + inferred types) live in `modules/<name>/application/contracts.ts` and are shared
   by forms and actions.
@@ -222,7 +228,7 @@ pnpm check                   # lint + typecheck + boundaries + unit/component te
 pnpm db:test:prepare         # migrate the peti_test database
 pnpm test:integration        # integration tests against peti_test
 pnpm build && pnpm test:e2e  # production build + Playwright
-pnpm jobs:sweep              # with a server running: expiry, auto-complete, refunds, emails once
+pnpm jobs:sweep              # with a server running: expiry, reconciliation, refunds, emails once
 ```
 
 ## 17. Definition of done

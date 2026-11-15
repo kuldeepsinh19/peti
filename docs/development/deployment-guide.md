@@ -34,15 +34,15 @@ limit accordingly.
 `src/config/env.ts` validates the environment when the application first needs it and refuses to run with
 an `Invalid environment configuration` error listing every problem. With `APP_ENV=production`:
 
-| Rule                                                                                             | Why                                              |
-| ------------------------------------------------------------------------------------------------ | ------------------------------------------------ |
-| `PAYMENT_PROVIDER` must be `razorpay`                                                            | The sandbox provider can never run in production |
-| `SANDBOX_PAYMENT_KEY_SECRET` and `SANDBOX_PAYMENT_WEBHOOK_SECRET` must be unset                  | No sandbox secrets anywhere near production      |
-| `MAIL_DRIVER` must not be `outbox` (so `smtp`, which requires `SMTP_URL`)                        | Real email delivery                              |
-| `STORAGE_DRIVER` must be `s3` (requires `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`) | No local-disk storage                            |
-| `CRON_SECRET` is required                                                                        | Protects `POST /api/cron/sweep`                  |
-| `RAZORPAY_KEY_ID` must not start with `rzp_live_`                                                | Live payments are not supported by this MVP      |
-| `SMS_DRIVER` must not be `outbox` — and `outbox` is the only driver that exists today            | Phone OTPs would never be delivered (see below)  |
+| Rule                                                                                                        | Why                                                             |
+| ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `PAYMENT_PROVIDER` must be `razorpay`                                                                       | The sandbox provider can never run in production                |
+| `SANDBOX_PAYMENT_KEY_SECRET` and `SANDBOX_PAYMENT_WEBHOOK_SECRET` must be unset                             | No sandbox secrets anywhere near production                     |
+| `MAIL_DRIVER` must not be `outbox` (so `smtp`, which requires `SMTP_URL`)                                   | Real email delivery                                             |
+| `STORAGE_DRIVER` must be `s3` (requires `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`)            | No local-disk storage                                           |
+| `CRON_SECRET` is required                                                                                   | Protects `POST /api/cron/sweep` and `GET /api/ops/money-health` |
+| `RAZORPAY_KEY_ID` must not start with `rzp_live_`                                                           | Live payments are not supported by this MVP                     |
+| `SMS_DRIVER` must not be `outbox` (so `msg91`, which requires `MSG91_AUTH_KEY` and `MSG91_OTP_TEMPLATE_ID`) | Real SMS delivery; the MSG91 adapter is unverified (see below)  |
 
 These rules apply to `production` only. `APP_ENV=staging` is not held to them, but the sandbox provider is
 still refused there (see below) and placeholder secrets are rejected. Configure staging like production
@@ -141,8 +141,9 @@ Notes:
 - **Build-time environment.** Configuration is parsed lazily, so modules can be imported during
   `next build` without a database; CI nevertheless builds with a full environment, and doing the same is
   the safe choice.
-- **Health check.** `GET /api/health` returns `200 {"status":"ok"}`. It does not query the database, so
-  use it for liveness, not as proof that the database is reachable.
+- **Health checks.** `GET /api/health` returns `200 {"status":"ok"}` without touching the database: use it
+  for liveness. `GET /api/health?ready=1` also validates the configuration, pings the database and fails
+  (`503`) while a migration is half-applied: use it for readiness and uptime monitoring.
 - **Request size.** Photos are uploaded through Server Actions with a 9 MB body limit
   (`next.config.ts`); any reverse proxy in front of the app must accept request bodies of at least that
   size. Browsers downscale photos to at most 2400 px before uploading, so a condition report with several
@@ -151,8 +152,9 @@ Notes:
 ## Scheduler: the sweep
 
 Deadlines (approval and payment expiry, auto-completion after the inspection window, automatic
-`NOT_RETURNED` disputes), refund dispatch, notification emails and review publication all run in the sweep.
-Nothing else triggers them. Call it every few minutes (for example every 5 minutes):
+`NOT_RETURNED` disputes), payment and refund reconciliation with the provider, refund dispatch,
+notification emails and review publication all run in the sweep. Nothing else triggers them. Call it every
+5 minutes:
 
 ```bash
 curl -fsS -X POST "https://peti.example.com/api/cron/sweep" \
@@ -169,14 +171,19 @@ curl -fsS -X POST "https://peti.example.com/api/cron/sweep" \
   minutes (the provider call is idempotent on Peti's refund id).
 - Refunds the provider rejects five times are marked `FAILED` and listed under **Refunds that failed** on
   `/admin/payouts`, where an administrator can queue them again (audit-logged).
-- If the scheduler stops, bookings stop expiring, refunds stay pending and booking emails are not sent.
-  Monitor it.
+- Each run also asks the provider about recent orders and pending refunds, so a lost webhook delays an
+  outcome instead of losing it ([payment architecture](../architecture/payment-architecture.md#reconciliation)).
+- If the scheduler stops, bookings stop expiring, refunds stay pending, booking emails are not sent, and a
+  payment that the callback and webhook both missed is never captured. Monitor it:
+  `GET /api/ops/money-health` (same bearer secret) answers `503` when anything in the money pipeline needs
+  attention ([production-operations.md](./production-operations.md)).
 
 ## Razorpay test mode
 
-The Razorpay adapter (`src/modules/payments/infrastructure/razorpay-provider.ts`) implements Orders →
-Checkout.js → signed callback → signed webhook. It has not been exercised against Razorpay in CI; the
-sandbox provider covers the same code paths in tests.
+The Razorpay adapter (`src/modules/payments/infrastructure/razorpay-provider.ts`) implements Orders (manual
+capture) → Checkout.js → signed callback → capture, signed webhooks, refunds and chargeback events. **It has
+never been run against Razorpay.** Its request builder, webhook parsing and SDK calls are unit-tested
+against a stubbed SDK, and the sandbox provider covers the same application code paths.
 
 1. In the Razorpay dashboard, switch to **Test mode** and generate API keys. Set `RAZORPAY_KEY_ID`
    (`rzp_test_…`) and `RAZORPAY_KEY_SECRET`.
@@ -184,27 +191,30 @@ sandbox provider covers the same code paths in tests.
    - **URL:** `https://<your APP_URL host>/api/payments/webhook/razorpay` (must be publicly reachable over
      HTTPS);
    - **Secret:** a random string; set the same value as `RAZORPAY_WEBHOOK_SECRET`;
-   - **Events:** `payment.captured`, `payment.failed`, `order.paid`, `refund.processed`, `refund.failed`.
-     The adapter also understands `payment.authorized` but does not need it.
+   - **Events:** `payment.authorized`, `payment.captured`, `payment.failed`, `order.paid`,
+     `refund.processed`, `refund.failed`, `payment.dispute.created`, `payment.dispute.won`,
+     `payment.dispute.lost`, `payment.dispute.closed`.
 3. No callback URL needs configuring in the dashboard: the app passes
    `APP_URL/api/payments/callback/razorpay` to Checkout with each order.
-4. **Turn on automatic capture** (Account & Settings → Payment capture → Automatic). Peti never calls
-   the capture API: it confirms a booking only on a `CAPTURED` payment. With manual capture, payments stay
-   `authorized`, bookings stay awaiting payment until they expire, and Razorpay auto-refunds the
-   authorisation later.
-5. Pay with Razorpay's test instruments and confirm that the booking becomes confirmed and that the
-   webhook deliveries in the dashboard show `200`.
+4. **Capture mode needs no dashboard setting.** Peti creates every order with `payment.capture = "manual"`
+   and a 24-hour capture window, which overrides the dashboard, and captures the payment itself
+   ([ADR-006](../decisions/ADR-006-payment-reliability.md)). Do not capture payments by hand in the
+   dashboard: a payment captured there for a booking that is already paid is refunded automatically.
+5. Verify in test mode, before anything else, the behaviour the design depends on:
+   - an order created by Peti shows manual capture, and a test payment on it stays `authorized` until Peti
+     captures it (within seconds);
+   - a second payment on the same order is left `authorized` and Razorpay returns it after the capture
+     window;
+   - a refund created by Peti carries `notes.reference`, and `refund.processed` arrives;
+   - webhook deliveries in the dashboard show `200`.
 
 The webhook route verifies `x-razorpay-signature` (HMAC-SHA256 of the raw body) before storing anything,
 deduplicates by `x-razorpay-event-id`, and answers `500` when processing fails so that Razorpay retries.
-A booking is confirmed only after a provider-confirmed capture: a webhook counts once its signature is
-verified, and a browser callback's payment is re-fetched from Razorpay before it counts, because a
-callback signature proves authorisation, not capture.
+A booking is confirmed only after a provider-confirmed capture: a browser callback's payment is fetched from
+Razorpay before anything is done with it, because a callback signature proves that the checkout finished,
+not that money moved.
 
-Money that does not fit a booking — a second capture on an already-paid order, or a captured amount that
-differs from the booking total — is never applied. The webhook answers `200 flagged` (so Razorpay stops
-retrying), the event is stored as `IGNORED`, and an audit entry `payment.unexpectedCapture` is written.
-Search the activity log for it and refund such payments by hand in the Razorpay dashboard.
+Only test-mode keys are accepted: the application refuses to start in production with `rzp_live_` keys.
 
 ## Security headers
 
@@ -290,13 +300,13 @@ npx vercel deploy --prod --yes
 The following are missing or deliberately out of scope. Do not take real users or real money until they
 are addressed.
 
-| Gap                                          | Current state                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Real SMS provider**                        | `SMS_DRIVER` only accepts `outbox`, which stores messages in the database, so `env.ts` refuses `APP_ENV=production`. On staging nothing is sent and `/dev/outbox` does not exist, so phone verification — required to request a booking or submit a listing — cannot be completed there. Implement an `SmsSender` adapter for a provider with DLT registration (sender ID and templates), add it to `SMS_DRIVER`, and the production check passes |
-| **Live payments and marketplace settlement** | Only Razorpay test keys are accepted. Owner payouts are recorded and marked paid by an administrator by hand; there is no split settlement (for example Razorpay Route), no KYC of owners and no live-mode review                                                                                                                                                                                                                                 |
-| **Legal review**                             | Terms, privacy policy, cancellation and deposit rules are product assumptions, not legal advice ([assumptions and risks](../product/assumptions-and-risks.md))                                                                                                                                                                                                                                                                                    |
-| **Tax**                                      | No GST on commission and no TDS handling                                                                                                                                                                                                                                                                                                                                                                                                          |
-| **Monitoring and alerting**                  | JSON logs only; no error tracking, uptime checks, metrics or alerts (including for a stalled sweep, `sweep step failed` lines, failed refunds or `payment.unexpectedCapture` audit entries)                                                                                                                                                                                                                                                       |
-| **Content-Security-Policy**                  | Only `/api/files/*` has one. A site-wide CSP (with nonces for Next.js scripts and Razorpay Checkout) is still to do                                                                                                                                                                                                                                                                                                                               |
-| **Identity verification provider**           | None. The schema has an `identity_verification_status` column that defaults to `UNVERIFIED`, no code sets it, and the UI states that Peti does not check identity documents                                                                                                                                                                                                                                                                       |
-| **Hosting**                                  | No hosting provider, container image or infrastructure is configured in this repository                                                                                                                                                                                                                                                                                                                                                           |
+| Gap                                          | Current state                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Real SMS provider**                        | An MSG91 adapter exists (`SMS_DRIVER=msg91`), written from MSG91's documentation and unit-tested against a stubbed `fetch`. It has **never been run against MSG91**: there is no account, no DLT registration (about two weeks of lead time) and no credentials. Until that is done and verified in staging, no verification code reaches a real phone ([sms-otp.md](./sms-otp.md))                                                                                                                |
+| **Live payments and marketplace settlement** | Only Razorpay test keys are accepted, and the Razorpay adapter has never been run against Razorpay. Owner payouts are recorded and marked paid by an administrator by hand. Collecting renters' money into Peti's own account and paying owners by hand may itself need an RBI authorisation, and Razorpay's split-settlement product (Route) needs more than ₹40 lakh turnover ([compliance](../compliance/india-marketplace-compliance.md)). **This is a legal blocker, not a missing feature.** |
+| **Legal review**                             | Terms, privacy policy, cancellation and deposit rules are product assumptions, not legal advice. The open questions for a lawyer are listed in [india-marketplace-compliance.md](../compliance/india-marketplace-compliance.md); none has been answered                                                                                                                                                                                                                                            |
+| **Tax**                                      | No GST registration, no GST on commission, no TCS, no TDS, and no PAN collected from owners. The questions for a chartered accountant are in [india-marketplace-compliance.md](../compliance/india-marketplace-compliance.md)                                                                                                                                                                                                                                                                      |
+| **Monitoring and alerting**                  | The application exposes readiness (`/api/health?ready=1`) and money health (`/api/ops/money-health`, `/admin/money`), but nothing calls them: no scheduler that runs every few minutes, no uptime monitor, no error tracking, no alerts, no tested restore ([production-operations.md](./production-operations.md))                                                                                                                                                                                |
+| **Content-Security-Policy**                  | Only `/api/files/*` has one. A site-wide CSP (with nonces for Next.js scripts and Razorpay Checkout) is still to do                                                                                                                                                                                                                                                                                                                                                                                |
+| **Identity verification provider**           | None. The schema has an `identity_verification_status` column that defaults to `UNVERIFIED`, no code sets it, and the UI states that Peti does not check identity documents                                                                                                                                                                                                                                                                                                                        |
+| **Hosting**                                  | No hosting provider, container image or infrastructure is configured in this repository                                                                                                                                                                                                                                                                                                                                                                                                            |
