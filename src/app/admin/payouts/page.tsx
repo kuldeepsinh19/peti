@@ -21,9 +21,13 @@ export default async function AdminPayoutsPage({
   const actor = await requireAdminOrNotFound();
   const params = await searchParams;
   const showPaid = params.view === "paid";
+  const admin = container().admin;
   const [rows, failed] = await Promise.all([
-    container().admin.payouts(actor, showPaid ? "PAID" : "PENDING"),
-    container().admin.failedRefunds(actor),
+    showPaid
+      ? admin.payouts(actor, "PAID")
+      : // Payouts that came back are sent again, so they wait with the pending ones.
+        Promise.all([admin.payouts(actor, "FAILED"), admin.payouts(actor, "PENDING")]).then((r) => r.flat()),
+    admin.failedRefunds(actor),
   ]);
   return (
     <div className="flex flex-col gap-8 pb-16">
@@ -38,6 +42,11 @@ export default async function AdminPayoutsPage({
         </Notice>
       ) : null}
       {params.done === "markPayoutPaid" ? <Notice tone="success" title="Payout recorded as paid" /> : null}
+      {params.done === "recordPayoutFailure" ? (
+        <Notice tone="success" title="Payout recorded as failed">
+          It is back under &ldquo;To pay&rdquo;, to be sent again once the cause is fixed.
+        </Notice>
+      ) : null}
       {params.done === "retryRefund" ? (
         <Notice tone="success" title="Refund queued again">
           The next sweep sends it to the payment provider.
@@ -110,6 +119,21 @@ export default async function AdminPayoutsPage({
             ),
           },
           { key: "owner", header: "Owner", cell: (r) => r.ownerName },
+          {
+            key: "state",
+            header: "Status",
+            cell: (r) =>
+              r.onHold ? (
+                <Tag tone="warning">On hold: chargeback open</Tag>
+              ) : r.status === "FAILED" ? (
+                <span className="flex flex-col gap-1">
+                  <Tag tone="danger">Failed</Tag>
+                  <span className="text-sm text-graphite">{r.failureReason}</span>
+                </span>
+              ) : (
+                <Tag>{r.status === "PAID" ? "Paid" : "Pending"}</Tag>
+              ),
+          },
           { key: "upi", header: "UPI ID", cell: (r) => r.upiVpa ?? <Tag tone="warning">Not provided</Tag> },
           {
             key: "net",
@@ -122,7 +146,26 @@ export default async function AdminPayoutsPage({
             header: showPaid ? "Reference" : "Record payment",
             cell: (r) =>
               r.status === "PAID" ? (
-                <span className="numeral">{r.payoutReference}</span>
+                <span className="flex flex-col gap-2">
+                  <span className="numeral">{r.payoutReference}</span>
+                  <form action={adminCommandAction} className="flex items-end gap-2">
+                    <input type="hidden" name="command" value="recordPayoutFailure" />
+                    <input type="hidden" name="payoutId" value={r.id} />
+                    <input
+                      name="reason"
+                      required
+                      minLength={5}
+                      placeholder="What came back, and why"
+                      aria-label={"Failure reason for " + r.reference}
+                      className={field}
+                    />
+                    <SubmitButton size="sm" variant="secondary">
+                      Record failure
+                    </SubmitButton>
+                  </form>
+                </span>
+              ) : r.onHold ? (
+                <span className="text-sm text-graphite">Waits until the chargeback is resolved</span>
               ) : !r.upiVpa ? (
                 <span className="text-sm text-graphite">Waiting for the owner&rsquo;s UPI ID</span>
               ) : (

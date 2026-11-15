@@ -18,7 +18,7 @@ const BOOKING_STATUSES = [
   "REJECTED",
   "EXPIRED",
 ] as const;
-const PAYOUT_STATUSES = ["PENDING", "PAID", "CANCELLED"] as const;
+const PAYOUT_STATUSES = ["PENDING", "PAID", "FAILED", "CANCELLED"] as const;
 
 function knownOrUndefined(known: readonly string[], value: string | undefined) {
   return value !== undefined && known.includes(value) ? value : undefined;
@@ -77,6 +77,10 @@ export interface AdminPayoutRow {
   netPaise: number;
   status: string;
   payoutReference: string | null;
+  /** Why a payout recorded as paid came back (FAILED payouts only). */
+  failureReason: string | null;
+  /** A chargeback is open on the booking's payment: the payout waits (ADR-006). */
+  onHold: boolean;
   createdAt: Date;
 }
 
@@ -126,9 +130,16 @@ export interface AdminRepository {
     bookingId: string;
     netPaise: number;
     upiVpa: string | null;
+    payoutReference: string | null;
+    onHold: boolean;
   } | null>;
-  /** Marks a PENDING payout paid, only if its owner still has a payout account; false otherwise. */
+  /**
+   * Marks a PENDING or FAILED payout paid (compare-and-swap), only if its owner still has a payout account
+   * and no chargeback is open on the booking's payment; false otherwise.
+   */
   markPayoutPaid(payoutId: string, reference: string, paidBy: string, at: Date): Promise<boolean>;
+  /** PAID → FAILED with a reason (compare-and-swap); the failed reference stays on the row. */
+  recordPayoutFailure(payoutId: string, reason: string): Promise<boolean>;
   audit(limit: number): Promise<AuditRow[]>;
   categories(): Promise<CategoryRow[]>;
   categorySlugExists(slug: string): Promise<boolean>;
@@ -152,6 +163,10 @@ const reinstateSchema = z.object({
 const payoutSchema = z.object({
   payoutId: z.uuid(),
   reference: z.string().trim().min(4, "Enter the UPI or bank reference (UTR).").max(64),
+});
+const payoutFailureSchema = z.object({
+  payoutId: z.uuid(),
+  reason: z.string().trim().min(5, "Say what happened, for the record.").max(500),
 });
 const categorySchema = z.object({
   name: z.string().trim().min(2).max(60),
@@ -253,14 +268,23 @@ export function adminUseCases({
       });
     },
 
-    /** Records that a payout was sent outside the platform (UPI/bank), with its reference. */
+    /**
+     * Records that a payout was sent outside the platform (UPI/bank), with its reference. A payout that
+     * failed can be sent again; a payout whose booking has an open chargeback waits.
+     */
     async markPayoutPaid(actor: Actor, input: unknown) {
       const me = requireAdmin(actor);
       const { payoutId, reference } = parseInput(payoutSchema, input);
       const payout = await admin.findPayout(payoutId);
       if (!payout) throw new NotFoundError("Payout");
-      if (payout.status !== "PENDING")
-        throw new PreconditionError("PAYOUT_NOT_PENDING", "This payout is not pending.");
+      if (payout.status !== "PENDING" && payout.status !== "FAILED")
+        throw new PreconditionError("PAYOUT_NOT_PENDING", "This payout is not waiting to be paid.");
+      if (payout.onHold) {
+        throw new PreconditionError(
+          "PAYOUT_ON_HOLD",
+          "A chargeback is open on this booking's payment. The payout waits until it is resolved.",
+        );
+      }
       // Money is only ever sent to a valid UPI ID the owner gave us (FR-PROF-06); otherwise a payout could
       // be recorded as paid with nowhere it could have gone.
       if (!payout.upiVpa || !UPI_VPA.test(payout.upiVpa)) {
@@ -278,7 +302,34 @@ export function adminUseCases({
         action: "payout.markPaid",
         entityType: "payout",
         entityId: payoutId,
+        before: { status: payout.status, reference: payout.payoutReference },
         after: { status: "PAID", reference, netPaise: payout.netPaise, upiVpa: payout.upiVpa },
+      });
+    },
+
+    /**
+     * A payout recorded as paid came back (a bounced UPI transfer, a wrong account). It returns to the
+     * queue as FAILED, to be sent again once the cause is fixed.
+     */
+    async recordPayoutFailure(actor: Actor, input: unknown) {
+      const me = requireAdmin(actor);
+      const { payoutId, reason } = parseInput(payoutFailureSchema, input);
+      const payout = await admin.findPayout(payoutId);
+      if (!payout) throw new NotFoundError("Payout");
+      if (payout.status !== "PAID")
+        throw new PreconditionError("PAYOUT_NOT_PAID", "Only a payout recorded as paid can fail.");
+      if (!(await admin.recordPayoutFailure(payoutId, reason))) {
+        throw new PreconditionError("PAYOUT_NOT_PAID", "This payout changed. Please reload.");
+      }
+      await audit.record({
+        actorUserId: me.userId,
+        actorRole: "ADMIN",
+        action: "payout.failed",
+        entityType: "payout",
+        entityId: payoutId,
+        before: { status: "PAID", reference: payout.payoutReference },
+        after: { status: "FAILED", netPaise: payout.netPaise },
+        reason,
       });
     },
 

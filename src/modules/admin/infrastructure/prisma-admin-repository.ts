@@ -32,6 +32,8 @@ const toBookingRow = (b: BookingWithPeople): AdminBookingRow => ({
   createdAt: b.createdAt,
 });
 
+const OPEN_DISPUTE = { where: { status: "OPEN" as const } };
+
 export function prismaAdminRepository(db: Db): AdminRepository {
   return {
     async metrics(): Promise<Metrics> {
@@ -159,7 +161,7 @@ export function prismaAdminRepository(db: Db): AdminRepository {
         orderBy: { createdAt: "asc" },
         take: 200,
         include: {
-          booking: { select: { reference: true } },
+          booking: { select: { reference: true, _count: { select: { paymentDisputes: OPEN_DISPUTE } } } },
           owner: {
             select: {
               name: true,
@@ -178,6 +180,8 @@ export function prismaAdminRepository(db: Db): AdminRepository {
         netPaise: p.netPaise,
         status: p.status,
         payoutReference: p.payoutReference,
+        failureReason: p.failureReason,
+        onHold: p.booking._count.paymentDisputes > 0,
         createdAt: p.createdAt,
       }));
     },
@@ -190,7 +194,9 @@ export function prismaAdminRepository(db: Db): AdminRepository {
           status: true,
           bookingId: true,
           netPaise: true,
+          payoutReference: true,
           owner: { select: { payoutAccount: { select: { upiVpa: true } } } },
+          booking: { select: { _count: { select: { paymentDisputes: OPEN_DISPUTE } } } },
         },
       });
       return p
@@ -200,15 +206,39 @@ export function prismaAdminRepository(db: Db): AdminRepository {
             bookingId: p.bookingId,
             netPaise: p.netPaise,
             upiVpa: p.owner.payoutAccount?.upiVpa ?? null,
+            payoutReference: p.payoutReference,
+            onHold: p.booking._count.paymentDisputes > 0,
           }
         : null;
     },
 
     async markPayoutPaid(payoutId, reference, paidBy, at) {
-      // The payout account must still exist when the payment is recorded, not only when it was checked.
+      // Re-checked in the write itself: the payout account must still exist and no chargeback may have
+      // opened since the checks above.
       const result = await db.payout.updateMany({
-        where: { id: payoutId, status: "PENDING", owner: { payoutAccount: { isNot: null } } },
-        data: { status: "PAID", payoutReference: reference, paidById: paidBy, paidAt: at },
+        where: {
+          id: payoutId,
+          status: { in: ["PENDING", "FAILED"] },
+          owner: { payoutAccount: { isNot: null } },
+          booking: { paymentDisputes: { none: { status: "OPEN" } } },
+        },
+        data: {
+          status: "PAID",
+          payoutReference: reference,
+          paidById: paidBy,
+          paidAt: at,
+          failureReason: null,
+        },
+      });
+      return result.count === 1;
+    },
+
+    async recordPayoutFailure(payoutId, reason) {
+      // payouts_paid_consistent: only a PAID payout carries paid_at and paid_by. The failed reference
+      // stays on the row (and in the audit log) until the payout is sent again.
+      const result = await db.payout.updateMany({
+        where: { id: payoutId, status: "PAID" },
+        data: { status: "FAILED", failureReason: reason, paidAt: null, paidById: null },
       });
       return result.count === 1;
     },
