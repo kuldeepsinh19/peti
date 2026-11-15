@@ -150,11 +150,20 @@ function build() {
     async sweep() {
       const bookingReport = await bookings.sweep();
       for (const failure of bookingReport.failures) logger.warn("sweep step failed", failure);
+      // Payments first, so a reversal or late-capture refund it queues is sent in the same run.
+      const paymentsReconciled = await paymentsRef.reconcilePayments();
       const refunds = await paymentsRef.dispatchRefunds();
       const refundsReconciled = await paymentsRef.reconcileRefunds();
       const emails = await dispatchPendingEmails(prismaNotificationOutbox(db), mail, env.APP_URL);
       const reviewsPublished = await reviews.publishExpired();
-      return { bookings: bookingReport, refunds, refundsReconciled, emails, reviewsPublished };
+      return {
+        bookings: bookingReport,
+        paymentsReconciled,
+        refunds,
+        refundsReconciled,
+        emails,
+        reviewsPublished,
+      };
     },
   };
 }

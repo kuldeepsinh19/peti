@@ -33,6 +33,9 @@ export interface PaymentRepository {
   setOrderId(paymentId: string, providerOrderId: string): Promise<void>;
   findByOrder(provider: ProviderId, providerOrderId: string): Promise<PaymentRef | null>;
   findForBooking(bookingId: string): Promise<PaymentRef | null>;
+  /** Orders to ask the provider about again (recent, and not checked lately), least recently checked first. */
+  dueForReconciliation(provider: ProviderId, limit: number): Promise<PaymentRef[]>;
+  markReconciled(paymentId: string): Promise<void>;
   /** A capture call failed while the authorisation can still be captured: the sweep retries it. */
   recordCaptureFailure(paymentId: string, error: string): Promise<void>;
   /** The claimed authorisation can no longer be captured: the booking may claim another one. */
@@ -348,6 +351,28 @@ export function paymentsUseCases(deps: PaymentsDeps) {
         }
       }
       return { claimed: claimed.length, sent };
+    },
+
+    /**
+     * Catches what webhooks missed: asks the provider about every recent order and applies what it reports
+     * through the same pipeline (an authorisation is captured or left, a capture is confirmed, refunded as
+     * late, or reversed). Safe to run concurrently with webhooks and with itself.
+     */
+    async reconcilePayments(limit = 25) {
+      const due = await payments.dueForReconciliation(provider.id, limit);
+      const report = { checked: due.length, applied: 0, errors: 0 };
+      for (const row of due) {
+        try {
+          const outcomes = await reconcileOrder(row);
+          report.applied += outcomes.filter((o) => o !== "ALREADY_CONFIRMED" && o !== "IGNORED").length;
+        } catch {
+          // Provider unreachable or a row that cannot be applied: checked again on a later run.
+          report.errors++;
+        } finally {
+          await payments.markReconciled(row.id);
+        }
+      }
+      return report;
     },
 
     /**

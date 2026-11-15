@@ -12,6 +12,15 @@ function redact(payload: unknown): Prisma.InputJsonValue {
   return json as Prisma.InputJsonValue;
 }
 
+/**
+ * Reconciliation covers an order for 6 days: longer than Razorpay keeps an uncaptured authorisation (our
+ * manual-capture window is 24 hours, the maximum 5 days), so nothing can be captured on it afterwards.
+ */
+const RECONCILE_FOR_DAYS = 6;
+const RECONCILE_EVERY_MINUTES = 60;
+/** An authorisation whose capture failed is retried sooner. */
+const RECONCILE_AUTHORIZED_EVERY_MINUTES = 15;
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PROVIDER_FAILED = "The payment provider reported the refund as failed.";
 
@@ -63,6 +72,46 @@ export function prismaPaymentRepository(db: Db): PaymentRepository {
     async findForBooking(bookingId) {
       const p = await db.payment.findUnique({ where: { bookingId }, select: REF });
       return p ? toRef(p) : null;
+    },
+
+    async dueForReconciliation(provider, limit) {
+      // Database time on purpose: this is an operational throttle, independent of the application clock.
+      const rows = await db.$queryRaw<
+        Array<{
+          id: string;
+          booking_id: string;
+          provider: string;
+          status: string;
+          amount_paise: number;
+          provider_order_id: string | null;
+          provider_payment_id: string | null;
+        }>
+      >`
+        SELECT id, booking_id, provider, status::text AS status, amount_paise, provider_order_id,
+               provider_payment_id
+        FROM payments
+        WHERE provider = ${provider} AND provider_order_id IS NOT NULL
+          AND created_at > now() - make_interval(days => ${RECONCILE_FOR_DAYS})
+          AND COALESCE(last_reconciled_at, created_at) < now() - CASE WHEN status = 'AUTHORIZED'
+                THEN make_interval(mins => ${RECONCILE_AUTHORIZED_EVERY_MINUTES})
+                ELSE make_interval(mins => ${RECONCILE_EVERY_MINUTES}) END
+        ORDER BY COALESCE(last_reconciled_at, created_at)
+        LIMIT ${limit}`;
+      return rows.map((r) =>
+        toRef({
+          id: r.id,
+          bookingId: r.booking_id,
+          provider: r.provider,
+          status: r.status,
+          amountPaise: r.amount_paise,
+          providerOrderId: r.provider_order_id,
+          providerPaymentId: r.provider_payment_id,
+        }),
+      );
+    },
+
+    async markReconciled(paymentId) {
+      await db.$executeRaw`UPDATE payments SET last_reconciled_at = now() WHERE id = ${paymentId}::uuid`;
     },
 
     async recordCaptureFailure(paymentId, error) {
