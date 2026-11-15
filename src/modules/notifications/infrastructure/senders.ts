@@ -24,8 +24,9 @@ export function outboxMailSender(db: Db): MailSender {
 
 export function outboxSmsSender(db: Db): SmsSender {
   return {
-    async send(to: string, text: string) {
-      await db.devOutboxMessage.create({ data: { channel: "SMS", recipient: to, body: text } });
+    async sendOtp(to, otp) {
+      const body = `${otp.code} is your Peti verification code. It expires in ${otp.expiresInMinutes} minutes.`;
+      await db.devOutboxMessage.create({ data: { channel: "SMS", recipient: to, body } });
     },
   };
 }

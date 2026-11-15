@@ -13,7 +13,7 @@ beforeEach(async () => {
   await resetDatabase();
 });
 
-const silent = { send: async () => {} };
+const silent = { send: async () => {}, sendOtp: async () => {} };
 
 function authFor(overrides: Record<string, string> = {}) {
   // APP_ENV=local: production-strength limits (the test environment loosens them twentyfold).

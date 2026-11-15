@@ -11,8 +11,12 @@ export interface MailSender {
 }
 
 export interface SmsSender {
-  /** `to` is an E.164 Indian mobile number (+91…). */
-  send(to: string, text: string): Promise<void>;
+  /**
+   * Sends a one-time verification code. `to` is an E.164 Indian mobile number (+91…). The code is passed
+   * as a value, not as message text: a real provider fills it into a template approved under India's DLT
+   * rules, so the wording is fixed outside the application.
+   */
+  sendOtp(to: string, otp: { code: string; expiresInMinutes: number }): Promise<void>;
 }
 
 /** Business events that notify a user. Written inside the business transaction, delivered later. */

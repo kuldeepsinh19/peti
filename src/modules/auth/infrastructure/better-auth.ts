@@ -17,6 +17,9 @@ import {
 import { INDIAN_MOBILE } from "@/modules/users";
 import { accountAttempts } from "../application/attempt-limits";
 
+/** Phone verification codes live this long. A real SMS template must state the same number (sms-otp.md). */
+const OTP_EXPIRES_MINUTES = 5;
+
 interface AuthDeps {
   env: Env;
   db: Db;
@@ -194,11 +197,11 @@ export function createAuth({ env, db, mail, sms, rateLimiter }: AuthDeps) {
     plugins: [
       phoneNumber({
         otpLength: 6,
-        expiresIn: 300,
+        expiresIn: OTP_EXPIRES_MINUTES * 60,
         allowedAttempts: 5,
         phoneNumberValidator: (value) => INDIAN_MOBILE.test(value),
         sendOTP: async ({ phoneNumber: to, code }) => {
-          await sms.send(to, `${code} is your Peti verification code. It expires in 5 minutes.`);
+          await sms.sendOtp(to, { code, expiresInMinutes: OTP_EXPIRES_MINUTES });
         },
       }),
       admin({ defaultRole: "user", adminRoles: ["admin"] }),
