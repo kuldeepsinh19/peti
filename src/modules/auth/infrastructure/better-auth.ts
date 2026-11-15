@@ -30,6 +30,39 @@ interface AuthDeps {
  * Better Auth configuration (ADR-001): email + password, database sessions, email verification, password
  * reset, phone OTP verification, admin roles/bans and database-backed rate limiting.
  */
+/**
+ * Better Auth endpoints the product does not use are switched off, so they cannot be reached directly:
+ * - phone-based password reset and phone sign-in would turn a leaked mobile number into a takeover target;
+ * - the admin plugin's endpoints (impersonate, set role, set password, ban, remove…) would bypass the app's
+ *   audited admin use cases; the plugin stays only for the role and ban fields and ban enforcement;
+ * - account self-service endpoints with no UI (change email or password, update or delete the user) would
+ *   bypass the app's own validated, audited profile use cases.
+ */
+export const DISABLED_PATHS = [
+  "/phone-number/request-password-reset",
+  "/phone-number/reset-password",
+  "/sign-in/phone-number",
+  "/admin/ban-user",
+  "/admin/create-user",
+  "/admin/get-user",
+  "/admin/has-permission",
+  "/admin/impersonate-user",
+  "/admin/list-users",
+  "/admin/list-user-sessions",
+  "/admin/remove-user",
+  "/admin/revoke-user-session",
+  "/admin/revoke-user-sessions",
+  "/admin/set-role",
+  "/admin/set-user-password",
+  "/admin/stop-impersonating",
+  "/admin/unban-user",
+  "/admin/update-user",
+  "/change-email",
+  "/change-password",
+  "/update-user",
+  "/delete-user",
+] as const;
+
 export function createAuth({ env, db, mail, sms, rateLimiter }: AuthDeps) {
   const trustedOrigins = [
     env.APP_URL,
@@ -47,13 +80,7 @@ export function createAuth({ env, db, mail, sms, rateLimiter }: AuthDeps) {
     secret: env.BETTER_AUTH_SECRET,
     trustedOrigins,
     database: prismaAdapter(db, { provider: "postgresql" }),
-    // Endpoints the product does not use are switched off: phone-based password reset and phone sign-in
-    // would turn a leaked mobile number into an account-takeover target.
-    disabledPaths: [
-      "/phone-number/request-password-reset",
-      "/phone-number/reset-password",
-      "/sign-in/phone-number",
-    ],
+    disabledPaths: [...DISABLED_PATHS],
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
         const phonePath = ctx.path === "/phone-number/verify" || ctx.path === "/phone-number/send-otp";

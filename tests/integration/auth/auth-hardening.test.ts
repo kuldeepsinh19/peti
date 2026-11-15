@@ -4,7 +4,7 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { parseEnv, type Env } from "@/config/env";
-import { createAuth } from "@/modules/auth/infrastructure/better-auth";
+import { DISABLED_PATHS, createAuth } from "@/modules/auth/infrastructure/better-auth";
 import { systemClock } from "@/shared/domain/clock";
 import { postgresRateLimiter } from "@/shared/infrastructure/rate-limiter";
 import { db, resetDatabase } from "../support/db";
@@ -65,5 +65,45 @@ describe("per-account sign-in limit (S-02)", () => {
     const res = await call("/phone-number/send-otp", { phoneNumber: "+919000000006" });
     expect(res.status).toBe(403);
     expect(await db.devOutboxMessage.count()).toBe(0);
+  });
+});
+
+describe("endpoints the product does not use (S-05, H2)", () => {
+  it("answer 404 whatever the method, so they cannot be reached directly", async () => {
+    const { env } = authFor();
+    const auth = createAuth({
+      env,
+      db,
+      mail: silent,
+      sms: silent,
+      rateLimiter: postgresRateLimiter(db, systemClock),
+    });
+    // Pinned here, independently of DISABLED_PATHS, so removing one from the config fails this test.
+    const mustStayOff = [
+      "/admin/impersonate-user",
+      "/admin/set-role",
+      "/admin/set-user-password",
+      "/admin/list-users",
+      "/admin/remove-user",
+      "/admin/update-user",
+      "/sign-in/phone-number",
+      "/phone-number/request-password-reset",
+      "/phone-number/reset-password",
+      "/change-email",
+      "/change-password",
+      "/update-user",
+    ];
+    for (const path of new Set([...mustStayOff, ...DISABLED_PATHS])) {
+      for (const method of ["GET", "POST"]) {
+        const res = await auth.handler(
+          new Request(`${env.APP_URL}/api/auth${path}`, {
+            method,
+            headers: { "content-type": "application/json", origin: env.APP_URL },
+            ...(method === "POST" ? { body: "{}" } : {}),
+          }),
+        );
+        expect({ path, method, status: res.status }).toEqual({ path, method, status: 404 });
+      }
+    }
   });
 });
