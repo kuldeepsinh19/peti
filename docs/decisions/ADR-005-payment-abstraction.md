@@ -1,6 +1,8 @@
 # ADR-005: Payment-provider abstraction and money model
 
-- Status: Accepted
+- Status: Accepted; amended by [ADR-006](./ADR-006-payment-reliability.md) (explicit capture, reversal of
+  stray captures, reconciliation; the port's `findCapturedPaymentForOrder` became `listOrderPayments` and
+  gained `capturePayment`)
 - Date: 2026-11-11
 
 ## Context
