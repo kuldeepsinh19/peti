@@ -156,10 +156,14 @@ See [api-overview.md](docs/api/api-overview.md) and [error-handling.md](docs/api
 See [security-architecture.md](docs/architecture/security-architecture.md) and [SECURITY.md](SECURITY.md).
 
 - Secrets only from env; never commit `.env`; never log secrets, tokens, OTPs or full payment payloads.
-- The sandbox payment provider, dev outbox and `/dev/*` pages exist only when `APP_ENV` is `local` or
-  `test`; `env.ts` refuses to boot production with them.
-- Rate-limit auth (Better Auth, database-backed), booking requests (in the use case) and every action that
-  uploads or writes user text: photos, condition reports, listings, disputes, reviews, saved toggles.
+- The dev outbox and design-system page exist only when `APP_ENV` is `local` or `test`; the sandbox
+  payment provider and checkout also in `demo`; `env.ts` refuses to boot production with any of them.
+- Never trust a client-controlled header for security decisions: the client IP comes only from the
+  configured proxy header (`AUTH_IP_HEADERS`, required outside local/test).
+- Rate-limit auth per IP (Better Auth) **and per account** (`modules/auth/application/attempt-limits.ts`),
+  booking requests (in the use case) and every action that uploads or writes user text.
+- Better Auth endpoints the product does not use stay disabled (`DISABLED_PATHS` in `better-auth.ts`,
+  pinned by `tests/integration/auth/auth-hardening.test.ts`).
 - Strip EXIF (including GPS) from every uploaded photo. Serve user files through the app with
   authorisation where they are private (condition-report photos).
 - Privacy by design: collect the minimum; listings show locality, never the street address.
@@ -198,7 +202,11 @@ See [testing-guide.md](docs/development/testing-guide.md).
 ## 15. Environment configuration
 
 All variables are documented in [.env.example](.env.example) and validated in `src/config/env.ts`.
-`APP_ENV` (`local | test | staging | production`) — not `NODE_ENV` — decides whether dev tooling runs.
+`APP_ENV` (`local | test | demo | staging | production`) — not `NODE_ENV` — decides the capabilities in
+`src/config/env.ts`: developer tooling (dev outbox, design system) only in `local`/`test`; sandbox payments
+in `local`/`test`/`demo`; self-service accounts (sign-up, password reset, verification) everywhere except
+`demo`. Outside `local`/`test`, `AUTH_IP_HEADERS` (and `AUTH_TRUSTED_PROXIES` with `x-forwarded-for`) is
+required.
 Business defaults (commission, windows, buffers, tiers) live in `src/config/marketplace-policy.ts` and are
 snapshotted onto each booking.
 

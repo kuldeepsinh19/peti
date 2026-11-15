@@ -97,18 +97,24 @@ AUTH_TRUSTED_PROXIES=10.0.0.10,10.0.0.11
 
 ### Client IP behind a proxy
 
-Better Auth rate-limits sign-in, sign-up, OTP and password-reset requests per client IP. The IP comes from
-the headers named in `AUTH_IP_HEADERS` (default `x-forwarded-for`). A client can send any header it
-likes, so:
+Better Auth rate-limits sign-in, sign-up, OTP and password-reset requests per client IP. A route handler
+cannot see the network address, so the IP comes from a request header, and a client can send any header
+it likes. Outside `local` and `test` the server therefore **refuses to start** unless you say which header
+your proxy sets:
 
-- name only a header that your load balancer or CDN **sets or overwrites** (for example
-  `cf-connecting-ip` behind Cloudflare, or `x-forwarded-for` behind a proxy that appends to it);
-- set `AUTH_TRUSTED_PROXIES` to your proxies' addresses so the client address is read from the right
-  position in `X-Forwarded-For`;
-- never expose the app directly to the internet while trusting a forwarding header — anyone could then
-  rotate the header to bypass the auth rate limits.
+- `AUTH_IP_HEADERS` (required): a header your load balancer or CDN **sets or overwrites**, for example
+  `x-real-ip` on Vercel or `cf-connecting-ip` behind Cloudflare.
+- `X-Forwarded-For` can be extended by any client, so it is accepted only together with
+  `AUTH_TRUSTED_PROXIES` (IP addresses or CIDR ranges of your proxies); the client address is then read
+  from the right, skipping trusted hops.
+- If the configured header is missing on a request, that request shares one bucket with every other
+  header-less request: limits fail closed (everyone is throttled together) rather than open.
 
-The application's own per-user limits (bookings, uploads, disputes, reviews) are keyed by user id, not IP.
+Independently of the address, sign-in and password-reset requests are limited **per email** (20 sign-ins
+per 15 minutes, 5 reset requests per hour) and one-time codes **per phone number and per user** (5 per
+hour), so rotating addresses never buys an attacker more guesses at one account. Sending a code requires a
+signed-in user. The application's other per-user limits (bookings, uploads, disputes, reviews) are keyed
+by user id.
 
 Keep secrets in the host's secret store, never in the repository. Never set `DATABASE_URL_TEST` or run
 the seed against production: `pnpm db:seed` refuses to run when `APP_ENV=production`.
@@ -234,8 +240,16 @@ database.
 
 ## Public demo on Vercel
 
-The hosted demo is **not** a production deployment. It runs with `APP_ENV=test` so visitors can try the
-whole flow with the sandbox payment provider and read emails and one-time codes at `/dev/outbox`.
+The hosted demo is **not** a production deployment. It runs with `APP_ENV=demo`, a locked mode for a
+public demonstration with fictional data:
+
+- the sandbox payment provider and its checkout page work, so visitors can try the whole booking flow;
+- there is **no developer outbox** and no design-system page (both answer 404);
+- sign-up, password reset, email verification and phone verification are switched off (404), so visitors
+  can only use the shared, already verified demo accounts listed on the sign-in page; nobody can take one
+  over or lock others out, and no real person's details are collected;
+- normal (not test-mode) auth limits apply, HSTS is sent, and a banner says it is a demonstration;
+- the server refuses to start without `CRON_SECRET`, `AUTH_IP_HEADERS` and non-placeholder sandbox secrets.
 
 | Piece       | Demo setting                                                                                                      |
 | ----------- | ----------------------------------------------------------------------------------------------------------------- |
@@ -245,11 +259,10 @@ whole flow with the sandbox payment provider and read emails and one-time codes 
 | Client IP   | `AUTH_IP_HEADERS=x-real-ip` (set by Vercel's edge)                                                                |
 | Uploads     | Not persisted: the serverless disk is read-only, and request bodies are capped at 4.5 MB                          |
 
-Caveats, all accepted for a demo with fictional data only:
+Caveats, accepted for a demo with fictional data only:
 
-- `/dev/outbox` is public, so anyone can read any sign-in code or password-reset link and take over any
-  account. That is why the demo is seeded with `--without-admin`: there is no administrator account.
-- Test-mode auth rate limits are looser than production's.
+- The demo accounts' password is published, so anyone can sign in as them and change their profile text
+  or their listings and bookings. The demo is seeded with `--without-admin`: there is no administrator.
 - Deadlines run once a day, not every few minutes.
 
 Setting it up (from the repository root, with the Vercel CLI logged in):
@@ -261,9 +274,9 @@ npx vercel integration add neon --billing-plan free_v3 --meta region=sin1 --meta
 npx vercel env pull --environment production .env.vercel
 # with DATABASE_URL_UNPOOLED from .env.vercel exported as DATABASE_URL:
 pnpm db:deploy
-APP_ENV=test STORAGE_FS_ROOT=./demo-storage pnpm db:seed -- --without-admin
+APP_ENV=test STORAGE_FS_ROOT=./demo-storage pnpm db:seed -- --without-admin   # the seed itself runs locally
 rm .env.vercel
-# project variables (production): APP_ENV=test, APP_URL, BETTER_AUTH_SECRET, PAYMENT_PROVIDER=sandbox,
+# project variables (production): APP_ENV=demo, APP_URL, BETTER_AUTH_SECRET, PAYMENT_PROVIDER=sandbox,
 # SANDBOX_PAYMENT_KEY_SECRET, SANDBOX_PAYMENT_WEBHOOK_SECRET, MAIL_DRIVER=outbox, SMS_DRIVER=outbox,
 # STORAGE_DRIVER=filesystem, STORAGE_FS_ROOT=./demo-storage, AUTH_IP_HEADERS=x-real-ip, CRON_SECRET
 npx vercel deploy --prod --yes
