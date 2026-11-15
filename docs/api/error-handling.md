@@ -100,16 +100,26 @@ Every code below appears in the code base. "Raised in" paths are relative to `sr
 | Code                    | Meaning                                                                                                                          | Raised in                                              |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
 | `NOT_PAYABLE`           | The booking is not awaiting payment, or its payment cannot be retried                                                            | `modules/payments/application/payments.ts`             |
+| `PAYMENT_PROCESSING`    | A payment for this booking is already authorised and being captured; a second one would only be returned                         | `modules/payments/application/payments.ts`             |
 | `PAYMENT_WINDOW_CLOSED` | Less than 2 minutes remain before the payment deadline                                                                           | `modules/payments/application/payments.ts`             |
-| `AMOUNT_MISMATCH`       | Captured amount or currency differs from the booking (callback/webhook path)                                                     | `modules/bookings/application/payment-events.ts`       |
-| `DUPLICATE_CAPTURE`     | A different provider payment was already captured for this booking                                                               | `modules/bookings/application/payment-events.ts`       |
 | `NOT_PAID`              | Settling a booking without a captured payment                                                                                    | `modules/bookings/application/core.ts` (`settleMoney`) |
 | `HANDOVER_UNDER_WAY`    | Renter or owner cancelling a paid booking once the handover report exists or the start date has arrived (open a dispute instead) | `modules/bookings/application/decisions.ts`            |
 
-`AMOUNT_MISMATCH` and `DUPLICATE_CAPTURE` arise inside the provider routes, not in user actions. Neither is
-retried: the webhook writes a `payment.unexpectedCapture` audit entry, marks the inbox row `IGNORED` and
-answers `200 flagged`; the callback writes the same audit entry and redirects with `?payment=error`. An
-administrator refunds such payments by hand.
+A payment that does not fit its booking is not an error ([ADR-006](../decisions/ADR-006-payment-reliability.md)).
+The provider routes report an outcome instead, and the callback redirects with it in `?payment=`:
+
+| Outcome                       | Meaning                                                                                              |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `confirmed`                   | The payment was captured and the booking confirmed                                                   |
+| `already_confirmed`           | The other signal (webhook or callback) had already confirmed it                                      |
+| `pending`                     | Not captured yet: the capture call failed and is being retried, or the payment is not authorised     |
+| `declined`                    | An authorisation Peti will not capture (second payment, wrong amount, closed booking); never charged |
+| `late_capture_refunded`       | Captured after the booking stopped waiting for payment; refunded in full                             |
+| `unexpected_capture_reversed` | A second or wrong-amount payment was captured outside Peti; that payment is refunded in full         |
+| `invalid` / `error`           | The callback could not be verified, or processing failed                                             |
+
+The webhook answers `200 ok` for all of these, `200 duplicate` for an event already processed, `401` for a
+bad signature and `500` when processing fails (so the provider retries).
 
 ### Rental, return and disputes
 
@@ -137,7 +147,9 @@ administrator refunds such payments by hand.
 | `ALREADY_REVIEWED`     | One review per person per rental                                  | `modules/reviews/application/reviews.ts` |
 | `SELF_SUSPEND`         | An administrator suspending their own account                     | `modules/admin/application/admin.ts`     |
 | `ADMIN_TARGET`         | Suspending another administrator                                  | `modules/admin/application/admin.ts`     |
-| `PAYOUT_NOT_PENDING`   | Marking a payout paid when it is no longer pending                | `modules/admin/application/admin.ts`     |
+| `PAYOUT_NOT_PENDING`   | Marking a payout paid when it is not pending or failed            | `modules/admin/application/admin.ts`     |
+| `PAYOUT_ON_HOLD`       | Marking a payout paid while a chargeback is open on the payment   | `modules/admin/application/admin.ts`     |
+| `PAYOUT_NOT_PAID`      | Recording a failure for a payout that was not recorded as paid    | `modules/admin/application/admin.ts`     |
 | `NO_PAYOUT_ACCOUNT`    | Marking a payout paid while the owner has no valid UPI ID on file | `modules/admin/application/admin.ts`     |
 
 ## From error to ActionResult

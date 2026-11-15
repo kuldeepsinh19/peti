@@ -62,8 +62,14 @@ See [payment architecture](payment-architecture.md) and [ADR-005](../decisions/A
 - `recordCapturedPayment` is the only path to `CONFIRMED`. Callbacks are HMAC-verified in constant time,
   then the payment is re-fetched from the provider; webhooks are HMAC-verified over the raw body and
   de-duplicated in the `provider_events` inbox. Amount and currency are checked against the stored payment.
-- Money that does not fit a booking (a second capture, a different amount) is never applied: it is
-  audit-logged as `payment.unexpectedCapture` and acknowledged, so the provider stops retrying.
+- Peti captures explicitly ([ADR-006](../decisions/ADR-006-payment-reliability.md)): one authorisation per
+  booking is claimed under the booking and payment locks, for the exact amount, and captured. A second
+  authorisation or a wrong amount is never captured. A capture made outside Peti that does not fit a booking
+  is never applied: a refund of exactly that provider payment is queued once, and audit-logged
+  (audit finding S-04, fixed in Phase 2).
+- Refund webhooks are matched by provider refund id or by Peti's reference, and refunds whose webhook was
+  lost are fetched from the provider (S-06, fixed in Phase 2).
+- An open chargeback holds the owner's payout; the hold is re-checked in the write.
 - Settlement is one pure function that conserves money by construction (property-tested). Database checks
   forbid over-refunds, double settlement and refunds before capture; `v_booking_money_reconciliation` must
   show zero imbalance.
@@ -183,12 +189,17 @@ owner's valid UPI ID.
 
 ## Open items before taking real users
 
-1. A real SMS provider with DLT registration, and a per-number OTP limit (H3, L4).
+1. A real SMS provider with DLT registration (H3). An MSG91 adapter exists but has never been run against
+   MSG91, and the DLT registration has not been done ([sms-otp.md](../development/sms-otp.md)). ~~A
+   per-number OTP limit (L4).~~ Done (Phase 1).
 2. ~~Correct `AUTH_IP_HEADERS` and `AUTH_TRUSTED_PROXIES` for the host (M5).~~ Now enforced at start-up (Phase 1); set them for the real host.
-3. Automatic reversal of unexpected captures, and refund webhook matching by reference (M3, M2).
+3. ~~Automatic reversal of unexpected captures, and refund webhook matching by reference (M3, M2).~~ Done
+   (Phase 2, [ADR-006](../decisions/ADR-006-payment-reliability.md)); verified with the sandbox provider
+   only.
 4. ~~Audit logging or removal of Better Auth's admin endpoints (S3).~~ Removed (Phase 1).
 5. Error codes instead of message text in redirects (L2); versioned handover reports (L7); pickup address
    snapshot (L10); explicit `refunded` mapping (L9).
-6. A site-wide Content-Security-Policy, error tracking and alerting on sweep failures, failed refunds and
-   `payment.unexpectedCapture` entries.
+6. A site-wide Content-Security-Policy and error tracking. Alerting on the money pipeline has an endpoint
+   (`GET /api/ops/money-health`, Phase 2) but no monitor is set up to call it
+   ([production-operations.md](../development/production-operations.md)).
 7. A penetration test and a legal review of the terms, privacy policy and deposit rules.

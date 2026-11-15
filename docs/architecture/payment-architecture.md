@@ -1,7 +1,12 @@
 # Payment architecture
 
-Decision record: [ADR-005](../decisions/ADR-005-payment-abstraction.md). Booking states referred to here are
-described in [booking-lifecycle.md](./booking-lifecycle.md).
+Decision records: [ADR-005](../decisions/ADR-005-payment-abstraction.md) (the port and the money model) and
+[ADR-006](../decisions/ADR-006-payment-reliability.md) (explicit capture, reversals, reconciliation). Booking
+states referred to here are described in [booking-lifecycle.md](./booking-lifecycle.md).
+
+**Status.** Everything on this page is verified end to end with the sandbox provider. The Razorpay adapter
+follows Razorpay's documentation and is unit-tested against a stubbed SDK; it has never been run against
+Razorpay.
 
 ## Money rules
 
@@ -21,6 +26,9 @@ described in [booking-lifecycle.md](./booking-lifecycle.md).
 
 ## Flow
 
+Peti captures explicitly: an order is created for **manual capture**, so an authorised payment becomes money
+only when Peti captures it, and Peti captures one payment per booking.
+
 ```mermaid
 sequenceDiagram
   autonumber
@@ -29,44 +37,98 @@ sequenceDiagram
   participant P as Payment provider
   R->>A: Start payment (booking AWAITING_PAYMENT)
   A->>A: insert payments row (CREATED)
-  A->>P: createOrder(amount, reference = payment id)
+  A->>P: createOrder(amount, reference = payment id, capture = manual)
   A-->>R: checkout session (redirect or client SDK)
-  R->>P: pays
+  R->>P: pays (the payment is AUTHORISED, not captured)
   par Browser callback
     P-->>R: signed callback params
     R->>A: POST /api/payments/callback/[provider]
-    A->>A: verify signature, fetchPayment from provider
+    A->>P: verify signature, then fetchPayment
   and Webhook
     P->>A: POST /api/payments/webhook/[provider] (raw body + signature)
     A->>A: verify signature, store in provider_events (dedupe)
+  and Reconciliation (every sweep)
+    A->>P: listOrderPayments for recent orders
   end
-  A->>A: confirmPayment (locks booking, then payment; idempotent)
-  A->>A: booking CONFIRMED, deposit HELD
+  A->>A: claim the authorisation (locks booking, then payment)
+  A->>P: capturePayment (outside any transaction)
+  A->>A: record the capture: booking CONFIRMED, deposit HELD
   A-->>R: 303 redirect to booking page (reads the database)
 ```
 
-`confirmPayment` is the **only** path to `CONFIRMED`:
+Every report of a payment — callback, webhook or reconciliation — goes through one function,
+`applyProviderPayment` (`modules/payments/application/payments.ts`):
 
-1. Find the payment by `(provider, provider_order_id)`.
-2. Lock the booking, then the payment (`FOR UPDATE`).
-3. If already `CAPTURED` with the same provider payment id, return — the other signal won the race.
-4. Verify amount and currency against the stored row. The callback path fetches the payment from the
-   provider first, because a valid signature proves authorisation, not capture.
-5. Mark the payment `CAPTURED`. If the booking is `AWAITING_PAYMENT`, transition it to `CONFIRMED` and create
-   the deposit (`HELD`). Otherwise queue a full refund (`LATE_CAPTURE_REVERSAL`).
+| Provider says | Peti does                                                                                |
+| ------------- | ---------------------------------------------------------------------------------------- |
+| `AUTHORIZED`  | Claim it for the booking, capture it, record the capture. Or decline it and leave it be. |
+| `CAPTURED`    | Record the capture: confirm, refund as late, or reverse.                                 |
+| `FAILED`      | Store the failure reason. A failure never downgrades a captured payment.                 |
+| `REFUNDED`    | Nothing: it can never apply to a booking.                                                |
+
+**Claim** (`claimAuthorization`, `modules/bookings/application/payment-events.ts`). Under the booking and
+payment row locks, an authorisation is claimed only if the booking is `AWAITING_PAYMENT`, the payment row is
+`CREATED`, and the amount and currency are exact. The row becomes `AUTHORIZED` with that provider payment id.
+A second authorisation, a wrong amount or a closed booking is **declined**: an audit entry
+(`payment.authorizationDeclined`) is written, the authorisation is never captured, and the provider returns
+it to the payer when the capture window (24 hours) ends.
+
+**Capture.** The provider call runs outside any database transaction. If it fails, Peti asks the provider
+for the payment: if it was captured after all (a lost response, or a concurrent caller), the capture is
+recorded; if it can no longer be captured, the claim is released so the renter can pay again; otherwise the
+error is stored (`capture_attempts`, `last_capture_error`) and the sweep retries every 15 minutes. While a
+payment is `AUTHORIZED`, starting checkout again is refused (`PAYMENT_PROCESSING`).
+
+**Record** (`recordCapturedPayment`) is the **only** path to `CONFIRMED`:
+
+1. Lock the booking, then the payment (`FOR UPDATE`).
+2. Already `CAPTURED` with the same provider payment id → nothing to do (another signal won the race).
+3. Already `CAPTURED` with a **different** provider payment id, or the amount or currency differs → queue a
+   **reversal**: a refund of exactly that provider payment (below). The booking is untouched.
+4. Otherwise mark the payment `CAPTURED`. If the booking is `AWAITING_PAYMENT`, confirm it and create the
+   deposit (`HELD`). If not, queue a full refund (`LATE_CAPTURE_REVERSAL`).
 
 The callback route is authenticated by signature only (the provider's POST is cross-site, so session cookies
-may be absent) and never renders success from query parameters.
+may be absent). A signature proves the checkout finished, not that money moved, so the server always fetches
+the payment from the provider and never renders success from query parameters.
+
+```mermaid
+stateDiagram-v2
+  [*] --> CREATED: checkout started
+  CREATED --> AUTHORIZED: authorisation claimed
+  AUTHORIZED --> CAPTURED: captured by Peti
+  AUTHORIZED --> CREATED: claim released (can no longer be captured)
+  CREATED --> CAPTURED: captured outside Peti (dashboard)
+  CREATED --> ABANDONED: booking expired or cancelled unpaid
+  AUTHORIZED --> ABANDONED: booking expired before capture
+  ABANDONED --> CAPTURED: late capture (refunded in full)
+  CAPTURED --> [*]
+```
 
 ## Webhook inbox
 
 1. Read the raw body (`request.text()`).
 2. `provider.parseWebhook` verifies the signature. Invalid → `401`, nothing stored.
 3. Insert into `provider_events` with `ON CONFLICT (provider, provider_event_id) DO NOTHING`. Already
-   processed → `200`.
-4. Process in a separate transaction; mark `PROCESSED`, or `FAILED` and return `500` so the provider retries.
+   processed → `200 duplicate`.
+4. Process; mark `PROCESSED`, or `FAILED` and return `500` so the provider retries.
 
-A `payment.failed` event never downgrades a captured payment (UPI retries can fail first and succeed later).
+Events handled: `payment.authorized`, `payment.captured` / `order.paid`, `payment.failed`,
+`refund.processed`, `refund.failed`, and `payment.dispute.created|won|lost|closed`. Everything else is
+stored as `IGNORED`.
+
+## Reconciliation
+
+Webhooks can be lost, so every sweep also asks the provider directly.
+
+| What     | Which rows                                                             | How often                                       | Then                                    |
+| -------- | ---------------------------------------------------------------------- | ----------------------------------------------- | --------------------------------------- |
+| Payments | Orders created in the last 6 days                                      | Hourly; every 15 minutes while `AUTHORIZED`     | `listOrderPayments` → the same pipeline |
+| Refunds  | `INITIATED` with a provider refund id                                  | 30 minutes after sending, then every 30 minutes | `fetchRefund` → settle                  |
+| Expiry   | A booking about to expire unpaid (inside the booking sweep, as before) | Once, before expiring                           | `listOrderPayments` → the same pipeline |
+
+Six days is longer than an uncaptured authorisation can live (24 hours here, 5 days at most), so nothing can
+be captured on an older order. The throttle uses database time (`payments.last_reconciled_at`).
 
 ## Settlement
 
@@ -100,25 +162,102 @@ rental fee.
 captured = refunded + owner payout (net) + commission
 ```
 
+Reversals are not part of it: that money was never the booking's. They are listed in
+`v_unexpected_captures`, with whether the refund has gone back.
+
 ## Refunds
 
-Refund rows are their own outbox. The business transaction inserts the row as `PENDING`, splits it into
-`rental_fee_portion` and `deposit_portion`, and increments `payments.refunded_paise` (a CHECK keeps it at or
-below the captured amount). After commit, the sweep sends pending refunds to the provider using the refund id
-as the idempotency reference. Provider calls never happen inside a database transaction.
+Refund rows are their own outbox. The business transaction inserts the row as `PENDING`. After commit, the
+sweep sends pending refunds to the provider using the refund id as the idempotency reference. Provider calls
+never happen inside a database transaction.
+
+```mermaid
+stateDiagram-v2
+  [*] --> PENDING: inserted with the business change
+  PENDING --> INITIATED: claimed by the dispatcher (SKIP LOCKED)
+  INITIATED --> PROCESSED: provider confirms (response, webhook or fetch)
+  INITIATED --> PENDING: attempt failed, retried (up to 5)
+  INITIATED --> FAILED: provider refused, or 5 attempts failed
+  INITIATED --> INITIATED: crashed worker, reclaimed after 15 minutes
+  FAILED --> PENDING: administrator retries
+  PROCESSED --> [*]
+```
+
+| Reason                        | Refunds                                       | Counts in `refunded_paise` |
+| ----------------------------- | --------------------------------------------- | -------------------------- |
+| `CANCELLATION`                | Per the cancellation policy                   | Yes                        |
+| `DEPOSIT_RELEASE`             | The deposit, less anything withheld           | Yes                        |
+| `DISPUTE_RESOLUTION`          | As accepted or decided                        | Yes                        |
+| `LATE_CAPTURE_REVERSAL`       | Everything: the booking had stopped waiting   | Yes                        |
+| `UNEXPECTED_CAPTURE_REVERSAL` | A stray provider payment, in full (see below) | No                         |
+
+- Settlement refunds are split into `rental_fee_portion` and `deposit_portion` and increment
+  `payments.refunded_paise` (a CHECK keeps it at or below the captured amount).
+- A **reversal** names the stray payment in `reversed_provider_payment_id`; a partial unique index allows one
+  per provider payment, so racing reports queue it once. The dispatcher refunds
+  `COALESCE(reversed_provider_payment_id, payments.provider_payment_id)`.
+- A webhook settles a refund by **provider refund id**, or by **our reference** while the provider id was
+  never stored (a worker died after sending it). A late webhook about a failed attempt cannot touch a retry:
+  the retry forgets the failed attempt's provider id.
+- Writes back from the dispatcher are compare-and-swap on `INITIATED`; a refund already settled by a webhook
+  is never undone.
+- Every state change writes an audit entry (`refund.sent`, `refund.processed`, `refund.failed`,
+  `refund.retry`) in the same transaction.
 
 ## Payouts
 
-A payout row (`PENDING`) is created at settlement. In the MVP an admin pays the owner outside the platform
-(for example by UPI) and marks the payout `PAID` with a reference; this is audit-logged. Automated payouts
-need the provider's marketplace product (Razorpay Route) and are out of scope.
+A payout row (`PENDING`) is created at settlement; `payouts.booking_id` is unique, so there is one per
+booking. An admin pays the owner outside the platform (UPI) and records the reference.
+
+```mermaid
+stateDiagram-v2
+  [*] --> PENDING: settlement
+  PENDING --> PAID: admin records the UPI reference
+  PAID --> FAILED: the transfer came back (reason recorded)
+  FAILED --> PAID: sent again
+  PENDING --> CANCELLED
+```
+
+- **Paid once.** Marking paid is a compare-and-swap from `PENDING` or `FAILED`; two administrators recording
+  the same payout get one success.
+- **Only to a valid UPI ID** the owner saved, re-checked in the write.
+- **Held during a chargeback.** While a `payment_disputes` row for the booking is `OPEN`, the payout cannot
+  be marked paid (`PAYOUT_ON_HOLD`), also re-checked in the write.
+- **Failures.** A bounced transfer is recorded as `FAILED` with a reason and returns to the "To pay" queue.
+- All of it is audit-logged (`payout.markPaid`, `payout.failed`).
+
+Automated payouts need the provider's marketplace product (Razorpay Route) and a settlement model that
+satisfies the RBI's payment-aggregator rules. Both are blockers outside the code; see
+[india-marketplace-compliance.md](../compliance/india-marketplace-compliance.md).
+
+## Chargebacks
+
+`payment.dispute.*` webhooks are stored in `payment_disputes` (`OPEN → WON | LOST | CLOSED`), linked to the
+booking through its payment, or through the reversal of a stray payment. Deliveries are idempotent and a
+resolved dispute never reopens, whatever order the events arrive in. Peti does not answer chargebacks: that
+happens in the provider dashboard. A lost chargeback is not recovered automatically; an administrator
+decides what happens to the payout.
+
+## Operations
+
+- `/admin/money` lists everything that needs attention: stray captures not yet refunded, failed, unsent and
+  stuck refunds, reconciliation imbalances, authorisations that are not being captured, failed webhooks,
+  open chargebacks and failed payouts.
+- `GET /api/ops/money-health` (bearer `CRON_SECRET`) serves the same counts to a monitor: `200` when all are
+  zero, `503` otherwise.
+- The admin booking page shows a money timeline built from the audit log.
+
+See [production-operations.md](../development/production-operations.md).
 
 ## Providers
 
-| Provider   | Where                             | Notes                                                                                                                                                                                                                                                                                |
-| ---------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `sandbox`  | `APP_ENV=local` or `test` only    | Checkout page at `/dev/sandbox-checkout/<orderId>` with outcomes: pay (callback and webhook), webhook only, callback only, duplicate webhook, fail, abandon. Signs callbacks and webhooks with HMAC-SHA256 using `SANDBOX_PAYMENT_*` secrets and sends them through the real routes. |
-| `razorpay` | Test mode only (`rzp_test_` keys) | Orders API; Checkout.js; callback signature `HMAC_SHA256(order_id + "                                                                                                                                                                                                                | " + payment_id, key_secret)`using the server-stored order id; webhook signature`HMAC_SHA256(raw_body, webhook_secret)`; event id from `x-razorpay-event-id`. |
+| Provider   | Where                                  | Notes                                                                                                                                                                                                                                                               |
+| ---------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sandbox`  | `APP_ENV=local`, `test` or `demo` only | Mirrors manual capture. Checkout page at `/dev/sandbox-checkout/<orderId>` with outcomes: pay (callback and webhook), webhook only, callback only, duplicate webhook, pay twice, captured outside Peti, wrong amount, fail. Signs with `SANDBOX_PAYMENT_*` secrets. |
+| `razorpay` | Test mode only (`rzp_test_` keys)      | Orders API with `payment.capture = "manual"`; Checkout.js; capture, order payments, refunds and refund fetch through the SDK; signed callback and webhooks, event id from `x-razorpay-event-id`. **Never run against Razorpay.**                                    |
+
+Razorpay signatures: the callback is `HMAC_SHA256(order_id + "|" + payment_id, key_secret)` using the
+server-stored order id; a webhook is `HMAC_SHA256(raw_body, webhook_secret)`.
 
 Known commercial risk: gateways usually keep their fee on refunded amounts, so refunding a deposit costs the
 platform money. See [assumptions-and-risks.md](../product/assumptions-and-risks.md).
