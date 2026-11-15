@@ -300,3 +300,92 @@ describe("refunds without their webhook (S-06)", () => {
     expect(stray).toEqual([{ status: "PROCESSED" }]);
   });
 });
+
+describe("payment reconciliation sweep", () => {
+  /** Reconciliation throttles on database time: make the order look older than it is. */
+  const age = (bookingId: string, minutes: number) =>
+    db.$executeRaw`UPDATE payments SET created_at = now() - make_interval(mins => ${minutes})
+                   WHERE booking_id = ${bookingId}::uuid`;
+
+  it("captures an authorisation whose webhook and callback never arrived", async () => {
+    const app = buildBookingApp();
+    const booking = await approvedBooking(app);
+    const orderId = await orderFor(app, booking);
+    await app.sandbox.simulate(orderId, "pay"); // nothing is delivered
+
+    expect(await app.payments.reconcilePayments()).toEqual({ checked: 0, applied: 0, errors: 0 });
+    await age(booking.bookingId, 90);
+    expect(await app.payments.reconcilePayments()).toEqual({ checked: 1, applied: 1, errors: 0 });
+    expect((await db.booking.findUniqueOrThrow({ where: { id: booking.bookingId } })).status).toBe(
+      "CONFIRMED",
+    );
+    // Checked just now: not again until the next interval.
+    expect(await app.payments.reconcilePayments()).toEqual({ checked: 0, applied: 0, errors: 0 });
+  });
+
+  it("finds a stray capture whose webhook was missed and reverses it", async () => {
+    const app = buildBookingApp();
+    const booking = await approvedBooking(app);
+    const paid = await app.payThroughSandbox(booking.renter, booking.bookingId);
+    const stray = await app.sandbox.simulate(paid.orderId, "pay-captured"); // nothing is delivered
+    await age(booking.bookingId, 90);
+
+    expect(await app.payments.reconcilePayments()).toMatchObject({ checked: 1, applied: 1 });
+    expect(await db.refund.findMany({ where: { bookingId: booking.bookingId } })).toMatchObject([
+      { reason: "UNEXPECTED_CAPTURE_REVERSAL", reversedProviderPaymentId: stray.paymentIds[0] },
+    ]);
+  });
+
+  it("refunds a capture on an expired booking whose webhook was missed", async () => {
+    const app = buildBookingApp();
+    const booking = await approvedBooking(app);
+    const orderId = await orderFor(app, booking);
+    app.clock.advance(13 * 60 * 60 * 1000);
+    await app.bookings.sweep(); // nothing paid yet: expires
+    await app.sandbox.simulate(orderId, "pay-captured"); // nothing is delivered
+    await age(booking.bookingId, 90);
+
+    await app.payments.reconcilePayments();
+    const b = await db.booking.findUniqueOrThrow({
+      where: { id: booking.bookingId },
+      include: { refunds: true },
+    });
+    expect(b.status).toBe("EXPIRED");
+    expect(b.refunds).toMatchObject([{ reason: "LATE_CAPTURE_REVERSAL" }]);
+  });
+
+  it("retries a failed capture sooner than it checks other orders", async () => {
+    let failures = 1;
+    const app = buildBookingApp(undefined, {
+      wrapProvider: (p): PaymentProvider => ({
+        ...p,
+        async capturePayment(id, amount) {
+          if (failures-- > 0) throw new PaymentProviderError("TRANSIENT", "Razorpay request failed");
+          return p.capturePayment(id, amount);
+        },
+      }),
+    });
+    const booking = await approvedBooking(app);
+    const orderId = await orderFor(app, booking);
+    const sim = await app.sandbox.simulate(orderId, "pay-webhook-only");
+    await app.payments.handleWebhook(sim.webhooks[0]!.body, sim.webhooks[0]!.headers);
+    expect((await db.payment.findUniqueOrThrow({ where: { bookingId: booking.bookingId } })).status).toBe(
+      "AUTHORIZED",
+    );
+
+    await age(booking.bookingId, 20); // due for an authorisation (15 min), not for other orders (60 min)
+    expect(await app.payments.reconcilePayments()).toMatchObject({ checked: 1, applied: 1 });
+    expect((await db.booking.findUniqueOrThrow({ where: { id: booking.bookingId } })).status).toBe(
+      "CONFIRMED",
+    );
+  });
+
+  it("leaves orders alone once nothing can be captured on them any more", async () => {
+    const app = buildBookingApp();
+    const booking = await approvedBooking(app);
+    const orderId = await orderFor(app, booking);
+    await app.sandbox.simulate(orderId, "pay");
+    await age(booking.bookingId, 7 * 24 * 60);
+    expect(await app.payments.reconcilePayments()).toEqual({ checked: 0, applied: 0, errors: 0 });
+  });
+});
