@@ -1,8 +1,9 @@
 import "server-only";
 import { allowsSandboxPayments, getEnv } from "@/config/env";
 import { marketplacePolicy } from "@/config/marketplace-policy";
-import { adminUseCases } from "@/modules/admin";
+import { adminUseCases, moneyUseCases } from "@/modules/admin";
 import { prismaAdminRepository } from "@/modules/admin/infrastructure/prisma-admin-repository";
+import { prismaMoneyQueries } from "@/modules/admin/infrastructure/prisma-money-queries";
 import { createAuth } from "@/modules/auth/infrastructure/better-auth";
 import { bookingsUseCases } from "@/modules/bookings";
 import { prismaBookingQueries } from "@/modules/bookings/infrastructure/booking-queries";
@@ -146,6 +147,8 @@ function build() {
     reviews,
     inbox: inboxUseCases({ inbox: prismaInboxRepository(db), clock }),
     admin: adminUseCases({ admin: prismaAdminRepository(db), audit: prismaAuditLog(db), clock }),
+    /** Money pipeline health: the admin page, the booking timeline and the monitoring endpoint. */
+    money: moneyUseCases(prismaMoneyQueries(db)),
     /** Background work: deadlines, refunds and emails. Idempotent and safe to run concurrently. */
     async sweep() {
       const bookingReport = await bookings.sweep();
