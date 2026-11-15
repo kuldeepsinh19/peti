@@ -74,7 +74,30 @@ export interface PaymentRepository {
     limit: number,
   ): Promise<Array<{ id: string; providerRefundId: string }>>;
   markRefundChecked(id: string): Promise<void>;
+  /**
+   * Records a chargeback, linked to the booking whose payment (or reversed stray payment) it disputes.
+   * Idempotent per provider dispute; a resolved dispute never reopens. False when nothing changed. Audited.
+   */
+  recordDispute(
+    provider: ProviderId,
+    dispute: {
+      providerDisputeId: string;
+      providerPaymentId: string;
+      status: DisputeStatus;
+      amountPaise: number;
+      reasonCode: string | null;
+    },
+  ): Promise<boolean>;
 }
+
+export type DisputeStatus = "OPEN" | "WON" | "LOST" | "CLOSED";
+
+const DISPUTE_STATUS = {
+  DISPUTE_OPENED: "OPEN",
+  DISPUTE_WON: "WON",
+  DISPUTE_LOST: "LOST",
+  DISPUTE_CLOSED: "CLOSED",
+} as const satisfies Record<string, DisputeStatus>;
 
 export interface PaymentsDeps {
   provider: PaymentProvider;
@@ -223,6 +246,19 @@ export function paymentsUseCases(deps: PaymentsDeps) {
           event.type === "REFUND_PROCESSED" ? "PROCESSED" : "FAILED",
           "webhook",
         );
+        return "PROCESSED";
+      case "DISPUTE_OPENED":
+      case "DISPUTE_WON":
+      case "DISPUTE_LOST":
+      case "DISPUTE_CLOSED":
+        // An open chargeback holds the owner's payout until it is resolved.
+        await payments.recordDispute(provider.id, {
+          providerDisputeId: event.providerDisputeId,
+          providerPaymentId: event.providerPaymentId,
+          status: DISPUTE_STATUS[event.type],
+          amountPaise: event.amountPaise,
+          reasonCode: event.reasonCode,
+        });
         return "PROCESSED";
       default:
         return "IGNORED";

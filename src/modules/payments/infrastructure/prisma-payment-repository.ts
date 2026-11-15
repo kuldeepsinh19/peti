@@ -299,6 +299,74 @@ export function prismaPaymentRepository(db: Db): PaymentRepository {
       return rows.map((r) => ({ id: r.id, providerRefundId: r.providerRefundId! }));
     },
 
+    async recordDispute(provider, d) {
+      return db.$transaction(async (tx) => {
+        // The disputed payment is the booking's own payment, or a stray capture Peti reversed.
+        const payment = await tx.payment.findFirst({
+          where: { provider, providerPaymentId: d.providerPaymentId },
+          select: { id: true, bookingId: true },
+        });
+        const reversal = payment
+          ? null
+          : await tx.refund.findFirst({
+              where: { reversedProviderPaymentId: d.providerPaymentId },
+              select: { paymentId: true, bookingId: true },
+            });
+        const link = payment
+          ? { paymentId: payment.id, bookingId: payment.bookingId }
+          : reversal
+            ? { paymentId: reversal.paymentId, bookingId: reversal.bookingId }
+            : { paymentId: null, bookingId: null };
+
+        const key = { provider_providerDisputeId: { provider, providerDisputeId: d.providerDisputeId } };
+        const find = () => tx.paymentDispute.findUnique({ where: key, select: { id: true, status: true } });
+        let existing = await find();
+        let id: string | null = null;
+        if (!existing) {
+          // ON CONFLICT, not a caught error: a failed insert would abort the whole transaction.
+          const created = await tx.$queryRaw<Array<{ id: string }>>`
+            INSERT INTO payment_disputes (provider, provider_dispute_id, provider_payment_id, payment_id,
+                                          booking_id, status, amount_paise, reason_code, updated_at)
+            VALUES (${provider}, ${d.providerDisputeId}, ${d.providerPaymentId}, ${link.paymentId}::uuid,
+                    ${link.bookingId}::uuid, ${d.status}::"PaymentDisputeStatus", ${d.amountPaise},
+                    ${d.reasonCode}, now())
+            ON CONFLICT (provider, provider_dispute_id) DO NOTHING
+            RETURNING id`;
+          id = created[0]?.id ?? null;
+          // A concurrent delivery recorded it first: apply this event to that row instead.
+          if (!id) existing = await find();
+        }
+        if (!id) {
+          if (!existing) return false;
+          // Never back to OPEN: events can arrive out of order, and a resolution is final.
+          if (existing.status === d.status || d.status === "OPEN") return false;
+          const updated = await tx.paymentDispute.updateMany({
+            where: { id: existing.id, status: existing.status },
+            data: { status: d.status, amountPaise: d.amountPaise, reasonCode: d.reasonCode },
+          });
+          if (updated.count !== 1) return false;
+          id = existing.id;
+        }
+        await prismaAuditLog(tx).record({
+          actorUserId: null,
+          actorRole: "SYSTEM",
+          action: "dispute." + d.status.toLowerCase(),
+          entityType: "payment_dispute",
+          entityId: id,
+          before: existing ? { status: existing.status } : undefined,
+          after: {
+            status: d.status,
+            providerDisputeId: d.providerDisputeId,
+            providerPaymentId: d.providerPaymentId,
+            bookingId: link.bookingId,
+            amountPaise: d.amountPaise,
+            reasonCode: d.reasonCode,
+          },
+        });
+        return true;
+      });
+    },
+
     async markRefundChecked(id) {
       // Moves the refund to the back of the queue, so pending refunds take turns being checked.
       await db.refund.updateMany({ where: { id, status: "INITIATED" }, data: { updatedAt: new Date() } });
