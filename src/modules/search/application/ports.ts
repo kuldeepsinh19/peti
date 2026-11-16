@@ -15,6 +15,10 @@ export interface OutfitCard {
   photoKey: string | null;
   photoAlt: string | null;
   ownerName: string;
+  /** Average of the owner's published reviews as a lender, one decimal; null before the first review. */
+  ownerRating: number | null;
+  ownerRatingCount: number;
+  ownerCompletedRentals: number;
 }
 
 export interface ExploreResult {

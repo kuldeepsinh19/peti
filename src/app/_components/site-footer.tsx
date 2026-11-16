@@ -17,7 +17,7 @@ const columns = [
     links: [
       { href: "/lend", label: "List an outfit" },
       { href: "/how-it-works", label: "How it works" },
-      { href: "/lend/dashboard", label: "Lending dashboard" },
+      { href: "/lend/dashboard", label: "My outfits" },
     ],
   },
   {

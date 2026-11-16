@@ -37,6 +37,9 @@ export function cardFromDetail(outfit: OutfitDetail): OutfitCard {
     photoKey: outfit.photos[0]?.key ?? null,
     photoAlt: outfit.photos[0]?.alt ?? null,
     ownerName: outfit.owner.displayName,
+    ownerRating: outfit.owner.rating,
+    ownerRatingCount: outfit.owner.ratingCount,
+    ownerCompletedRentals: outfit.owner.completedRentals,
   };
 }
 

@@ -32,6 +32,9 @@ interface CardRow {
   photo_key: string | null;
   photo_alt: string | null;
   owner_name: string;
+  owner_rating_sum: number | null;
+  owner_rating_count: number | null;
+  owner_completed: number;
   total: bigint;
 }
 
@@ -50,6 +53,11 @@ function toCard(r: CardRow): OutfitCard {
     photoKey: r.photo_key,
     photoAlt: r.photo_alt,
     ownerName: r.owner_name,
+    ownerRating: r.owner_rating_count
+      ? Math.round(((r.owner_rating_sum ?? 0) / r.owner_rating_count) * 10) / 10
+      : null,
+    ownerRatingCount: r.owner_rating_count ?? 0,
+    ownerCompletedRentals: r.owner_completed,
   };
 }
 
@@ -60,6 +68,9 @@ function cardSelect(priceJoin: Prisma.Sql) {
            o.occasions::text[] AS occasions, po.price_paise, po.duration_days AS price_days, o.deposit_paise,
            img.storage_key AS photo_key, img.alt_text AS photo_alt,
            COALESCE(up.display_name, u.name) AS owner_name,
+           up.owner_rating_sum, up.owner_rating_count,
+           (SELECT COUNT(*)::int FROM bookings ob
+             WHERE ob.owner_id = o.owner_id AND ob.status = 'COMPLETED') AS owner_completed,
            COUNT(*) OVER () AS total
     FROM outfits o
     JOIN outfit_categories c ON c.id = o.category_id

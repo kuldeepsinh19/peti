@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ExploreQuery, ExploreResult } from "@/modules/search";
 import { OutfitGrid } from "@/modules/search/ui/outfit-grid";
+import { formatLocalDate, isLocalDate } from "@/shared/domain/local-date";
 import { EmptyState } from "@/shared/ui/feedback";
 
 /** Results with pagination links that keep the current filters. */
@@ -39,7 +40,14 @@ export function Results({
   return (
     <>
       <div className="mt-12">
-        <OutfitGrid items={result.items} priority />
+        <OutfitGrid
+          items={result.items}
+          priority
+          // Results are already filtered to outfits free from the chosen date (see marketplace-discovery.md).
+          availableFrom={
+            query.from && isLocalDate(query.from) ? `from ${formatLocalDate(query.from)}` : undefined
+          }
+        />
       </div>
       {result.pageCount > 1 ? (
         <nav
