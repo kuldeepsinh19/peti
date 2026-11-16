@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { container } from "@/composition/container";
 import { requireActorOrRedirect } from "@/composition/session";
 import { outfitStatusLabel, type ListingEditView } from "@/modules/listings";
+import { RentalPolicies } from "@/modules/bookings/ui/rental-policies";
 import { ListingSteps } from "@/modules/listings/ui/listing-steps";
 import { outfitStatusTone } from "@/modules/listings/ui/status";
 import { OutfitCardView } from "@/modules/search/ui/outfit-grid";
@@ -99,6 +100,9 @@ export default async function ListingPreviewPage({
           <OutfitDetailView
             outfit={outfit}
             breadcrumb={false}
+            policies={
+              <RentalPolicies depositPaise={outfit.depositPaise} turnaroundDays={outfit.turnaroundDays} />
+            }
             actions={
               <p className="border border-dashed border-rule-strong px-4 py-3 text-sm text-graphite">
                 Renters see the request-to-rent button here once the listing is published.

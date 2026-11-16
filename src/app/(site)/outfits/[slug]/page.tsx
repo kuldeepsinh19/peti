@@ -3,7 +3,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { container } from "@/composition/container";
 import { getActor } from "@/composition/session";
+import { marketplacePolicy } from "@/config/marketplace-policy";
+import { AvailabilityCalendar } from "@/modules/bookings/ui/availability-calendar";
+import { RentalPolicies } from "@/modules/bookings/ui/rental-policies";
 import { OutfitDetailView } from "@/modules/search/ui/outfit-detail-view";
+import { addDays, localDateInIndia } from "@/shared/domain/local-date";
 import { NotFoundError } from "@/shared/domain/errors";
 import { ButtonLink } from "@/shared/ui/button";
 import { SubmitButton } from "@/shared/ui/submit-button";
@@ -41,10 +45,13 @@ export default async function OutfitPage({
   const { slug } = await params;
   const { saveError } = await searchParams;
   const { actor, outfit } = await load(slug);
-  const [savedIds, reviews] = await Promise.all([
-    container().search.savedIds(actor),
-    container().reviews.forOutfit(outfit.id),
+  const { search, reviews: reviewsModule, bookings, clock } = container();
+  const [savedIds, reviews, unavailable] = await Promise.all([
+    search.savedIds(actor),
+    reviewsModule.forOutfit(outfit.id),
+    bookings.unavailableRanges(outfit.id),
   ]);
+  const today = localDateInIndia(clock.now());
   const saved = savedIds.has(outfit.id);
   const isOwner = actor?.userId === outfit.owner.id;
 
@@ -64,6 +71,19 @@ export default async function OutfitPage({
       <OutfitDetailView
         outfit={outfit}
         reviews={reviews}
+        availability={
+          outfit.status === "ACTIVE" ? (
+            <AvailabilityCalendar
+              unavailable={unavailable}
+              earliestStart={addDays(today, marketplacePolicy.minLeadDays)}
+              latestStart={addDays(today, marketplacePolicy.maxAdvanceDays)}
+              turnaroundDays={outfit.turnaroundDays}
+            />
+          ) : undefined
+        }
+        policies={
+          <RentalPolicies depositPaise={outfit.depositPaise} turnaroundDays={outfit.turnaroundDays} />
+        }
         actions={
           <>
             {isOwner ? (
