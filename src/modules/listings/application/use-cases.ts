@@ -9,7 +9,7 @@ import {
   ValidationError,
 } from "@/shared/domain/errors";
 import { parseInput } from "@/shared/contracts/validation";
-import { cmToMm, listingSlug, validateListingMoney } from "../domain/listing-rules";
+import { cmToMm, listingSlug, orderWithCover, validateListingMoney } from "../domain/listing-rules";
 import { editNeedsReview, isEditable, nextOutfitStatus, type OutfitCommand } from "../domain/outfit-status";
 import {
   type ListingFormData,
@@ -219,6 +219,24 @@ export function listingsUseCases(deps: ListingsDeps) {
       const removed = await listings.removePhoto(outfitId, photoId);
       if (!removed) throw new NotFoundError("Photograph");
       await photos.remove(removed.storageKey);
+    },
+
+    /**
+     * Makes a photograph the cover (the one renters see first in Explore). It only reorders photographs a
+     * reviewer has already seen, so a live listing stays live.
+     */
+    async setCoverPhoto(actor: Actor, input: unknown) {
+      const { outfitId, photoId } = parseInput(photoIdSchema, input);
+      const outfit = await owned(actor, outfitId);
+      if (!isEditable(outfit.status))
+        throw new PreconditionError("LISTING_FROZEN", "This listing cannot be edited.");
+      const current = await listings.listPhotos(outfitId);
+      const order = orderWithCover(
+        current.map((p) => p.id),
+        photoId,
+      );
+      if (!order) throw new NotFoundError("Photograph");
+      await listings.setPhotoOrder(outfitId, order);
     },
 
     submitForReview: (actor: Actor, input: unknown) => ownerTransition(actor, input, "submit"),

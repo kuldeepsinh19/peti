@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { cmToMm, listingSlug, validateListingMoney } from "@/modules/listings/domain/listing-rules";
+import {
+  cmToMm,
+  listingSlug,
+  orderWithCover,
+  validateListingMoney,
+} from "@/modules/listings/domain/listing-rules";
 import { OUTFIT_STATUSES, editNeedsReview, nextOutfitStatus } from "@/modules/listings/domain/outfit-status";
 
 describe("outfit status machine", () => {
@@ -85,5 +90,17 @@ describe("helpers", () => {
   it("builds URL-safe slugs with a random suffix", () => {
     const slug = listingSlug("Ivory Sherwani — Worn Once!", () => 0);
     expect(slug).toBe("ivory-sherwani-worn-once-aaaaa");
+  });
+});
+
+describe("cover photograph", () => {
+  it("moves the chosen photograph to the front and keeps the others in order", () => {
+    expect(orderWithCover(["a", "b", "c", "d"], "c")).toEqual(["c", "a", "b", "d"]);
+    expect(orderWithCover(["a", "b"], "a")).toEqual(["a", "b"]);
+  });
+
+  it("refuses a photograph that is not the listing's", () => {
+    expect(orderWithCover(["a", "b"], "z")).toBeNull();
+    expect(orderWithCover([], "a")).toBeNull();
   });
 });

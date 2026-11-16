@@ -70,3 +70,12 @@ export function listingSlug(title: string, random: () => number = Math.random): 
   ).join("");
   return `${base || "outfit"}-${suffix}`;
 }
+
+/**
+ * The cover is the first photograph (lowest sort order). Making a photograph the cover moves it to the front
+ * and keeps the others in their order. Null when the photograph is not one of the listing's.
+ */
+export function orderWithCover(photoIdsInOrder: readonly string[], coverId: string): string[] | null {
+  if (!photoIdsInOrder.includes(coverId)) return null;
+  return [coverId, ...photoIdsInOrder.filter((id) => id !== coverId)];
+}

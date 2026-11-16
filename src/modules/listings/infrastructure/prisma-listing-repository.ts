@@ -220,6 +220,29 @@ export function prismaListingRepository(db: Db): ListingRepository {
       return { ...row };
     },
 
+    async listPhotos(outfitId) {
+      const rows = await db.outfitImage.findMany({
+        where: { outfitId },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      });
+      return rows.map((row) => ({
+        id: row.id,
+        storageKey: row.storageKey,
+        altText: row.altText,
+        width: row.width,
+        height: row.height,
+        sortOrder: row.sortOrder,
+      }));
+    },
+
+    async setPhotoOrder(outfitId, orderedIds) {
+      await db.$transaction(
+        orderedIds.map((id, sortOrder) =>
+          db.outfitImage.updateMany({ where: { id, outfitId }, data: { sortOrder } }),
+        ),
+      );
+    },
+
     countOpenBookings: (outfitId) =>
       db.booking.count({ where: { outfitId, status: { in: [...OPEN_BOOKING_STATUSES] } } }),
 

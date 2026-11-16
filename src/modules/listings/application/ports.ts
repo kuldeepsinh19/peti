@@ -97,6 +97,10 @@ export interface ListingRepository {
   ): Promise<boolean>;
   addPhoto(outfitId: string, photo: Omit<ListingPhoto, "id" | "sortOrder">): Promise<ListingPhoto>;
   removePhoto(outfitId: string, photoId: string): Promise<ListingPhoto | null>;
+  /** The listing's photographs, cover first. */
+  listPhotos(outfitId: string): Promise<ListingPhoto[]>;
+  /** Rewrites the sort order to match `orderedIds` (all of the listing's photographs), in one transaction. */
+  setPhotoOrder(outfitId: string, orderedIds: readonly string[]): Promise<void>;
   countOpenBookings(outfitId: string): Promise<number>;
   addressBelongsTo(addressId: string, userId: string): Promise<boolean>;
   categoryAndLocalityExist(categoryId: string, localityId: string): Promise<boolean>;

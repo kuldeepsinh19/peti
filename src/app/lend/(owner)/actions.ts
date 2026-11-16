@@ -48,7 +48,7 @@ export async function uploadPhotoAction(formData: FormData): Promise<ActionResul
         bytes,
         String(formData.get("altText") ?? ""),
       );
-      revalidatePath(`/lend/outfits/${outfitId}/edit`);
+      revalidateListing(outfitId);
       return { id: photo.id };
     },
     LIMITS.photoUpload,
@@ -58,7 +58,21 @@ export async function uploadPhotoAction(formData: FormData): Promise<ActionResul
 export async function removePhotoAction(formData: FormData): Promise<ActionResult<undefined>> {
   return runAction("removePhoto", async (actor) => {
     await container().listings.removePhoto(actor, formDataToObject(formData));
-    revalidatePath(`/lend/outfits/${String(formData.get("outfitId"))}/edit`);
+    revalidateListing(String(formData.get("outfitId")));
+    return undefined;
+  });
+}
+
+/** Every owner page that shows a listing's photographs. */
+function revalidateListing(outfitId: string) {
+  for (const page of ["edit", "photos", "preview"]) revalidatePath(`/lend/outfits/${outfitId}/${page}`);
+  revalidatePath("/lend/dashboard");
+}
+
+export async function setCoverPhotoAction(formData: FormData): Promise<ActionResult<undefined>> {
+  return runAction("setCoverPhoto", async (actor) => {
+    await container().listings.setCoverPhoto(actor, formDataToObject(formData));
+    revalidateListing(String(formData.get("outfitId")));
     return undefined;
   });
 }
