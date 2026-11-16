@@ -1,23 +1,16 @@
 import type { ReactNode } from "react";
 import { requireActorOrRedirect } from "@/composition/session";
-import { IndexBar } from "@/shared/ui/index-bar";
 import { Page } from "@/shared/ui/layout";
+import { AccountNav } from "../../_components/account-nav";
 
 export const dynamic = "force-dynamic";
 
-const items = [
-  { href: "/lend/dashboard", label: "Your outfits" },
-  { href: "/lend/requests", label: "Requests" },
-  { href: "/lend/history", label: "Rental history" },
-  { href: "/lend/earnings", label: "Earnings" },
-  { href: "/lend/outfits/new", label: "List an outfit" },
-];
-
+/** Lending pages share the account bar: one account rents and lends. */
 export default async function OwnerLayout({ children }: { children: ReactNode }) {
   await requireActorOrRedirect("/lend/dashboard");
   return (
     <Page className="pt-8">
-      <IndexBar label="Lending" items={items} />
+      <AccountNav />
       {children}
     </Page>
   );

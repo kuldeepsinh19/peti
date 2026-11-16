@@ -2,26 +2,30 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { primaryNav } from "@/config/site";
+import { listAnOutfit, primaryNav } from "@/config/site";
 import { Sheet } from "@/shared/ui/overlay";
 import type { HeaderViewer } from "./viewer";
 
 export function MobileNav({ viewer }: { viewer: HeaderViewer | null }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
+  // The two marketplace actions lead, then the account, then the rest.
   const links = [
-    ...primaryNav,
+    primaryNav[0],
+    { href: listAnOutfit.href(viewer !== null), label: listAnOutfit.label },
     ...(viewer
       ? [
-          { href: "/account", label: "Your account" },
-          { href: "/account/rentals", label: "Your rentals" },
-          { href: "/lend/dashboard", label: "Your lending" },
+          { href: "/account/rentals", label: "My rentals" },
+          { href: "/lend/dashboard", label: "My outfits" },
+          { href: "/lend/requests", label: "Rental requests" },
+          { href: "/account", label: "Profile & settings" },
           ...(viewer.isAdmin ? [{ href: "/admin", label: "Admin" }] : []),
         ]
       : [
           { href: "/sign-in", label: "Sign in" },
           { href: "/sign-up", label: "Join Peti" },
         ]),
+    ...primaryNav.slice(1),
   ];
   return (
     <div className="lg:hidden">

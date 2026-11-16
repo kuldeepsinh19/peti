@@ -10,11 +10,19 @@ export const site = {
 } as const;
 
 export const primaryNav = [
-  { href: "/explore", label: "Explore" },
-  { href: "/lend", label: "Lend an outfit" },
+  { href: "/explore", label: "Explore outfits" },
   { href: "/how-it-works", label: "How it works" },
   { href: "/trust-and-safety", label: "Trust & safety" },
 ] as const;
+
+/**
+ * The marketplace's second primary action. Signed-in members go straight to the listing flow; visitors
+ * first see what lending involves.
+ */
+export const listAnOutfit = {
+  label: "List an outfit",
+  href: (signedIn: boolean) => (signedIn ? "/lend/outfits/new" : "/lend"),
+} as const;
 
 /** Ceremonies used as a browsing facet. Values match the `Occasion` enum in prisma/schema.prisma. */
 export const occasions = [

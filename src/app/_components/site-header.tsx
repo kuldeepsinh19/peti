@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { primaryNav, site } from "@/config/site";
+import { listAnOutfit, primaryNav, site } from "@/config/site";
 import { ButtonLink } from "@/shared/ui/button";
 import { MobileNav } from "./mobile-nav";
 import { Wordmark } from "./wordmark";
@@ -31,6 +31,9 @@ export function SiteHeader({ viewer }: { viewer: HeaderViewer | null }) {
           </ul>
         </nav>
         <div className="hidden items-center gap-5 lg:flex">
+          <ButtonLink href={listAnOutfit.href(viewer !== null)} size="sm">
+            {listAnOutfit.label}
+          </ButtonLink>
           {viewer ? (
             <>
               {viewer.isAdmin ? (
@@ -38,7 +41,11 @@ export function SiteHeader({ viewer }: { viewer: HeaderViewer | null }) {
                   Admin
                 </Link>
               ) : null}
-              <Link href="/account" className="text-sm no-underline hover:underline">
+              <Link
+                href="/account/rentals"
+                className="text-sm no-underline hover:underline"
+                aria-label={`Your account (${viewer.displayName})`}
+              >
                 {viewer.displayName}
               </Link>
             </>
@@ -47,9 +54,9 @@ export function SiteHeader({ viewer }: { viewer: HeaderViewer | null }) {
               <Link href="/sign-in" className="text-sm no-underline hover:underline">
                 Sign in
               </Link>
-              <ButtonLink href="/sign-up" size="sm" variant="secondary">
+              <Link href="/sign-up" className="text-sm no-underline hover:underline">
                 Join Peti
-              </ButtonLink>
+              </Link>
             </>
           )}
         </div>
