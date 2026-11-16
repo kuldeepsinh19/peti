@@ -54,6 +54,9 @@ function toListingData(form: ListingFormData): ListingData {
   };
 }
 
+export const PHOTO_UPLOADS_DISABLED_MESSAGE =
+  "Photo upload isn't available in the public demo. Listings there use the photographs already added.";
+
 export function listingsUseCases(deps: ListingsDeps) {
   const { listings, photos, audit, clock } = deps;
 
@@ -175,6 +178,9 @@ export function listingsUseCases(deps: ListingsDeps) {
 
     async addPhoto(actor: Actor, outfitId: string, bytes: Uint8Array, altText: string) {
       const outfit = await owned(actor, outfitId);
+      if (deps.photoUploadsEnabled === false) {
+        throw new PreconditionError("PHOTO_UPLOADS_DISABLED", PHOTO_UPLOADS_DISABLED_MESSAGE);
+      }
       if (!isEditable(outfit.status))
         throw new PreconditionError("LISTING_FROZEN", "This listing cannot be edited.");
       if (outfit.photoCount >= marketplacePolicy.maxListingPhotos) {

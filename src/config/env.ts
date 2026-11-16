@@ -211,6 +211,14 @@ export function allowsSelfServiceAccounts(env: Env = getEnv()): boolean {
   return env.APP_ENV !== "demo";
 }
 
+/**
+ * Whether members can upload listing photographs. Not in the public demo: it runs on a read-only
+ * filesystem with no object storage, and the demo accounts' password is public.
+ */
+export function allowsPhotoUploads(env: Env = getEnv()): boolean {
+  return env.APP_ENV !== "demo";
+}
+
 /** Which /dev routes exist: the sandbox checkout follows sandbox payments, everything else dev tooling. */
 export function devRouteAllowed(pathname: string, env: Env = getEnv()): boolean {
   if (pathname === "/dev/sandbox-checkout" || pathname.startsWith("/dev/sandbox-checkout/")) {

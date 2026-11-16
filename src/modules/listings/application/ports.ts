@@ -129,4 +129,6 @@ export interface ListingsDeps {
   photos: PhotoStore;
   audit: AuditLog;
   clock: { now(): Date };
+  /** False where photographs cannot be stored (the public demo); defaults to true. */
+  photoUploadsEnabled?: boolean;
 }

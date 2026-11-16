@@ -3,7 +3,10 @@
  * (and do not do) to existing bookings.
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import { buildApp } from "../support/app";
+import { listingsUseCases } from "@/modules/listings";
+import { prismaListingRepository } from "@/modules/listings/infrastructure/prisma-listing-repository";
+import { prismaAuditLog } from "@/shared/infrastructure/audit";
+import { buildApp, clock, memoryPhotos } from "../support/app";
 import { db, insertBookingRow, resetDatabase } from "../support/db";
 import { listingSetup, publishListing } from "../support/listing-fixtures";
 
@@ -152,6 +155,31 @@ describe("My outfits", () => {
     expect(after).toEqual(before);
     await expect(app.listings.archive(owner, { outfitId: id })).rejects.toMatchObject({
       code: "LISTING_HAS_BOOKINGS",
+    });
+  });
+});
+
+describe("photographs in the public demo", () => {
+  it("are refused before anything is stored, with a message that says why", async () => {
+    const demo = listingsUseCases({
+      listings: prismaListingRepository(db),
+      photos: memoryPhotos,
+      audit: prismaAuditLog(db),
+      clock,
+      photoUploadsEnabled: false,
+    });
+    const { owner, stranger, form } = await listingSetup();
+    const { id } = await demo.createListing(owner, form);
+    const saved = memoryPhotos.saved.length;
+    await expect(demo.addPhoto(owner, id, new Uint8Array([1]), "")).rejects.toMatchObject({
+      code: "PHOTO_UPLOADS_DISABLED",
+      message: expect.stringContaining("public demo"),
+    });
+    expect(memoryPhotos.saved.length).toBe(saved);
+    expect(await db.outfitImage.count({ where: { outfitId: id } })).toBe(0);
+    // Ownership is still checked first: a stranger learns nothing about the listing.
+    await expect(demo.addPhoto(stranger, id, new Uint8Array([1]), "")).rejects.toMatchObject({
+      code: "FORBIDDEN",
     });
   });
 });

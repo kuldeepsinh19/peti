@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   InvalidEnvironmentError,
+  allowsPhotoUploads,
   allowsSandboxPayments,
   allowsSelfServiceAccounts,
   devRouteAllowed,
@@ -213,3 +214,11 @@ function pick(source: typeof base) {
     SANDBOX_PAYMENT_WEBHOOK_SECRET: source.SANDBOX_PAYMENT_WEBHOOK_SECRET,
   };
 }
+
+describe("listing photo uploads", () => {
+  it("are on everywhere except the public demo", () => {
+    expect(allowsPhotoUploads(parseEnv(base))).toBe(true);
+    expect(allowsPhotoUploads(parseEnv({ ...base, APP_ENV: "test" }))).toBe(true);
+    expect(allowsPhotoUploads({ ...parseEnv(base), APP_ENV: "demo" })).toBe(false);
+  });
+});

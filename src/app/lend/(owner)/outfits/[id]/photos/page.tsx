@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { container } from "@/composition/container";
 import { requireActorOrRedirect } from "@/composition/session";
-import type { ListingEditView } from "@/modules/listings";
+import { allowsPhotoUploads } from "@/config/env";
+import { type ListingEditView, PHOTO_UPLOADS_DISABLED_MESSAGE } from "@/modules/listings";
 import { ListingSteps } from "@/modules/listings/ui/listing-steps";
 import { PhotoManager } from "@/modules/listings/ui/photo-manager";
 import { DomainError } from "@/shared/domain/errors";
@@ -68,6 +69,7 @@ export default async function ListingPhotosPage({
             upload={uploadPhotoAction}
             remove={removePhotoAction}
             makeCover={setCoverPhotoAction}
+            uploadsDisabledReason={allowsPhotoUploads() ? null : PHOTO_UPLOADS_DISABLED_MESSAGE}
           />
         )}
       </div>

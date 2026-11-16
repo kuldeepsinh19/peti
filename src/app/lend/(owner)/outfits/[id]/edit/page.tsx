@@ -3,7 +3,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { container } from "@/composition/container";
 import { requireActorOrRedirect } from "@/composition/session";
-import { type ListingEditView, mmToCm, outfitStatusLabel } from "@/modules/listings";
+import { allowsPhotoUploads } from "@/config/env";
+import {
+  type ListingEditView,
+  mmToCm,
+  outfitStatusLabel,
+  PHOTO_UPLOADS_DISABLED_MESSAGE,
+} from "@/modules/listings";
 import { ListingForm } from "@/modules/listings/ui/listing-form";
 import { ListingSteps } from "@/modules/listings/ui/listing-steps";
 import { PhotoManager } from "@/modules/listings/ui/photo-manager";
@@ -167,6 +173,7 @@ export default async function EditListingPage({
           upload={uploadPhotoAction}
           remove={removePhotoAction}
           makeCover={setCoverPhotoAction}
+          uploadsDisabledReason={allowsPhotoUploads() ? null : PHOTO_UPLOADS_DISABLED_MESSAGE}
         />
       </section>
 

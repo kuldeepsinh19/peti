@@ -1,5 +1,5 @@
 import "server-only";
-import { allowsSandboxPayments, getEnv } from "@/config/env";
+import { allowsPhotoUploads, allowsSandboxPayments, getEnv } from "@/config/env";
 import { marketplacePolicy } from "@/config/marketplace-policy";
 import { adminUseCases, moneyUseCases } from "@/modules/admin";
 import { prismaAdminRepository } from "@/modules/admin/infrastructure/prisma-admin-repository";
@@ -148,6 +148,7 @@ function build() {
       photos: storagePhotoStore(storage, images),
       audit: prismaAuditLog(db),
       clock,
+      photoUploadsEnabled: allowsPhotoUploads(env),
     }),
     search: searchUseCases({ catalogue: prismaCatalogueQueries(db), clock }),
     bookings,
