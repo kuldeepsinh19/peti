@@ -1,6 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
-import { occasions, site } from "@/config/site";
+import { container } from "@/composition/container";
+import { getActor } from "@/composition/session";
+import { listAnOutfit, occasions, site } from "@/config/site";
+import type { OutfitCard } from "@/modules/search";
+import { OutfitCardView } from "@/modules/search/ui/outfit-grid";
 import { ButtonLink } from "@/shared/ui/button";
 import { Page, SectionIndex } from "@/shared/ui/layout";
 import { DiscoveryStrip } from "./_components/discovery-strip";
@@ -10,11 +14,15 @@ import bandhgala from "../../public/images/editorial/black-bandhgala.jpg";
 import saree from "../../public/images/editorial/golden-saree-tree.jpg";
 import embroidery from "../../public/images/textures/red-embroidery.jpg";
 
-export default function HomePage() {
+export const dynamic = "force-dynamic";
+
+export default async function HomePage() {
+  const [actor, recent] = await Promise.all([getActor(), container().search.recentlyListed(6)]);
   return (
     <>
-      <Hero />
+      <Hero signedIn={actor !== null} />
       <DiscoveryStrip />
+      <RecentlyListed items={recent} />
       <OccasionContents />
       <CategoryFeature />
       <TextileBand />
@@ -24,7 +32,7 @@ export default function HomePage() {
   );
 }
 
-function Hero() {
+function Hero({ signedIn }: { signedIn: boolean }) {
   return (
     <section aria-labelledby="hero-title" className="relative overflow-hidden">
       <Page className="page-grid pt-10 pb-12 lg:pt-16 lg:pb-20">
@@ -43,8 +51,8 @@ function Hero() {
             <ButtonLink href="/explore" size="lg">
               Explore outfits
             </ButtonLink>
-            <ButtonLink href="/lend" size="lg" variant="secondary">
-              Lend an outfit
+            <ButtonLink href={listAnOutfit.href(signedIn)} size="lg" variant="secondary">
+              {listAnOutfit.label}
             </ButtonLink>
           </div>
         </div>
@@ -69,12 +77,39 @@ function Hero() {
   );
 }
 
+/** The newest published outfits: proof the wardrobe is real, and the quickest way to an outfit page. */
+function RecentlyListed({ items }: { items: OutfitCard[] }) {
+  if (items.length === 0) return null;
+  return (
+    <section aria-labelledby="recent-title" className="mt-(--spacing-section)">
+      <Page>
+        <div className="flex flex-wrap items-end justify-between gap-4 border-b border-ink pb-4">
+          <div>
+            <SectionIndex index={2}>Just listed</SectionIndex>
+            <h2 id="recent-title" className="mt-4 text-display-md">
+              New in the <span className="display-italic">wardrobe</span>
+            </h2>
+          </div>
+          <Link href="/explore">See every outfit</Link>
+        </div>
+        <ul className="mt-10 grid grid-cols-2 gap-x-(--spacing-gutter) gap-y-10 md:grid-cols-3 lg:grid-cols-6">
+          {items.map((item) => (
+            <li key={item.id}>
+              <OutfitCardView item={item} />
+            </li>
+          ))}
+        </ul>
+      </Page>
+    </section>
+  );
+}
+
 function OccasionContents() {
   return (
     <section aria-labelledby="occasions-title" className="mt-(--spacing-section)">
       <Page className="page-grid gap-y-10">
         <div className="col-span-4 lg:col-span-4">
-          <SectionIndex index={2}>Contents</SectionIndex>
+          <SectionIndex index={3}>Contents</SectionIndex>
           <h2 id="occasions-title" className="mt-4 text-display-md">
             Dressed for <span className="display-italic">every</span> ceremony.
           </h2>
@@ -116,7 +151,7 @@ function CategoryFeature() {
     <section aria-labelledby="categories-title" className="mt-(--spacing-section)">
       <Page className="page-grid gap-y-12">
         <div className="col-span-4 lg:col-span-12">
-          <SectionIndex index={3}>The edit</SectionIndex>
+          <SectionIndex index={4}>The edit</SectionIndex>
           <h2 id="categories-title" className="mt-4 max-w-3xl text-display-md">
             Worn once, kept carefully, <span className="display-italic">ready again.</span>
           </h2>
@@ -249,7 +284,7 @@ function HowLendingWorks() {
       <Page className="page-grid gap-y-12">
         <div className="col-span-4 lg:col-span-5">
           <p className="flex items-center gap-3 eyebrow text-sand">
-            <span className="text-brass numeral">04</span>
+            <span className="text-brass numeral">05</span>
             <span aria-hidden className="h-px w-8 bg-sand/50" />
             <span>For lenders</span>
           </p>
@@ -297,7 +332,7 @@ function TrustLedger() {
     <section aria-labelledby="trust-title" className="mt-(--spacing-section)">
       <Page className="page-grid gap-y-10">
         <div className="col-span-4 lg:col-span-12">
-          <SectionIndex index={5}>Trust, plainly stated</SectionIndex>
+          <SectionIndex index={6}>Trust, plainly stated</SectionIndex>
           <h2 id="trust-title" className="mt-4 max-w-3xl text-display-md">
             What we check, and what we <span className="display-italic">don&rsquo;t</span>.
           </h2>

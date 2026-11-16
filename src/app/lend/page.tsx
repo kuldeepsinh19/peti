@@ -7,7 +7,7 @@ import { DefinitionList, Page, SectionIndex } from "@/shared/ui/layout";
 import hanger from "../../../public/images/textures/sherwani-embroidery.jpg";
 
 export const metadata: Metadata = {
-  title: "Lend an outfit",
+  title: "List an outfit",
   description: "Earn from the occasionwear you wore once. You set the price and approve every rental.",
 };
 
