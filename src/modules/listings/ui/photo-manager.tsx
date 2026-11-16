@@ -2,95 +2,182 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { marketplacePolicy } from "@/config/marketplace-policy";
 import { fileUrl } from "@/modules/media";
 import type { ActionResult } from "@/shared/contracts/action-result";
-import { Button } from "@/shared/ui/button";
+import { cn } from "@/shared/ui/cn";
 import { downscaleImage } from "@/shared/ui/downscale-image";
 import { FormMessage } from "@/shared/ui/form";
 import type { ListingPhoto } from "../application/ports";
 
 const CONNECTION_ERROR = "That did not reach Peti. Check your connection and try again.";
 /** The policy limit, capped below the smallest request limit we deploy behind (Vercel accepts 4.5 MB). */
-const MAX_PHOTO_UPLOAD_BYTES = Math.min(marketplacePolicy.maxUploadBytes, 4 * 1024 * 1024);
+export const MAX_PHOTO_UPLOAD_BYTES = Math.min(marketplacePolicy.maxUploadBytes, 4 * 1024 * 1024);
+export const ACCEPTED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+
+type Stage = "waiting" | "preparing" | "uploading" | "done" | "failed";
+
+interface QueuedPhoto {
+  key: string;
+  name: string;
+  preview: string | null;
+  stage: Stage;
+  error?: string;
+  file: File;
+}
+
+const STAGE_LABEL: Record<Stage, string> = {
+  waiting: "Waiting",
+  preparing: "Preparing",
+  uploading: "Uploading",
+  done: "Added",
+  failed: "Not added",
+};
+
+type Action<T> = (formData: FormData) => Promise<ActionResult<T>>;
 
 /**
- * Uploads photographs one at a time through a Server Action. The server checks the file's content,
- * strips metadata (including location) and re-encodes it; nothing here is trusted.
+ * The photographs step of listing an outfit: choose or drop several photographs, watch each one upload,
+ * remove any, and choose the cover renters see first. Photographs upload one at a time through a Server
+ * Action; the server checks each file's content, strips metadata (including location) and re-encodes it —
+ * the checks here only save the owner a wasted upload.
  */
 export function PhotoManager({
   outfitId,
   photos,
   upload,
   remove,
+  makeCover,
+  uploadsDisabledReason = null,
 }: {
   outfitId: string;
   photos: ListingPhoto[];
-  upload: (formData: FormData) => Promise<ActionResult<{ id: string }>>;
-  remove: (formData: FormData) => Promise<ActionResult<undefined>>;
+  upload: Action<{ id: string }>;
+  remove: Action<undefined>;
+  makeCover: Action<undefined>;
+  /** Shown instead of the drop zone when photographs cannot be added here (the public demo). */
+  uploadsDisabledReason?: string | null;
 }) {
   const router = useRouter();
+  const inputId = useId();
   const input = useRef<HTMLInputElement>(null);
-  const [alt, setAlt] = useState("");
+  const [queue, setQueue] = useState<QueuedPhoto[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const full = photos.length >= marketplacePolicy.maxListingPhotos;
+  const [dragging, setDragging] = useState(false);
+  const [busyPhoto, setBusyPhoto] = useState<string | null>(null);
+  const uploading = queue.some((q) => q.stage !== "done" && q.stage !== "failed");
+  const room = marketplacePolicy.maxListingPhotos - photos.length;
 
-  async function onUpload() {
-    const chosen = input.current?.files?.[0];
-    if (!chosen) {
-      setError("Choose a photograph first.");
-      return;
-    }
-    setBusy(true);
+  // Release the local previews when they are no longer shown.
+  const previews = useRef(new Set<string>());
+  useEffect(() => {
+    const urls = previews.current;
+    return () => {
+      for (const url of urls) URL.revokeObjectURL(url);
+    };
+  }, []);
+
+  const update = (key: string, patch: Partial<QueuedPhoto>) =>
+    setQueue((all) => all.map((q) => (q.key === key ? { ...q, ...patch } : q)));
+
+  async function add(chosen: File[]) {
     setError(null);
-    try {
-      const file = await downscaleImage(chosen);
-      if (file.size > MAX_PHOTO_UPLOAD_BYTES) {
-        setError(`Photographs must be smaller than ${MAX_PHOTO_UPLOAD_BYTES / 1024 / 1024} MB.`);
-        return;
-      }
-      const data = new FormData();
-      data.set("outfitId", outfitId);
-      data.set("photo", file);
-      data.set("altText", alt);
-      const result = await upload(data);
-      if (!result.ok) {
-        setError(result.error.message);
-        return;
-      }
-      setAlt("");
-      if (input.current) input.current.value = "";
-      router.refresh();
-    } catch {
-      setError(CONNECTION_ERROR);
-    } finally {
-      setBusy(false);
+    if (chosen.length === 0) return;
+    let files = chosen;
+    if (files.length > room) {
+      setError(
+        room > 0
+          ? `You can add ${room} more photograph${room === 1 ? "" : "s"} (up to ${marketplacePolicy.maxListingPhotos}).`
+          : `This listing already has the maximum of ${marketplacePolicy.maxListingPhotos} photographs.`,
+      );
+      files = files.slice(0, Math.max(room, 0));
     }
+    const items: QueuedPhoto[] = files.map((file, i) => {
+      const supported = (ACCEPTED_PHOTO_TYPES as readonly string[]).includes(file.type);
+      const preview =
+        supported && typeof URL.createObjectURL === "function" ? URL.createObjectURL(file) : null;
+      if (preview) previews.current.add(preview);
+      return {
+        key: `${Date.now()}-${i}-${file.name}`,
+        name: file.name,
+        file,
+        preview,
+        stage: supported ? "waiting" : "failed",
+        ...(supported ? {} : { error: "Use a JPEG, PNG or WebP photograph." }),
+      };
+    });
+    setQueue((all) => [...all.filter((q) => q.stage !== "done"), ...items]);
+
+    let added = false;
+    for (const item of items) {
+      if (item.stage === "failed") continue;
+      update(item.key, { stage: "preparing" });
+      try {
+        const file = await downscaleImage(item.file);
+        if (file.size > MAX_PHOTO_UPLOAD_BYTES) {
+          update(item.key, {
+            stage: "failed",
+            error: `Larger than ${MAX_PHOTO_UPLOAD_BYTES / 1024 / 1024} MB, even after resizing.`,
+          });
+          continue;
+        }
+        update(item.key, { stage: "uploading" });
+        const data = new FormData();
+        data.set("outfitId", outfitId);
+        data.set("photo", file);
+        data.set("altText", "");
+        const result = await upload(data);
+        if (result.ok) {
+          update(item.key, { stage: "done" });
+          added = true;
+        } else {
+          update(item.key, { stage: "failed", error: result.error.message });
+        }
+      } catch {
+        update(item.key, { stage: "failed", error: CONNECTION_ERROR });
+      }
+    }
+    if (input.current) input.current.value = "";
+    if (added) router.refresh();
   }
 
-  async function onRemove(photoId: string) {
+  async function run(action: Action<undefined>, photoId: string) {
     const data = new FormData();
     data.set("outfitId", outfitId);
     data.set("photoId", photoId);
+    setBusyPhoto(photoId);
+    setError(null);
     try {
-      const result = await remove(data);
+      const result = await action(data);
       if (!result.ok) setError(result.error.message);
       router.refresh();
     } catch {
       setError(CONNECTION_ERROR);
+    } finally {
+      setBusyPhoto(null);
     }
   }
 
+  const pending = queue.filter((q) => q.stage !== "done");
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <FormMessage>{error}</FormMessage>
+
       {photos.length > 0 ? (
-        <ul className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <ul
+          aria-label="Photographs"
+          className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4"
+        >
           {photos.map((p, i) => (
             <li key={p.id} className="flex flex-col gap-2">
-              <div className="relative aspect-[3/4] overflow-hidden bg-sand">
+              <div
+                className={cn(
+                  "relative aspect-[3/4] overflow-hidden bg-sand",
+                  i === 0 && "outline-2 outline-offset-2 outline-burgundy",
+                )}
+              >
                 <Image
                   src={fileUrl(p.storageKey)}
                   alt={p.altText}
@@ -98,48 +185,117 @@ export function PhotoManager({
                   sizes="25vw"
                   className="object-cover"
                 />
+                {i === 0 ? (
+                  <span className="absolute top-0 left-0 bg-burgundy px-2 py-1 eyebrow text-paper">
+                    Cover
+                  </span>
+                ) : null}
               </div>
-              <div className="flex items-center justify-between text-caption text-graphite">
-                <span>{i === 0 ? "Cover" : `Photo ${i + 1}`}</span>
-                <button type="button" onClick={() => onRemove(p.id)} className="text-burgundy underline">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-caption">
+                {i === 0 ? (
+                  <span className="text-graphite">Shown first in Explore</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => run(makeCover, p.id)}
+                    disabled={busyPhoto !== null}
+                    className="text-ink underline disabled:opacity-50"
+                    aria-label={`Make photo ${i + 1} the cover`}
+                  >
+                    Make cover
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => run(remove, p.id)}
+                  disabled={busyPhoto !== null}
+                  className="text-burgundy underline disabled:opacity-50"
+                  aria-label={`Remove photo ${i + 1}`}
+                >
                   Remove
                 </button>
               </div>
             </li>
           ))}
         </ul>
-      ) : (
-        <p className="text-graphite">No photographs yet. The first one becomes the cover.</p>
-      )}
-      {!full ? (
-        <div className="grid max-w-xl gap-4 border-t border-rule pt-6">
-          <label className="flex flex-col gap-2">
-            <span className="eyebrow text-graphite">Photograph (JPEG, PNG or WebP)</span>
-            <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" className="text-sm" />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="eyebrow text-graphite">Describe it for screen readers</span>
-            <input
-              value={alt}
-              onChange={(e) => setAlt(e.target.value)}
-              placeholder="Front of the sherwani on a hanger"
-              className="border-0 border-b border-rule-strong bg-transparent py-2 focus:border-ink focus:outline-none"
-            />
-          </label>
-          <div>
-            <Button onClick={onUpload} pending={busy}>
-              Upload photograph
-            </Button>
-          </div>
-          <p className="text-caption text-stone">
-            Photograph the garment itself in good light. Location data is removed from every upload.
-          </p>
-        </div>
+      ) : null}
+
+      {pending.length > 0 ? (
+        <ul aria-label="Uploads" className="flex flex-col divide-y divide-rule border-y border-rule">
+          {pending.map((q) => (
+            <li key={q.key} className="flex items-center gap-4 py-3">
+              <div className="relative h-16 w-12 shrink-0 overflow-hidden bg-sand">
+                {q.preview ? (
+                  // A local object URL: next/image cannot optimise it, and does not need to.
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={q.preview} alt="" className="h-full w-full object-cover" />
+                ) : null}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm">{q.name}</p>
+                {q.error ? <p className="text-caption text-danger">{q.error}</p> : null}
+              </div>
+              <span
+                role="status"
+                className={cn("eyebrow", q.stage === "failed" ? "text-danger" : "text-graphite")}
+              >
+                {STAGE_LABEL[q.stage]}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {uploadsDisabledReason ? (
+        <p className="border border-rule-strong px-5 py-4 text-sm text-graphite">{uploadsDisabledReason}</p>
+      ) : room > 0 ? (
+        <label
+          htmlFor={inputId}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            if (!uploading) void add(Array.from(e.dataTransfer.files));
+          }}
+          className={cn(
+            "flex cursor-pointer flex-col items-center gap-3 border border-dashed px-6 py-12 text-center transition-colors duration-150 motion-reduce:transition-none",
+            dragging ? "border-burgundy bg-ivory" : "border-rule-strong hover:border-ink",
+            uploading && "pointer-events-none opacity-60",
+          )}
+        >
+          <span className="font-display text-2xl">
+            {photos.length === 0 ? "Add your photographs" : "Add more photographs"}
+          </span>
+          <span className="max-w-md text-sm text-graphite">
+            Drop them here or <span className="text-burgundy underline">choose from your device</span>. JPEG,
+            PNG or WebP; up to {room} more. Large phone photos are resized for you.
+          </span>
+          <input
+            id={inputId}
+            ref={input}
+            type="file"
+            multiple
+            accept={ACCEPTED_PHOTO_TYPES.join(",")}
+            disabled={uploading}
+            aria-label="Choose photographs"
+            onChange={(e) => void add(Array.from(e.target.files ?? []))}
+            className="sr-only"
+          />
+        </label>
       ) : (
         <p className="text-sm text-graphite">
           You have added the maximum of {marketplacePolicy.maxListingPhotos} photographs.
         </p>
       )}
+
+      <p className="text-caption text-stone">
+        Photograph the garment itself in good daylight: front, back, and a close-up of the work. Location data
+        is removed from every upload. The first photograph is the cover.
+      </p>
     </div>
   );
 }

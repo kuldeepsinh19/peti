@@ -14,6 +14,7 @@ import { PageHeader, SectionIndex } from "@/shared/ui/layout";
 import {
   listingStatusAction,
   removePhotoAction,
+  setCoverPhotoAction,
   updateListingAction,
   uploadPhotoAction,
 } from "../../../actions";
@@ -181,6 +182,7 @@ export default async function EditListingPage({
           photos={view.photos}
           upload={uploadPhotoAction}
           remove={removePhotoAction}
+          makeCover={setCoverPhotoAction}
         />
       </section>
 
