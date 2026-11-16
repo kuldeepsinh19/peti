@@ -124,6 +124,11 @@ See [api-overview.md](docs/api/api-overview.md) and [error-handling.md](docs/api
   (which parses input with the module's Zod contract); revalidate paths.
 - Photo uploads (listing photos, condition reports) are multipart Server Actions; the browser downscales
   first (`shared/ui/downscale-image.ts`) and the server re-validates and re-encodes everything.
+- One account rents and lends. Renting and lending pages share `AccountNav`
+  (`src/app/_components/account-nav.tsx`); add a page to its sections rather than a new tab bar.
+- Anything that shows an outfit to renters is reused, not imitated: the owner's preview renders
+  `OutfitDetailView` and `OutfitCardView`. Components from another module reach a page through the page
+  (props or slots), never by one module importing another's UI.
 - Route handlers (`route.ts`) only for: auth, payment callback/webhook, file serving, cron sweep, health
   and the money-health monitor.
   Webhooks read the **raw** body for signature checks.
