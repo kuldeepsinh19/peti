@@ -52,6 +52,9 @@ test("rent an outfit: request, approval, sandbox payment, confirmation", async (
   await renter.goto(bookingPath);
   await renter.getByRole("button", { name: /^Pay ₹/ }).click();
   await expect(renter).toHaveURL(/\/dev\/sandbox-checkout\//);
+  // The outcome buttons are client components: over a real network a click can land before the page has
+  // hydrated and do nothing, so wait for its scripts to finish loading first.
+  await renter.waitForLoadState("networkidle");
   await renter.getByRole("button", { name: "Pay" }).first().click();
   await expect(renter).toHaveURL(new RegExp(`/account/rentals/${bookingId}\\?payment=`));
   await expect(renter.getByText("Payment received")).toBeVisible();
