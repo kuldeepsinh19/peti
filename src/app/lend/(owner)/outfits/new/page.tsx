@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requireActorOrRedirect } from "@/composition/session";
 import { ListingForm } from "@/modules/listings/ui/listing-form";
+import { ListingSteps } from "@/modules/listings/ui/listing-steps";
 import { PageHeader } from "@/shared/ui/layout";
 import { createListingAction } from "../../actions";
 import { listingFormOptions } from "../../form-options";
@@ -13,14 +14,15 @@ export default async function NewListingPage() {
   return (
     <div className="pb-16">
       <PageHeader
-        eyebrow="Step 1 of 2 — details"
+        eyebrow="Your wardrobe, earning"
         title={
           <>
             List an <span className="display-italic">outfit</span>
           </>
         }
-        lede="Describe it honestly and measure it carefully: renters choose by these details, and the handover is checked against them."
+        lede="Describe it honestly: renters choose by these details, and the handover is checked against them. You can change anything before you submit."
       />
+      <ListingSteps current="details" />
       <div className="mt-10">
         <ListingForm {...options} submitLabel="Save and add photographs" action={createListingAction} />
       </div>

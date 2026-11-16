@@ -7,6 +7,7 @@ import { ValidationError } from "@/shared/domain/errors";
 import { formDataToObject } from "@/shared/contracts/validation";
 import { runAction } from "../../_lib/action";
 import { LIMITS } from "../../_lib/limits";
+import { ownerReturnPath } from "../../_lib/paths";
 
 export async function createListingAction(input: unknown): Promise<ActionResult<{ redirectTo: string }>> {
   return runAction(
@@ -14,7 +15,7 @@ export async function createListingAction(input: unknown): Promise<ActionResult<
     async (actor) => {
       const created = await container().listings.createListing(actor, input);
       revalidatePath("/lend/dashboard");
-      return { redirectTo: `/lend/outfits/${created.id}/edit?created=1#photos` };
+      return { redirectTo: `/lend/outfits/${created.id}/photos?created=1` };
     },
     LIMITS.listingWrite,
   );
@@ -87,19 +88,26 @@ const COMMANDS: readonly StatusCommand[] = [
 ];
 
 /** One form-post endpoint for the owner's status buttons. Errors are returned to the page via a query flag. */
+const DONE_NOTICE: Record<StatusCommand, string> = {
+  submitForReview: "submitted",
+  withdrawFromReview: "withdrawn",
+  pause: "paused",
+  resume: "resumed",
+  archive: "archived",
+};
+
 export async function listingStatusAction(formData: FormData): Promise<void> {
   const command = String(formData.get("command")) as StatusCommand;
   if (!COMMANDS.includes(command)) return;
   const input = formDataToObject(formData);
+  const outfitId = String(input.outfitId);
+  const target = ownerReturnPath(formData.get("returnTo"), `/lend/outfits/${outfitId}/edit`);
   const result = await runAction(command, (actor) => container().listings[command](actor, input));
-  revalidatePath("/lend/dashboard");
-  revalidatePath(`/lend/outfits/${String(input.outfitId)}/edit`);
-  if (!result.ok) {
-    const { redirect } = await import("next/navigation");
-    redirect(
-      `/lend/outfits/${String(input.outfitId)}/edit?error=${encodeURIComponent(result.error.message)}`,
-    );
-  }
+  revalidateListing(outfitId);
+  const { redirect } = await import("next/navigation");
+  if (!result.ok) redirect(`${target}?error=${encodeURIComponent(result.error.message)}`);
+  // The edit page has always stayed put on success; the other owner pages say what happened.
+  if (formData.get("returnTo")) redirect(`${target}?done=${DONE_NOTICE[command]}`);
 }
 
 export async function savePayoutAccountAction(formData: FormData): Promise<void> {

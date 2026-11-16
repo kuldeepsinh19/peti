@@ -76,10 +76,10 @@ export function editNeedsReview(status: OutfitStatus, contentChanged: boolean): 
 
 export const outfitStatusLabel: Record<OutfitStatus, string> = {
   DRAFT: "Draft",
-  PENDING_REVIEW: "In review",
-  ACTIVE: "Live",
+  PENDING_REVIEW: "Pending approval",
+  ACTIVE: "Published",
   PAUSED: "Paused",
-  REJECTED: "Changes requested",
-  SUSPENDED: "Suspended",
+  REJECTED: "Rejected",
+  SUSPENDED: "Unavailable",
   ARCHIVED: "Archived",
 };

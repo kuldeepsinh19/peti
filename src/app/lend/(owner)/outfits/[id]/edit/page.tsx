@@ -5,20 +5,20 @@ import { container } from "@/composition/container";
 import { requireActorOrRedirect } from "@/composition/session";
 import { type ListingEditView, mmToCm, outfitStatusLabel } from "@/modules/listings";
 import { ListingForm } from "@/modules/listings/ui/listing-form";
+import { ListingSteps } from "@/modules/listings/ui/listing-steps";
 import { PhotoManager } from "@/modules/listings/ui/photo-manager";
 import { outfitStatusTone } from "@/modules/listings/ui/status";
 import { DomainError } from "@/shared/domain/errors";
-import { SubmitButton } from "@/shared/ui/submit-button";
 import { Notice, Tag } from "@/shared/ui/feedback";
 import { PageHeader, SectionIndex } from "@/shared/ui/layout";
 import {
-  listingStatusAction,
   removePhotoAction,
   setCoverPhotoAction,
   updateListingAction,
   uploadPhotoAction,
 } from "../../../actions";
 import { listingFormOptions } from "../../../form-options";
+import { StatusButton } from "../../../status-button";
 
 export const metadata: Metadata = { title: "Edit listing" };
 
@@ -58,26 +58,6 @@ function defaultsFrom(view: ListingEditView) {
     bottomLength: cm(view.measurementsMm.bottomLength),
     measurementNotes: view.measurementNotes ?? "",
   };
-}
-
-function StatusButton({
-  outfitId,
-  command,
-  label,
-  variant = "secondary",
-}: {
-  outfitId: string;
-  command: string;
-  label: string;
-  variant?: "primary" | "secondary" | "quiet";
-}) {
-  return (
-    <form action={listingStatusAction}>
-      <input type="hidden" name="outfitId" value={outfitId} />
-      <input type="hidden" name="command" value={command} />
-      <SubmitButton variant={variant}>{label}</SubmitButton>
-    </form>
-  );
 }
 
 export default async function EditListingPage({
@@ -132,12 +112,14 @@ export default async function EditListingPage({
                 Calendar
               </Link>
             ) : null}
-            <Link href={`/outfits/${view.slug}`} className="self-center text-sm">
-              View listing
+            <Link href={`/lend/outfits/${view.id}/preview`} className="self-center text-sm">
+              Preview
             </Link>
           </>
         }
       />
+
+      {s === "DRAFT" || s === "REJECTED" ? <ListingSteps current="details" outfitId={view.id} /> : null}
 
       <div className="mt-8 flex flex-col gap-4">
         {typeof query.error === "string" ? (
@@ -147,7 +129,7 @@ export default async function EditListingPage({
         ) : null}
         {query.created === "1" ? (
           <Notice tone="success" title="Saved as a draft">
-            Now add photographs, then submit the listing for review.
+            Now add photographs, then preview the listing and submit it for review.
           </Notice>
         ) : null}
         {query.saved === "1" ? <Notice tone="success" title="Changes saved" /> : null}
@@ -168,7 +150,9 @@ export default async function EditListingPage({
           </Notice>
         ) : null}
         {s === "PENDING_REVIEW" ? (
-          <Notice title="In review">An administrator checks every listing before it is published.</Notice>
+          <Notice title="Pending approval">
+            A Peti administrator checks every listing before it is published.
+          </Notice>
         ) : null}
       </div>
 
