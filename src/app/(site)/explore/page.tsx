@@ -19,7 +19,7 @@ export default async function ExplorePage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { search } = container();
-  const { query, result } = search.explore(await searchParams);
+  const { query, result, datesChecked } = search.explore(await searchParams);
   const [explored, categories, localities, actor] = await Promise.all([
     result,
     search.categories(),
@@ -48,7 +48,7 @@ export default async function ExplorePage({
       </header>
       <CategoryStrip categories={categories} active={query.category} />
       <FilterRow query={query} categories={categories} localities={localities} total={explored.total} />
-      <Results query={query} result={explored} basePath="/explore" />
+      <Results query={query} result={explored} datesChecked={datesChecked} basePath="/explore" />
     </Page>
   );
 }

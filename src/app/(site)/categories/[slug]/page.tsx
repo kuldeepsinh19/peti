@@ -27,7 +27,7 @@ export default async function CategoryPage({
   const category = categories[index];
   if (!category) notFound();
 
-  const { query, result } = search.explore({ ...(await searchParams), category: slug });
+  const { query, result, datesChecked } = search.explore({ ...(await searchParams), category: slug });
   const explored = await result;
   return (
     <Page className="pt-10 lg:pt-14">
@@ -50,7 +50,7 @@ export default async function CategoryPage({
         lockCategory={slug}
         total={explored.total}
       />
-      <Results query={query} result={explored} basePath={`/categories/${slug}`} />
+      <Results query={query} result={explored} datesChecked={datesChecked} basePath={`/categories/${slug}`} />
     </Page>
   );
 }

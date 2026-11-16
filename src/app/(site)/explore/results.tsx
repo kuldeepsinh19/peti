@@ -9,10 +9,13 @@ export function Results({
   query,
   result,
   basePath,
+  datesChecked = false,
 }: {
   query: ExploreQuery;
   result: ExploreResult;
   basePath: string;
+  /** True when the results were filtered to outfits free from `query.from`. */
+  datesChecked?: boolean;
 }) {
   if (result.items.length === 0) {
     return (
@@ -45,7 +48,9 @@ export function Results({
           priority
           // Results are already filtered to outfits free from the chosen date (see marketplace-discovery.md).
           availableFrom={
-            query.from && isLocalDate(query.from) ? `from ${formatLocalDate(query.from)}` : undefined
+            datesChecked && query.from && isLocalDate(query.from)
+              ? `from ${formatLocalDate(query.from)}`
+              : undefined
           }
         />
       </div>

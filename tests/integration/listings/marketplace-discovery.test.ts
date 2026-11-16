@@ -148,3 +148,13 @@ describe("renting from other people", () => {
     );
   });
 });
+
+describe("the free-dates marker", () => {
+  it("is only promised when the results were really filtered by the date", () => {
+    // The test clock is 1 December 2026 (IST).
+    expect(app.search.explore({ from: "2026-12-20" }).datesChecked).toBe(true);
+    expect(app.search.explore({ from: "2026-12-01" }).datesChecked).toBe(false); // today: not filtered
+    expect(app.search.explore({ from: "2026-11-20" }).datesChecked).toBe(false);
+    expect(app.search.explore({}).datesChecked).toBe(false);
+  });
+});

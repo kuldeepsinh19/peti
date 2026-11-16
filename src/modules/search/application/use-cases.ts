@@ -13,7 +13,13 @@ export function searchUseCases({ catalogue, clock }: { catalogue: CatalogueQueri
     /** Never throws on bad input: unknown or malformed filters are ignored. */
     explore(searchParams: Record<string, string | string[] | undefined>) {
       const query = exploreQuerySchema.parse(searchParams);
-      return { query, result: catalogue.explore(query, localDateInIndia(clock.now())) };
+      const today = localDateInIndia(clock.now());
+      return {
+        query,
+        result: catalogue.explore(query, today),
+        // The date filter only applies to future start dates: only then is every result free on them.
+        datesChecked: query.from !== undefined && query.from > today,
+      };
     },
 
     /**
