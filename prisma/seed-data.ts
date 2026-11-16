@@ -76,6 +76,12 @@ export const categories = [
     audience: "WOMEN",
     description: "For nine nights of Navratri garba.",
   },
+  {
+    slug: "other-occasionwear",
+    name: "Other occasionwear",
+    audience: "UNISEX",
+    description: "Anything worn for an occasion that the categories above do not cover.",
+  },
 ] as const;
 
 export const demoPassword = "peti-demo-password";
