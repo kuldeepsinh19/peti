@@ -1,5 +1,6 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
+import { localDateFromDb } from "@/shared/domain/local-date";
 import type { Db } from "@/shared/infrastructure/prisma";
 import type { ListingData, ListingEditView, ListingRepository } from "../application/ports";
 import type { OutfitStatus } from "../domain/outfit-status";
@@ -12,6 +13,9 @@ const OPEN_BOOKING_STATUSES = [
   "RETURNED",
   "DISPUTED",
 ] as const;
+
+/** Approved and not yet returned: what the owner has coming up. */
+const UPCOMING_STATUSES: readonly string[] = ["AWAITING_PAYMENT", "CONFIRMED", "ACTIVE"];
 
 function measurementColumns(data: ListingData) {
   const m = data.measurementsMm;
@@ -174,9 +178,38 @@ export function prismaListingRepository(db: Db): ListingRepository {
         include: {
           category: { select: { name: true } },
           images: { orderBy: { sortOrder: "asc" }, take: 1, select: { storageKey: true } },
-          _count: { select: { bookings: { where: { status: { in: [...OPEN_BOOKING_STATUSES] } } } } },
+          priceOptions: {
+            where: { isActive: true },
+            orderBy: { pricePaise: "asc" },
+            take: 1,
+            select: { durationDays: true },
+          },
+          _count: { select: { images: true } },
         },
       });
+      // One grouped query for every outfit's open bookings, rather than one per row.
+      const groups = rows.length
+        ? await db.booking.groupBy({
+            by: ["outfitId", "status"],
+            where: { outfitId: { in: rows.map((r) => r.id) }, status: { in: [...OPEN_BOOKING_STATUSES] } },
+            _count: { _all: true },
+            _min: { startDate: true },
+          })
+        : [];
+      const activity = (outfitId: string) => {
+        const mine = groups.filter((g) => g.outfitId === outfitId);
+        const upcoming = mine.filter((g) => UPCOMING_STATUSES.includes(g.status));
+        const starts = upcoming.map((g) => g._min.startDate).filter((d): d is Date => d !== null);
+        const next = starts.length ? new Date(Math.min(...starts.map((d) => d.getTime()))) : null;
+        return {
+          openBookings: mine.reduce((n, g) => n + g._count._all, 0),
+          pendingRequests: mine
+            .filter((g) => g.status === "PENDING_APPROVAL")
+            .reduce((n, g) => n + g._count._all, 0),
+          upcomingRentals: upcoming.reduce((n, g) => n + g._count._all, 0),
+          nextRentalStart: next ? localDateFromDb(next) : null,
+        };
+      };
       return rows.map((o) => ({
         id: o.id,
         slug: o.slug,
@@ -184,8 +217,11 @@ export function prismaListingRepository(db: Db): ListingRepository {
         status: o.status as OutfitStatus,
         categoryName: o.category.name,
         minPricePaise: o.minPricePaise,
+        minPriceDays: o.priceOptions[0]?.durationDays ?? null,
         photoKey: o.images[0]?.storageKey ?? null,
-        openBookings: o._count.bookings,
+        photoCount: o._count.images,
+        moderationNote: o.moderationNote,
+        ...activity(o.id),
         updatedAt: o.updatedAt,
       }));
     },

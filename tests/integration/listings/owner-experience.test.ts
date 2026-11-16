@@ -4,7 +4,7 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../support/app";
-import { db, resetDatabase } from "../support/db";
+import { db, insertBookingRow, resetDatabase } from "../support/db";
 import { listingSetup, publishListing } from "../support/listing-fixtures";
 
 const app = buildApp();
@@ -95,5 +95,63 @@ describe("the essentials-first listing form", () => {
     );
     expect(await fieldsFor({ ...form, price3: "50000" })).toContain("price3"); // above what it cost new
     expect(await db.outfit.count()).toBe(0);
+  });
+});
+
+describe("My outfits", () => {
+  it("shows each outfit with its requests waiting, upcoming rentals and next rental date", async () => {
+    const { owner, admin, stranger, form } = await listingSetup();
+    const live = await publishListing(app, form, owner, admin);
+    const draft = (await app.listings.createListing(owner, { ...form, title: "Draft lehenga to finish" })).id;
+    const booking = (startDate: string, endDate: string) =>
+      insertBookingRow({
+        outfitId: live,
+        ownerId: owner.userId,
+        renterId: stranger.userId,
+        startDate,
+        endDate,
+      });
+    await booking("2027-01-10", "2027-01-12"); // waiting for the owner
+    await booking("2027-02-01", "2027-02-03");
+    const confirmed = await booking("2027-03-05", "2027-03-07");
+    await db.booking.update({ where: { id: confirmed.id }, data: { status: "AWAITING_PAYMENT" } });
+
+    const rows = await app.listings.listMine(owner);
+    const byId = Object.fromEntries(rows.map((r) => [r.id, r]));
+    expect(byId[live]).toMatchObject({
+      status: "ACTIVE",
+      pendingRequests: 2,
+      upcomingRentals: 1,
+      nextRentalStart: "2027-03-05",
+      openBookings: 3,
+      photoCount: 1,
+      minPricePaise: 350_000,
+      minPriceDays: 3,
+    });
+    expect(byId[draft]).toMatchObject({
+      status: "DRAFT",
+      pendingRequests: 0,
+      upcomingRentals: 0,
+      nextRentalStart: null,
+      photoCount: 0,
+    });
+    // Only the owner's own outfits.
+    expect(await app.listings.listMine(stranger)).toEqual([]);
+  });
+
+  it("pausing and editing a booked outfit leave its bookings exactly as they were", async () => {
+    const { owner, admin, stranger, form } = await listingSetup();
+    const id = await publishListing(app, form, owner, admin);
+    const before = await insertBookingRow({ outfitId: id, ownerId: owner.userId, renterId: stranger.userId });
+
+    await app.listings.pause(owner, { outfitId: id });
+    await app.listings.updateListing(owner, id, { ...form, title: "Ivory sherwani, freshly cleaned" });
+    await app.listings.resume(owner, { outfitId: id }).catch(() => undefined); // back in review after the edit
+
+    const after = await db.booking.findUniqueOrThrow({ where: { id: before.id } });
+    expect(after).toEqual(before);
+    await expect(app.listings.archive(owner, { outfitId: id })).rejects.toMatchObject({
+      code: "LISTING_HAS_BOOKINGS",
+    });
   });
 });

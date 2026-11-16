@@ -58,8 +58,19 @@ export interface OwnerListingRow {
   status: OutfitStatus;
   categoryName: string;
   minPricePaise: number | null;
+  /** The rental length the lowest price is for. */
+  minPriceDays: number | null;
   photoKey: string | null;
+  photoCount: number;
+  moderationNote: string | null;
+  /** Bookings in any open state (the listing cannot be archived while there are any). */
   openBookings: number;
+  /** Requests waiting for the owner's answer. */
+  pendingRequests: number;
+  /** Approved bookings not yet returned: awaiting payment, confirmed or out with the renter. */
+  upcomingRentals: number;
+  /** First day of the earliest of those, as an ISO date. */
+  nextRentalStart: string | null;
   updatedAt: Date;
 }
 
