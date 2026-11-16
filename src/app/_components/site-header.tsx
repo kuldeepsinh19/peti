@@ -62,6 +62,21 @@ export function SiteHeader({ viewer }: { viewer: HeaderViewer | null }) {
         </div>
         <MobileNav viewer={viewer} />
       </div>
+      {/* Small screens: the two marketplace actions stay one tap away instead of inside the menu. */}
+      <nav aria-label="Marketplace" className="grid grid-cols-2 border-t border-rule lg:hidden">
+        <Link
+          href={primaryNav[0].href}
+          className="border-r border-rule py-3 text-center text-sm text-ink no-underline"
+        >
+          {primaryNav[0].label}
+        </Link>
+        <Link
+          href={listAnOutfit.href(viewer !== null)}
+          className="py-3 text-center text-sm text-burgundy no-underline"
+        >
+          {listAnOutfit.label}
+        </Link>
+      </nav>
     </header>
   );
 }
