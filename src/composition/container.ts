@@ -149,6 +149,7 @@ function build() {
       audit: prismaAuditLog(db),
       clock,
       photoUploadsEnabled: allowsPhotoUploads(env),
+      notifications: prismaNotificationWriter(db),
     }),
     search: searchUseCases({ catalogue: prismaCatalogueQueries(db), clock }),
     bookings,

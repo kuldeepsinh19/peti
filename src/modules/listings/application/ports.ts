@@ -131,4 +131,18 @@ export interface ListingsDeps {
   clock: { now(): Date };
   /** False where photographs cannot be stored (the public demo); defaults to true. */
   photoUploadsEnabled?: boolean;
+  /** Tells the owner what an administrator decided about their listing (in-app and email). */
+  notifications?: {
+    enqueue(
+      drafts: ReadonlyArray<{
+        userId: string;
+        type: string;
+        subject: string;
+        body: string;
+        link?: string;
+        dedupeKey: string;
+        channels: ReadonlyArray<"IN_APP" | "EMAIL">;
+      }>,
+    ): Promise<void>;
+  };
 }

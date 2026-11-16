@@ -5,6 +5,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { listingsUseCases } from "@/modules/listings";
 import { prismaListingRepository } from "@/modules/listings/infrastructure/prisma-listing-repository";
+import { prismaNotificationWriter } from "@/modules/notifications/infrastructure/notification-writer";
 import { prismaAuditLog } from "@/shared/infrastructure/audit";
 import { buildApp, clock, memoryPhotos } from "../support/app";
 import { db, insertBookingRow, resetDatabase } from "../support/db";
@@ -181,5 +182,43 @@ describe("photographs in the public demo", () => {
     await expect(demo.addPhoto(stranger, id, new Uint8Array([1]), "")).rejects.toMatchObject({
       code: "FORBIDDEN",
     });
+  });
+});
+
+describe("moderation decisions", () => {
+  it("tell the owner, in the app and by email, with the reviewer's note when changes are asked for", async () => {
+    const withNotices = listingsUseCases({
+      listings: prismaListingRepository(db),
+      photos: memoryPhotos,
+      audit: prismaAuditLog(db),
+      clock,
+      notifications: prismaNotificationWriter(db),
+    });
+    const { owner, admin, form } = await listingSetup();
+    const submit = async (title: string) => {
+      const { id } = await withNotices.createListing(owner, { ...form, title });
+      await withNotices.addPhoto(owner, id, new Uint8Array([1]), "");
+      await withNotices.submitForReview(owner, { outfitId: id });
+      return id;
+    };
+    const approved = await submit("Ivory sherwani for the approval");
+    const rejected = await submit("Lehenga that needs better photographs");
+    await withNotices.approve(admin, { outfitId: approved });
+    await withNotices.reject(admin, { outfitId: rejected, note: "Please add a photograph in daylight." });
+
+    const notices = await db.notification.findMany({
+      where: { userId: owner.userId },
+    });
+    expect(notices.map((n) => `${n.type} ${n.channel}`).sort()).toEqual([
+      "listing.approve EMAIL",
+      "listing.approve IN_APP",
+      "listing.reject EMAIL",
+      "listing.reject IN_APP",
+    ]);
+    const approval = notices.find((n) => n.type === "listing.approve")!;
+    expect(approval.subject).toBe("Ivory sherwani for the approval is published");
+    const rejection = notices.find((n) => n.type === "listing.reject")!;
+    expect(rejection.body).toContain("Please add a photograph in daylight.");
+    expect(rejection.link).toBe(`/lend/outfits/${rejected}/edit`);
   });
 });

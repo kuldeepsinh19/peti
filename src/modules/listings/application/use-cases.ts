@@ -54,6 +54,26 @@ function toListingData(form: ListingFormData): ListingData {
   };
 }
 
+/** What the owner is told after an administrator's decision. */
+const DECISION_MESSAGES: Partial<
+  Record<OutfitCommand, { subject: (title: string) => string; body: (note?: string) => string }>
+> = {
+  approve: {
+    subject: (title) => `${title} is published`,
+    body: () => "Renters can now find and request it. You will hear from Peti when someone does.",
+  },
+  reject: {
+    subject: (title) => `Changes requested for ${title}`,
+    body: (note) =>
+      `A Peti administrator asked for changes before it goes live: ${note ?? "see the listing"}. Edit it and submit it again.`,
+  },
+  suspend: {
+    subject: (title) => `${title} is suspended`,
+    body: (note) =>
+      `A Peti administrator suspended it, so renters cannot see it: ${note ?? "no reason given"}.`,
+  },
+};
+
 export const PHOTO_UPLOADS_DISABLED_MESSAGE =
   "Photo upload isn't available in the public demo. Listings there use the photographs already added.";
 
@@ -146,6 +166,21 @@ export function listingsUseCases(deps: ListingsDeps) {
       after: { status: next },
       ...(note ? { reason: note } : {}),
     });
+    const message = DECISION_MESSAGES[command];
+    if (message && deps.notifications) {
+      await deps.notifications.enqueue([
+        {
+          userId: outfit.ownerId,
+          type: `listing.${command}`,
+          subject: message.subject(outfit.title),
+          body: message.body(note),
+          link: command === "approve" ? `/outfits/${outfit.slug}` : `/lend/outfits/${outfitId}/edit`,
+          // One message per decision, even if the action is retried.
+          dedupeKey: `listing:${outfitId}:${command}:${clock.now().getTime()}`,
+          channels: ["IN_APP", "EMAIL"],
+        },
+      ]);
+    }
     return next;
   }
 
