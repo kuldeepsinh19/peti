@@ -85,29 +85,32 @@ stateDiagram-v2
 
 ## B. Listing an outfit
 
-**Goal:** an owner publishes a garment that renters can book.
+**Goal:** a member publishes a garment they own that others can rent. The full workflow is in
+[outfit-listing-workflow.md](./outfit-listing-workflow.md).
 
-1. The owner opens the owner dashboard `/lend` and selects "List an outfit" → `/lend/outfits/new`.
-2. They upload at least 3 photos (garment only is recommended), reorder them and pick a cover photo. Location
-   data is stripped from the files.
-3. They enter title, description, category, occasion tags, size label, measurements, colour, fabric,
-   condition, declared retail value, locality and the pickup address.
-4. They set a price for one or more duration options (2, 3, 5, 7 days). Next to each, the form shows what they
-   would earn after the 15% commission.
-5. They set the deposit (₹500 up to the declared retail value; the form suggests 20–30% of retail).
-6. They set the turnaround buffer (default 1 day, 0–7 allowed).
-7. They save. The listing is `DRAFT` and visible only to them.
-8. They select "Submit for review". The listing becomes `PENDING_REVIEW` (requires verified email and phone).
-9. An admin reviews it (journey G). On approval it becomes `ACTIVE` and the owner is notified; it now appears
-   in explore, its category page and at `/outfits/[slug]`.
-10. Optionally, the owner blocks dates when the garment is unavailable on `/lend/outfits/[id]/calendar`.
-11. Before their first payout, the owner records a UPI ID for payouts on `/lend/earnings`.
+1. The member selects **List an outfit** in the header (or on My outfits) → `/lend/outfits/new`. The same
+   account rents and lends; there is nothing to switch.
+2. **Details:** name, category, size, description, occasions, condition (default Good), a price for one or
+   more rental lengths (2, 3, 5, 7 days) with what they would receive after the 15% commission, what it cost
+   new, the deposit (₹500 up to what it cost new; 20–30% suggested), the pickup address and the locality
+   shown. Colour, fabric, label, condition notes, measurements and cleaning days are optional, under "More
+   about the outfit". Saving creates a `DRAFT` visible only to them.
+3. **Photographs** (`/lend/outfits/[id]/photos`): several at once, each with a preview and its upload stage;
+   remove any; "Make cover" picks the one shown first. Location data is stripped from the files.
+4. **Preview** (`/lend/outfits/[id]/preview`): the real Explore card and outfit page. They can go back to the
+   details or photographs, or select "Submit for review". The listing becomes `PENDING_REVIEW` (requires a
+   photograph and verified email and phone) and they land on **My outfits** (`/lend/dashboard`) with
+   "Submitted for review".
+5. An admin reviews it (journey G). On approval it becomes `ACTIVE` (Published) and the owner is notified;
+   it now appears in Explore outfits, its category page and at `/outfits/[slug]`.
+6. Optionally, the owner blocks dates when the garment is unavailable on `/lend/outfits/[id]/calendar`.
+7. Before their first payout, the owner records a UPI ID for payouts on `/lend/earnings`.
 
 **Unhappy paths**
 
 | #    | What happens                                                 | Result                                                                                                                                                                |
 | ---- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| B-U1 | Fewer than 3 photos, unsupported file, file too large        | Inline error; the file is rejected before storage.                                                                                                                    |
+| B-U1 | Unsupported file, file too large, more than 8 photographs    | That file is marked "Not added" with the reason; nothing is stored.                                                                                                   |
 | B-U2 | Deposit below ₹500 or above retail value; no duration priced | Inline validation error; cannot submit.                                                                                                                               |
 | B-U3 | Admin rejects the listing                                    | `REJECTED` with a reason; the owner edits at `/lend/outfits/[id]/edit` and resubmits → `PENDING_REVIEW`.                                                              |
 | B-U4 | Owner blocks dates that overlap a booking hold               | Refused: "These dates are booked". Nothing changes.                                                                                                                   |
@@ -119,17 +122,22 @@ stateDiagram-v2
 
 ## C. Discovering outfits
 
-**Goal:** a renter finds an outfit that is free on their dates and fits.
+**Goal:** a renter finds an outfit that is free on their dates and fits. The full workflow is in
+[outfit-discovery-workflow.md](./outfit-discovery-workflow.md).
 
-1. On the landing page `/`, the renter enters dates and an occasion in the discovery strip, or picks an
-   occasion from "browse by occasion".
-2. They land on `/explore` with those filters applied. They refine by keyword, category, price, size,
-   measurements and locality. Filters are kept in the URL.
-3. Outfits whose holds (bookings, owner blocks and buffer days) overlap the dates are not shown.
+1. On the landing page `/`, the renter selects **Explore outfits**, enters dates and an occasion in the
+   discovery strip, picks an occasion, or opens one of the newest outfits.
+2. They land on `/explore`. A row of categories runs across the top; they refine by keyword, category,
+   occasion, size, locality, start date, rental length, price, measurements and order. Filters are kept in
+   the URL.
+3. Outfits whose holds (bookings, owner blocks and cleaning days) overlap the dates are not shown, and each
+   card then says it is free from that date. Every card names the lender with their rating, completed
+   rentals or "New lender".
 4. Alternatively, they browse a category at `/categories/[slug]`.
-5. They open an outfit at `/outfits/[slug]`: photos, description, measurements, condition, locality, price per
-   duration, deposit, buffer, availability calendar, owner profile and reviews. No phone number or address is
-   shown.
+5. They open an outfit at `/outfits/[slug]`: a photo gallery, prices, deposit, description, an availability
+   calendar, measurements, condition, how renting works (request and payment windows, deposit, cancellation,
+   late fee, cleaning), reviews and the lender. No phone number or address is shown. Their own outfits show
+   "This is your outfit" instead of the request button.
 6. They save the outfit (signing in first if needed, then returning to the page). It appears on
    `/account/saved`.
 

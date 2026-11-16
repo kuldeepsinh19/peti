@@ -84,10 +84,14 @@ Status is never conveyed by colour alone: every tag carries text.
 
 ## Navigation
 
-- Public: wordmark left, four text links centred, account links right; a top strip carries the tagline. On
-  mobile, a "Menu" button opens a numbered sheet.
-- Account, lending and admin areas: a top **index bar** of text links (never a sidebar) under a page header,
-  and ledger tables for lists.
+- Public: wordmark left; **Explore outfits**, How it works and Trust & safety as text links centred; on the
+  right, **List an outfit** as the header's only filled button, then the account link. A top strip carries
+  the tagline. On mobile, a two-link bar under the header keeps Explore outfits and List an outfit one tap
+  away, and a "Menu" button opens a numbered sheet that leads with them.
+- Account and lending share **one index bar** (My rentals, My outfits, Rental requests, Earnings, Saved,
+  Profile & settings), with a quiet second row for sections that span several pages. Admin has its own.
+  Never a sidebar. Lists are ledger tables, except My outfits, which is image-led rows: an owner recognises
+  an outfit by its photograph first.
 
 ## Motion
 
