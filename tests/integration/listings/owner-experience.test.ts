@@ -64,3 +64,36 @@ describe("photographs and the cover", () => {
     expect((await photoOrder(id))[0]).toBe(second.id);
   });
 });
+
+describe("the essentials-first listing form", () => {
+  it("creates a draft from the essentials alone: condition defaults to good, notes may be left out", async () => {
+    const { owner, form } = await listingSetup();
+    const { conditionGrade: _grade, conditionNotes: _notes, ...essentials } = form;
+    const { id } = await app.listings.createListing(owner, essentials);
+    expect(await db.outfit.findUniqueOrThrow({ where: { id } })).toMatchObject({
+      status: "DRAFT",
+      conditionGrade: "GOOD",
+      conditionNotes: "",
+    });
+  });
+
+  it("still refuses missing essentials, bad prices and notes that say nothing", async () => {
+    const { owner, form } = await listingSetup();
+    const fieldsFor = (input: Record<string, unknown>) =>
+      app.listings.createListing(owner, input).then(
+        () => [],
+        (e: { code: string; fieldErrors?: Record<string, string[]> }) => {
+          expect(e.code).toBe("VALIDATION_FAILED");
+          return Object.keys(e.fieldErrors ?? {});
+        },
+      );
+    const { title: _t, categoryId: _c, ...noTitle } = form;
+    expect(await fieldsFor(noTitle)).toEqual(expect.arrayContaining(["title", "categoryId"]));
+    expect(await fieldsFor({ ...form, conditionNotes: "ok" })).toEqual(["conditionNotes"]);
+    expect(await fieldsFor({ ...form, price3: "-5", price5: "abc" })).toEqual(
+      expect.arrayContaining(["price3", "price5"]),
+    );
+    expect(await fieldsFor({ ...form, price3: "50000" })).toContain("price3"); // above what it cost new
+    expect(await db.outfit.count()).toBe(0);
+  });
+});

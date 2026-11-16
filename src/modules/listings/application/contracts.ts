@@ -70,8 +70,15 @@ export const listingFormSchema = z.object({
   colour: optionalText(60),
   fabric: optionalText(80),
   sizeLabel: z.enum(SIZE_LABELS, { error: "Choose a size." }),
-  conditionGrade: z.enum(CONDITION_GRADES, { error: "Choose a condition." }),
-  conditionNotes: z.string().trim().min(5, "Describe the condition, including any flaws.").max(1000),
+  // A first listing asks for the essentials: the grade defaults to "Good" and notes are optional, but notes
+  // that are given must say something.
+  conditionGrade: z.enum(CONDITION_GRADES, { error: "Choose a condition." }).default("GOOD"),
+  conditionNotes: z
+    .string()
+    .trim()
+    .max(1000, "At most 1000 characters.")
+    .refine((v) => v === "" || v.length >= 5, "Describe the condition in at least 5 characters.")
+    .default(""),
   retailValueRupees: rupees("the retail value"),
   depositRupees: rupees("a deposit"),
   turnaroundDays: z.coerce.number().int().min(0).max(marketplacePolicy.turnaroundDaysMax),
