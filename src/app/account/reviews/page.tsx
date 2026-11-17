@@ -9,6 +9,7 @@ import { EmptyState, Notice, Tag } from "@/shared/ui/feedback";
 import { PageHeader, SectionIndex } from "@/shared/ui/layout";
 import { runAction } from "../../_lib/action";
 import { LIMITS } from "../../_lib/limits";
+import { errorQuery, signedError } from "@/app/_lib/flash";
 
 export const metadata: Metadata = { title: "Reviews" };
 const field = "border-0 border-b border-rule-strong bg-transparent py-2 focus:border-ink focus:outline-none";
@@ -23,9 +24,7 @@ async function submitReviewAction(formData: FormData) {
     LIMITS.reviewWrite,
   );
   revalidatePath("/account/reviews");
-  redirect(
-    "/account/reviews?" + (result.ok ? "done=1" : "error=" + encodeURIComponent(result.error.message)),
-  );
+  redirect("/account/reviews?" + (result.ok ? "done=1" : errorQuery(result.error.message)));
 }
 
 const stars = (n: number) => "★".repeat(n) + "☆".repeat(5 - n);
@@ -50,9 +49,9 @@ export default async function ReviewsPage({
         title="Reviews"
         lede="Only the two people in a completed rental can review each other. Reviews stay hidden until both have written one, or 14 days pass."
       />
-      {typeof params.error === "string" ? (
+      {signedError(params) ? (
         <Notice tone="danger" title="Not saved">
-          {params.error}
+          {signedError(params)}
         </Notice>
       ) : null}
       {params.done === "1" ? <Notice tone="success" title="Thank you — your review is saved" /> : null}

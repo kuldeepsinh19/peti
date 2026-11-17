@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { container } from "@/composition/container";
 import { formDataToObject } from "@/shared/contracts/validation";
 import { runAction } from "../_lib/action";
+import { errorQuery } from "@/app/_lib/flash";
 
 type ModerationCommand = "approve" | "reject" | "suspend" | "reinstate";
 const MODERATION: readonly ModerationCommand[] = ["approve", "reject", "suspend", "reinstate"];
@@ -16,10 +17,7 @@ export async function moderateListingAction(formData: FormData): Promise<void> {
     await container().listings[command](actor, formDataToObject(formData));
   });
   revalidatePath("/admin/listings");
-  redirect(
-    "/admin/listings?" +
-      (result.ok ? "done=" + command : "error=" + encodeURIComponent(result.error.message)),
-  );
+  redirect("/admin/listings?" + (result.ok ? "done=" + command : errorQuery(result.error.message)));
 }
 
 type AdminCommand =
@@ -50,7 +48,5 @@ export async function adminCommandAction(formData: FormData): Promise<void> {
     await container().admin[command](actor, formDataToObject(formData));
   });
   revalidatePath(path);
-  redirect(
-    path + "?" + (result.ok ? "done=" + command : "error=" + encodeURIComponent(result.error.message)),
-  );
+  redirect(path + "?" + (result.ok ? "done=" + command : errorQuery(result.error.message)));
 }

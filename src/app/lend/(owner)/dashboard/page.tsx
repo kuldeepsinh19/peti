@@ -14,6 +14,7 @@ import { ButtonLink } from "@/shared/ui/button";
 import { Notice, Tag } from "@/shared/ui/feedback";
 import { PageHeader } from "@/shared/ui/layout";
 import { StatusButton } from "../status-button";
+import { signedError } from "@/app/_lib/flash";
 
 export const metadata: Metadata = { title: "My outfits" };
 
@@ -137,9 +138,9 @@ export default async function MyOutfitsPage({
             {done.body}
           </Notice>
         ) : null}
-        {typeof query.error === "string" ? (
+        {signedError(query) ? (
           <Notice tone="danger" title="That did not work">
-            {query.error}
+            {signedError(query)}
           </Notice>
         ) : null}
         {!actor.phoneVerified || !actor.emailVerified ? (

@@ -25,6 +25,7 @@ import {
 } from "../../../actions";
 import { listingFormOptions } from "../../../form-options";
 import { StatusButton } from "../../../status-button";
+import { signedError } from "@/app/_lib/flash";
 
 export const metadata: Metadata = { title: "Edit listing" };
 
@@ -128,9 +129,9 @@ export default async function EditListingPage({
       {s === "DRAFT" || s === "REJECTED" ? <ListingSteps current="details" outfitId={view.id} /> : null}
 
       <div className="mt-8 flex flex-col gap-4">
-        {typeof query.error === "string" ? (
+        {signedError(query) ? (
           <Notice tone="danger" title="That did not work">
-            {query.error}
+            {signedError(query)}
           </Notice>
         ) : null}
         {query.created === "1" ? (

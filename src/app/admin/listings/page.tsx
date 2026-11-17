@@ -11,6 +11,7 @@ import { SubmitButton } from "@/shared/ui/submit-button";
 import { EmptyState, Notice, Tag } from "@/shared/ui/feedback";
 import { PageHeader } from "@/shared/ui/layout";
 import { moderateListingAction } from "../actions";
+import { signedError } from "@/app/_lib/flash";
 
 export const metadata: Metadata = { title: "Listing moderation" };
 
@@ -84,9 +85,9 @@ export default async function AdminListingsPage({
         ))}
       </nav>
       <div className="mt-6 flex flex-col gap-3">
-        {typeof params.error === "string" ? (
+        {signedError(params) ? (
           <Notice tone="danger" title="Not done">
-            {params.error}
+            {signedError(params)}
           </Notice>
         ) : null}
         {typeof params.done === "string" ? <Notice tone="success" title="Recorded in the audit log" /> : null}

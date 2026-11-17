@@ -7,6 +7,7 @@ import { SubmitButton } from "@/shared/ui/submit-button";
 import { EmptyState, Notice, Tag } from "@/shared/ui/feedback";
 import { PageHeader, SectionIndex } from "@/shared/ui/layout";
 import { addAddressAction, removeAddressAction, setDefaultAddressAction } from "../actions";
+import { signedError } from "@/app/_lib/flash";
 
 export const metadata: Metadata = { title: "Addresses" };
 
@@ -27,9 +28,9 @@ export default async function AddressesPage({
         title="Addresses"
         lede="Where owners hand over outfits. Only your locality appears on listings; the full address is shared with the other person once a booking is paid."
       />
-      {typeof params.error === "string" ? (
+      {signedError(params) ? (
         <Notice tone="danger" title="That did not work" className="mt-8">
-          {params.error}
+          {signedError(params)}
         </Notice>
       ) : null}
       <section aria-label="Saved addresses" className="mt-10">

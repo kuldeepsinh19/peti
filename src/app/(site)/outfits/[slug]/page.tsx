@@ -15,6 +15,7 @@ import { Notice } from "@/shared/ui/feedback";
 import { Page } from "@/shared/ui/layout";
 import { toggleSavedAction } from "../actions";
 import { BookingPanel } from "./booking-panel";
+import { signedError } from "@/app/_lib/flash";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +44,7 @@ export default async function OutfitPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { slug } = await params;
-  const { saveError } = await searchParams;
+  const saveError = signedError(await searchParams, "saveError");
   const { actor, outfit } = await load(slug);
   const { search, reviews: reviewsModule, bookings, clock } = container();
   const [savedIds, reviews, unavailable] = await Promise.all([
@@ -57,7 +58,7 @@ export default async function OutfitPage({
 
   return (
     <Page className="pt-8 lg:pt-12">
-      {typeof saveError === "string" ? (
+      {saveError ? (
         <Notice tone="danger" title="Could not update your saved outfits" className="mb-8">
           {saveError}
         </Notice>

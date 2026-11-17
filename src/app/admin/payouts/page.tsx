@@ -8,6 +8,7 @@ import { EmptyState, Notice, Tag } from "@/shared/ui/feedback";
 import { PageHeader } from "@/shared/ui/layout";
 import { Ledger } from "@/shared/ui/ledger";
 import { adminCommandAction } from "../actions";
+import { signedError } from "@/app/_lib/flash";
 
 export const metadata: Metadata = { title: "Payouts" };
 const field =
@@ -36,9 +37,9 @@ export default async function AdminPayoutsPage({
         title="Payouts"
         lede="Send each payout by UPI outside Peti, then record the reference here. Recording is audit-logged and cannot be undone from the interface."
       />
-      {typeof params.error === "string" ? (
+      {signedError(params) ? (
         <Notice tone="danger" title="Not recorded">
-          {params.error}
+          {signedError(params)}
         </Notice>
       ) : null}
       {params.done === "markPayoutPaid" ? <Notice tone="success" title="Payout recorded as paid" /> : null}

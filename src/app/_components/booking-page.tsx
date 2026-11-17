@@ -5,6 +5,7 @@ import type { UserActor } from "@/shared/application/actor";
 import { DomainError } from "@/shared/domain/errors";
 import { localDateInIndia } from "@/shared/domain/local-date";
 import { bookingCommandAction, conditionReportAction, startCheckoutAction } from "../_actions/bookings";
+import { signedError } from "@/app/_lib/flash";
 
 type Search = Record<string, string | string[] | undefined>;
 const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : undefined);
@@ -29,7 +30,7 @@ export async function BookingPage({
   const now = clock.now();
   const flash = {
     done: one(searchParams.done),
-    error: one(searchParams.error),
+    error: signedError(searchParams),
     payment: one(searchParams.payment),
   };
   return (

@@ -6,6 +6,7 @@ import { Notice, Tag } from "@/shared/ui/feedback";
 import { PageHeader } from "@/shared/ui/layout";
 import { Ledger } from "@/shared/ui/ledger";
 import { adminCommandAction } from "../actions";
+import { signedError } from "@/app/_lib/flash";
 
 export const metadata: Metadata = { title: "Users" };
 const day = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "Asia/Kolkata" });
@@ -24,9 +25,9 @@ export default async function AdminUsersPage({
   return (
     <div className="flex flex-col gap-8 pb-16">
       <PageHeader eyebrow="Administration" title="Users" />
-      {typeof params.error === "string" ? (
+      {signedError(params) ? (
         <Notice tone="danger" title="Not done">
-          {params.error}
+          {signedError(params)}
         </Notice>
       ) : null}
       {typeof params.done === "string" ? <Notice tone="success" title="Recorded in the audit log" /> : null}

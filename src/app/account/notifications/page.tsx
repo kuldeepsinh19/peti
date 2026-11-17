@@ -8,6 +8,7 @@ import { SubmitButton } from "@/shared/ui/submit-button";
 import { EmptyState, Notice } from "@/shared/ui/feedback";
 import { PageHeader } from "@/shared/ui/layout";
 import { runAction } from "../../_lib/action";
+import { errorQuery, signedError } from "@/app/_lib/flash";
 
 export const metadata: Metadata = { title: "Notifications" };
 const instant = new Intl.DateTimeFormat("en-IN", {
@@ -20,7 +21,7 @@ async function markAllReadAction() {
   "use server";
   const result = await runAction("markAllRead", (actor) => container().inbox.markAllRead(actor));
   revalidatePath("/account/notifications");
-  if (!result.ok) redirect(`/account/notifications?error=${encodeURIComponent(result.error.message)}`);
+  if (!result.ok) redirect("/account/notifications?" + errorQuery(result.error.message));
 }
 
 export default async function NotificationsPage({
@@ -29,7 +30,7 @@ export default async function NotificationsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const actor = await requireActorOrRedirect("/account/notifications");
-  const { error } = await searchParams;
+  const error = signedError(await searchParams);
   const items = await container().inbox.list(actor);
   const unread = items.filter((i) => !i.read).length;
   return (
@@ -45,7 +46,7 @@ export default async function NotificationsPage({
           ) : null
         }
       />
-      {typeof error === "string" ? (
+      {error ? (
         <Notice tone="danger" title="That did not work" className="mt-8">
           {error}
         </Notice>

@@ -8,6 +8,7 @@ import { formDataToObject } from "@/shared/contracts/validation";
 import { runAction } from "../_lib/action";
 import { LIMITS } from "../_lib/limits";
 import { isSafeReturnPath } from "../_lib/paths";
+import { errorQuery } from "@/app/_lib/flash";
 
 /** Booking pages live under three areas; refresh all views of a booking after any change. */
 function refresh(bookingId: string) {
@@ -72,9 +73,7 @@ export async function bookingCommandAction(formData: FormData): Promise<void> {
   );
   refresh(String(input.bookingId));
   const sep = returnTo.includes("?") ? "&" : "?";
-  redirect(
-    `${returnTo}${sep}${result.ok ? `done=${command}` : `error=${encodeURIComponent(result.error.message)}`}`,
-  );
+  redirect(`${returnTo}${sep}${result.ok ? `done=${command}` : errorQuery(result.error.message)}`);
 }
 
 /** Condition reports carry photographs, so they are submitted as multipart form data. */
@@ -112,5 +111,5 @@ export async function calendarBlockAction(formData: FormData): Promise<void> {
   );
   const path = `/lend/outfits/${String(input.outfitId)}/calendar`;
   revalidatePath(path);
-  redirect(`${path}?${result.ok ? "done=1" : `error=${encodeURIComponent(result.error.message)}`}`);
+  redirect(`${path}?${result.ok ? "done=1" : errorQuery(result.error.message)}`);
 }

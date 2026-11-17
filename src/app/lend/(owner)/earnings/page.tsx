@@ -7,6 +7,7 @@ import { EmptyState, Notice, Tag } from "@/shared/ui/feedback";
 import { DefinitionList, PageHeader, SectionIndex } from "@/shared/ui/layout";
 import { Ledger } from "@/shared/ui/ledger";
 import { savePayoutAccountAction } from "../actions";
+import { signedError } from "@/app/_lib/flash";
 
 export const metadata: Metadata = { title: "Earnings" };
 
@@ -32,9 +33,9 @@ export default async function EarningsPage({
         title="Earnings"
         lede="Payouts are created when a rental completes. In this early release an administrator pays them by UPI and records the reference here."
       />
-      {typeof params.error === "string" ? (
+      {signedError(params) ? (
         <Notice tone="danger" title="Not saved">
-          {params.error}
+          {signedError(params)}
         </Notice>
       ) : null}
       {params.saved === "1" ? <Notice tone="success" title="Payout details saved" /> : null}

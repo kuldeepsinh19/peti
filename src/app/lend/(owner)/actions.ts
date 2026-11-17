@@ -8,6 +8,7 @@ import { formDataToObject } from "@/shared/contracts/validation";
 import { runAction } from "../../_lib/action";
 import { LIMITS } from "../../_lib/limits";
 import { ownerReturnPath } from "../../_lib/paths";
+import { errorQuery } from "@/app/_lib/flash";
 
 export async function createListingAction(input: unknown): Promise<ActionResult<{ redirectTo: string }>> {
   return runAction(
@@ -109,7 +110,7 @@ export async function listingStatusAction(formData: FormData): Promise<void> {
   const result = await runAction(command, (actor) => container().listings[command](actor, input));
   revalidateListing(outfitId);
   const { redirect } = await import("next/navigation");
-  if (!result.ok) redirect(`${target}?error=${encodeURIComponent(result.error.message)}`);
+  if (!result.ok) redirect(`${target}?${errorQuery(result.error.message)}`);
   // The edit page has always stayed put on success; the other owner pages say what happened.
   if (formData.get("returnTo")) redirect(`${target}?done=${DONE_NOTICE[command]}`);
 }
@@ -122,7 +123,5 @@ export async function savePayoutAccountAction(formData: FormData): Promise<void>
   );
   revalidatePath("/lend/earnings");
   const { redirect } = await import("next/navigation");
-  redirect(
-    result.ok ? "/lend/earnings?saved=1" : "/lend/earnings?error=" + encodeURIComponent(result.error.message),
-  );
+  redirect(result.ok ? "/lend/earnings?saved=1" : "/lend/earnings?" + errorQuery(result.error.message));
 }

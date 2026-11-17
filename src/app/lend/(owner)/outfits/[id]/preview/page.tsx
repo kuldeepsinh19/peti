@@ -14,6 +14,7 @@ import { ButtonLink } from "@/shared/ui/button";
 import { Notice, Tag } from "@/shared/ui/feedback";
 import { PageHeader, SectionIndex } from "@/shared/ui/layout";
 import { StatusButton } from "../../../status-button";
+import { signedError } from "@/app/_lib/flash";
 
 export const metadata: Metadata = { title: "Preview your listing" };
 
@@ -61,9 +62,9 @@ export default async function ListingPreviewPage({
       <ListingSteps current="preview" outfitId={view.id} />
 
       <div className="mt-8 flex flex-col gap-4">
-        {typeof query.error === "string" ? (
+        {signedError(query) ? (
           <Notice tone="danger" title="Not submitted">
-            {query.error}
+            {signedError(query)}
           </Notice>
         ) : null}
         {s === "REJECTED" && view.moderationNote ? (

@@ -6,6 +6,7 @@ import { Notice, Tag } from "@/shared/ui/feedback";
 import { PageHeader, SectionIndex } from "@/shared/ui/layout";
 import { Ledger } from "@/shared/ui/ledger";
 import { adminCommandAction } from "../actions";
+import { signedError } from "@/app/_lib/flash";
 
 export const metadata: Metadata = { title: "Categories" };
 const field =
@@ -22,9 +23,9 @@ export default async function AdminCategoriesPage({
   return (
     <div className="flex flex-col gap-10 pb-16">
       <PageHeader eyebrow="Administration" title="Categories" />
-      {typeof params.error === "string" ? (
+      {signedError(params) ? (
         <Notice tone="danger" title="Not saved">
-          {params.error}
+          {signedError(params)}
         </Notice>
       ) : null}
       {typeof params.done === "string" ? <Notice tone="success" title="Saved" /> : null}

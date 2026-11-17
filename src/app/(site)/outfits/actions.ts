@@ -6,6 +6,7 @@ import { container } from "@/composition/container";
 import { formDataToObject } from "@/shared/contracts/validation";
 import { runAction } from "../../_lib/action";
 import { LIMITS } from "../../_lib/limits";
+import { errorQuery } from "@/app/_lib/flash";
 
 export async function toggleSavedAction(formData: FormData): Promise<void> {
   const input = formDataToObject(formData);
@@ -18,5 +19,5 @@ export async function toggleSavedAction(formData: FormData): Promise<void> {
   if (slug) revalidatePath(`/outfits/${slug}`);
   revalidatePath("/account/saved");
   // A refused toggle (signed out, rate limit) is reported on the page instead of silently doing nothing.
-  if (!result.ok && slug) redirect(`/outfits/${slug}?saveError=${encodeURIComponent(result.error.message)}`);
+  if (!result.ok && slug) redirect(`/outfits/${slug}?${errorQuery(result.error.message, "saveError")}`);
 }

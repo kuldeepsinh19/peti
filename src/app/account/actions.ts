@@ -7,6 +7,7 @@ import type { ActionResult } from "@/shared/contracts/action-result";
 import { formDataToObject } from "@/shared/contracts/validation";
 import { runAction } from "../_lib/action";
 import { LIMITS } from "../_lib/limits";
+import { errorQuery } from "@/app/_lib/flash";
 
 export async function updateProfileAction(input: unknown): Promise<ActionResult<undefined>> {
   const result = await runAction(
@@ -37,9 +38,7 @@ export async function addAddressAction(input: unknown): Promise<ActionResult<{ i
 /** Address buttons are plain forms: report a failure on the page instead of silently doing nothing. */
 function backToAddresses(result: ActionResult<unknown>): never {
   revalidatePath("/account/addresses");
-  redirect(
-    result.ok ? "/account/addresses" : `/account/addresses?error=${encodeURIComponent(result.error.message)}`,
-  );
+  redirect(result.ok ? "/account/addresses" : "/account/addresses?" + errorQuery(result.error.message));
 }
 
 export async function removeAddressAction(formData: FormData): Promise<void> {

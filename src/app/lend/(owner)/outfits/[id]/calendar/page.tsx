@@ -10,6 +10,7 @@ import { SubmitButton } from "@/shared/ui/submit-button";
 import { EmptyState, Notice, Tag } from "@/shared/ui/feedback";
 import { PageHeader, SectionIndex } from "@/shared/ui/layout";
 import { calendarBlockAction } from "../../../../../_actions/bookings";
+import { signedError } from "@/app/_lib/flash";
 
 export const metadata: Metadata = { title: "Availability calendar" };
 
@@ -46,9 +47,9 @@ export default async function CalendarPage({
           ". Block dates when the outfit is not available — blocks can never overlap a booking."
         }
       />
-      {typeof query.error === "string" ? (
+      {signedError(query) ? (
         <Notice tone="danger" title="Not blocked">
-          {query.error}
+          {signedError(query)}
         </Notice>
       ) : null}
       {query.done === "1" ? <Notice tone="success" title="Calendar updated" /> : null}
