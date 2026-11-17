@@ -102,10 +102,14 @@ export async function startCheckoutAction(bookingId: string) {
 export async function calendarBlockAction(formData: FormData): Promise<void> {
   const input = formDataToObject(formData);
   const remove = input.intent === "remove";
-  const result = await runAction("calendarBlock", async (actor): Promise<void> => {
-    if (remove) await container().bookings.removeOwnerBlock(actor, input);
-    else await container().bookings.addOwnerBlock(actor, input);
-  });
+  const result = await runAction(
+    "calendarBlock",
+    async (actor): Promise<void> => {
+      if (remove) await container().bookings.removeOwnerBlock(actor, input);
+      else await container().bookings.addOwnerBlock(actor, input);
+    },
+    LIMITS.calendarBlock,
+  );
   const path = `/lend/outfits/${String(input.outfitId)}/calendar`;
   revalidatePath(path);
   redirect(`${path}?${result.ok ? "done=1" : `error=${encodeURIComponent(result.error.message)}`}`);

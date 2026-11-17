@@ -25,12 +25,16 @@ export async function updateListingAction(
   outfitId: string,
   input: unknown,
 ): Promise<ActionResult<{ redirectTo: string }>> {
-  return runAction("updateListing", async (actor) => {
-    const result = await container().listings.updateListing(actor, outfitId, input);
-    revalidatePath("/lend/dashboard");
-    revalidatePath(`/lend/outfits/${outfitId}/edit`);
-    return { redirectTo: `/lend/outfits/${outfitId}/edit?saved=${result.sentForReview ? "review" : "1"}` };
-  });
+  return runAction(
+    "updateListing",
+    async (actor) => {
+      const result = await container().listings.updateListing(actor, outfitId, input);
+      revalidatePath("/lend/dashboard");
+      revalidatePath(`/lend/outfits/${outfitId}/edit`);
+      return { redirectTo: `/lend/outfits/${outfitId}/edit?saved=${result.sentForReview ? "review" : "1"}` };
+    },
+    LIMITS.listingWrite,
+  );
 }
 
 export async function uploadPhotoAction(formData: FormData): Promise<ActionResult<{ id: string }>> {
