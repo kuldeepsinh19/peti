@@ -176,3 +176,65 @@ describe("handover integrity (#5, #6)", () => {
     expect((await db.booking.findUniqueOrThrow({ where: { id: bookingId } })).status).toBe("ACTIVE");
   });
 });
+
+describe("editing a published listing (#8)", () => {
+  it("does not stop the owner approving requests that were already waiting", async () => {
+    const app = buildBookingApp();
+    const s = await scenario();
+    const { bookingId } = await app.bookings.request(s.renter, {
+      outfitId: s.outfit.id,
+      startDate: "2026-12-10",
+      days: 3,
+      acceptTerms: "on",
+    });
+    // Mark the seeded outfit as published, as approval would.
+    await db.outfit.update({ where: { id: s.outfit.id }, data: { publishedAt: new Date() } });
+    await db.outfit.update({ where: { id: s.outfit.id }, data: { status: "PENDING_REVIEW" } });
+
+    await app.bookings.approve(s.owner, { bookingId });
+    expect((await db.booking.findUniqueOrThrow({ where: { id: bookingId } })).status).toBe(
+      "AWAITING_PAYMENT",
+    );
+  });
+
+  it("brings a paused listing back paused after its edit is approved", async () => {
+    const app = buildApp();
+    const { owner, admin, form } = await listingSetup();
+    const { id } = await app.listings.createListing(owner, form);
+    for (let i = 0; i < 3; i++) await app.listings.addPhoto(owner, id, new Uint8Array([1]), "");
+    await app.listings.submitForReview(owner, { outfitId: id });
+    await app.listings.approve(admin, { outfitId: id });
+    await app.listings.pause(owner, { outfitId: id });
+
+    await app.listings.updateListing(owner, id, { ...form, title: "Ivory sherwani, newly altered" });
+    expect((await db.outfit.findUniqueOrThrow({ where: { id } })).status).toBe("PENDING_REVIEW");
+    await app.listings.approve(admin, { outfitId: id });
+    expect((await db.outfit.findUniqueOrThrow({ where: { id } })).status).toBe("PAUSED");
+
+    // An edit made while live goes back live.
+    await app.listings.resume(owner, { outfitId: id });
+    await app.listings.updateListing(owner, id, { ...form, title: "Ivory sherwani, altered again" });
+    await app.listings.approve(admin, { outfitId: id });
+    expect((await db.outfit.findUniqueOrThrow({ where: { id } })).status).toBe("ACTIVE");
+  });
+});
+
+describe("an outfit never published", () => {
+  it("cannot have a request approved while it is in review", async () => {
+    const app = buildBookingApp();
+    const s = await scenario();
+    const { bookingId } = await app.bookings.request(s.renter, {
+      outfitId: s.outfit.id,
+      startDate: "2026-12-10",
+      days: 3,
+      acceptTerms: "on",
+    });
+    await db.outfit.update({
+      where: { id: s.outfit.id },
+      data: { status: "PENDING_REVIEW", publishedAt: null },
+    });
+    await expect(app.bookings.approve(s.owner, { bookingId })).rejects.toMatchObject({
+      code: "OUTFIT_UNAVAILABLE",
+    });
+  });
+});

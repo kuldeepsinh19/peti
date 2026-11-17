@@ -27,7 +27,14 @@ export async function approveBooking(deps: BookingsDeps, actor: Actor, input: un
     const outfit = await store.lockOutfit(peek.outfitId);
     const booking = await loadBooking(store, bookingId);
     if (booking.ownerId !== user.userId) requireRole(booking, actor, []);
-    if (!outfit || (outfit.status !== "ACTIVE" && outfit.status !== "PAUSED")) {
+    // A published outfit whose edit is being reviewed is still the outfit the renter asked for: requests
+    // made before the edit can still be approved (they carry their own price snapshot).
+    const bookable =
+      outfit &&
+      (outfit.status === "ACTIVE" ||
+        outfit.status === "PAUSED" ||
+        (outfit.status === "PENDING_REVIEW" && outfit.published));
+    if (!bookable) {
       throw new PreconditionError("OUTFIT_UNAVAILABLE", "This outfit is no longer available to rent.");
     }
     if (booking.status === "PENDING_APPROVAL" && booking.expiresAt && booking.expiresAt <= now) {

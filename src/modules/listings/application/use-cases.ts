@@ -155,9 +155,11 @@ export function listingsUseCases(deps: ListingsDeps) {
         "A listing needs a photograph before it can go live.",
       );
     }
-    await setStatusOrConflict(outfitId, outfit.status, next, {
+    // An edit to a paused listing is approved back to PAUSED: approval never overrides the owner's pause.
+    const approvedTo = command === "approve" && outfit.resumePausedAfterReview ? "PAUSED" : next;
+    await setStatusOrConflict(outfitId, outfit.status, approvedTo, {
       moderationNote: note ?? null,
-      ...(command === "approve" ? { publishedAt: clock.now() } : {}),
+      ...(command === "approve" ? { publishedAt: clock.now(), resumePausedAfterReview: false } : {}),
     });
     await audit.record({
       actorUserId: admin.userId,
@@ -166,7 +168,7 @@ export function listingsUseCases(deps: ListingsDeps) {
       entityType: "outfit",
       entityId: outfitId,
       before: { status: outfit.status },
-      after: { status: next },
+      after: { status: approvedTo },
       ...(note ? { reason: note } : {}),
     });
     const message = DECISION_MESSAGES[command];
@@ -175,8 +177,12 @@ export function listingsUseCases(deps: ListingsDeps) {
         {
           userId: outfit.ownerId,
           type: `listing.${command}`,
-          subject: message.subject(outfit.title),
-          body: message.body(note),
+          ...(approvedTo === "PAUSED"
+            ? {
+                subject: `Changes approved for ${outfit.title}`,
+                body: "Your changes are approved. The listing is still paused: resume it from My outfits when you want renters to find it.",
+              }
+            : { subject: message.subject(outfit.title), body: message.body(note) }),
           link: command === "approve" ? `/outfits/${outfit.slug}` : `/lend/outfits/${outfitId}/edit`,
           // One message per decision, even if the action is retried.
           dedupeKey: `listing:${outfitId}:${command}:${clock.now().getTime()}`,
@@ -184,7 +190,7 @@ export function listingsUseCases(deps: ListingsDeps) {
         },
       ]);
     }
-    return next;
+    return approvedTo;
   }
 
   return {

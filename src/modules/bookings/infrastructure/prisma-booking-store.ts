@@ -91,16 +91,19 @@ export function prismaBookingStore(tx: Tx, notifications: NotificationWriter): B
         deposit_paise: number;
         turnaround_days: number;
         owner_suspended: boolean;
+        published: boolean;
       };
       // The owner's suspension is read through a subquery so the lock stays on the outfit row only.
       const rows = lock
         ? await tx.$queryRaw<Row[]>`
             SELECT id, owner_id, status::text AS status, title, deposit_paise, turnaround_days,
-                   COALESCE((SELECT banned FROM users WHERE id = owner_id), false) AS owner_suspended
+                   COALESCE((SELECT banned FROM users WHERE id = owner_id), false) AS owner_suspended,
+                   published_at IS NOT NULL AS published
             FROM outfits WHERE id = ${outfitId}::uuid FOR NO KEY UPDATE`
         : await tx.$queryRaw<Row[]>`
             SELECT id, owner_id, status::text AS status, title, deposit_paise, turnaround_days,
-                   COALESCE((SELECT banned FROM users WHERE id = owner_id), false) AS owner_suspended
+                   COALESCE((SELECT banned FROM users WHERE id = owner_id), false) AS owner_suspended,
+                   published_at IS NOT NULL AS published
             FROM outfits WHERE id = ${outfitId}::uuid`;
       const o = rows[0];
       return o
@@ -112,6 +115,7 @@ export function prismaBookingStore(tx: Tx, notifications: NotificationWriter): B
             depositPaise: o.deposit_paise,
             turnaroundDays: o.turnaround_days,
             ownerSuspended: o.owner_suspended,
+            published: o.published,
           }
         : null;
     },

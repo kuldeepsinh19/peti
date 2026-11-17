@@ -74,7 +74,11 @@ export function prismaListingRepository(db: Db): ListingRepository {
       return db.$transaction(async (tx) => {
         const swapped = await tx.outfit.updateMany({
           where: { id: outfitId, status: from },
-          data: { ...outfitColumns(data), status },
+          data: {
+            ...outfitColumns(data),
+            status,
+            ...(from === "PAUSED" && status === "PENDING_REVIEW" ? { resumePausedAfterReview: true } : {}),
+          },
         });
         if (swapped.count !== 1) return false;
         await tx.outfitMeasurement.upsert({
@@ -111,6 +115,7 @@ export function prismaListingRepository(db: Db): ListingRepository {
           title: true,
           description: true,
           categoryId: true,
+          resumePausedAfterReview: true,
           _count: { select: { images: true } },
         },
       });
@@ -229,7 +234,11 @@ export function prismaListingRepository(db: Db): ListingRepository {
     async setStatus(outfitId, from, status, extra = {}) {
       const result = await db.outfit.updateMany({
         where: { id: outfitId, status: from },
-        data: { status, ...extra },
+        data: {
+          status,
+          ...(from === "PAUSED" && status === "PENDING_REVIEW" ? { resumePausedAfterReview: true } : {}),
+          ...extra,
+        },
       });
       return result.count === 1;
     },

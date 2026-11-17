@@ -263,33 +263,35 @@ model OutfitCategory {
 }
 
 model Outfit {
-  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ownerId          String         @map("owner_id") @db.Uuid
-  categoryId       String         @map("category_id") @db.Uuid
-  slug             String         @unique
-  title            String
-  description      String
-  brand            String?
-  colour           String?
-  fabric           String?
-  sizeLabel        SizeLabel      @map("size_label")
-  conditionGrade   ConditionGrade @map("condition_grade")
+  id                      String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId                 String         @map("owner_id") @db.Uuid
+  categoryId              String         @map("category_id") @db.Uuid
+  slug                    String         @unique
+  title                   String
+  description             String
+  brand                   String?
+  colour                  String?
+  fabric                  String?
+  sizeLabel               SizeLabel      @map("size_label")
+  conditionGrade          ConditionGrade @map("condition_grade")
   /// The documented baseline condition, including known flaws.
-  conditionNotes   String         @map("condition_notes")
-  retailValuePaise Int            @map("retail_value_paise")
-  depositPaise     Int            @map("deposit_paise")
+  conditionNotes          String         @map("condition_notes")
+  retailValuePaise        Int            @map("retail_value_paise")
+  depositPaise            Int            @map("deposit_paise")
   /// Denormalised MIN(active price option), maintained by the listings module for sorting and filters.
-  minPricePaise    Int?           @map("min_price_paise")
-  turnaroundDays   Int            @default(1) @map("turnaround_days") @db.SmallInt
-  occasions        Occasion[]
-  localityId       String         @map("locality_id") @db.Uuid
-  pickupAddressId  String?        @map("pickup_address_id") @db.Uuid
-  status           OutfitStatus   @default(DRAFT)
-  moderationNote   String?        @map("moderation_note")
-  submittedAt      DateTime?      @map("submitted_at") @db.Timestamptz(3)
-  publishedAt      DateTime?      @map("published_at") @db.Timestamptz(3)
-  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  minPricePaise           Int?           @map("min_price_paise")
+  turnaroundDays          Int            @default(1) @map("turnaround_days") @db.SmallInt
+  occasions               Occasion[]
+  localityId              String         @map("locality_id") @db.Uuid
+  pickupAddressId         String?        @map("pickup_address_id") @db.Uuid
+  status                  OutfitStatus   @default(DRAFT)
+  /// The owner had paused it when an edit sent it back to review: approval restores PAUSED, not ACTIVE.
+  resumePausedAfterReview Boolean        @default(false) @map("resume_paused_after_review")
+  moderationNote          String?        @map("moderation_note")
+  submittedAt             DateTime?      @map("submitted_at") @db.Timestamptz(3)
+  publishedAt             DateTime?      @map("published_at") @db.Timestamptz(3)
+  createdAt               DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt               DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   owner         User                @relation(fields: [ownerId], references: [id])
   category      OutfitCategory      @relation(fields: [categoryId], references: [id])

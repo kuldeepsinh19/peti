@@ -32,6 +32,8 @@ export interface OwnedOutfit {
   description: string;
   categoryId: string;
   photoCount: number;
+  /** It was paused when an edit sent it to review: approval brings it back paused. */
+  resumePausedAfterReview: boolean;
 }
 
 export interface ListingPhoto {
@@ -104,7 +106,12 @@ export interface ListingRepository {
     outfitId: string,
     from: OutfitStatus,
     status: OutfitStatus,
-    extra?: { moderationNote?: string | null; publishedAt?: Date; submittedAt?: Date },
+    extra?: {
+      moderationNote?: string | null;
+      publishedAt?: Date;
+      submittedAt?: Date;
+      resumePausedAfterReview?: boolean;
+    },
   ): Promise<boolean>;
   addPhoto(outfitId: string, photo: Omit<ListingPhoto, "id" | "sortOrder">): Promise<ListingPhoto>;
   removePhoto(outfitId: string, photoId: string): Promise<ListingPhoto | null>;

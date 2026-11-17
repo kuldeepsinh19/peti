@@ -40,6 +40,8 @@ export interface LockedOutfit {
   turnaroundDays: number;
   /** The owner's account is suspended: the outfit cannot be requested. */
   ownerSuspended: boolean;
+  /** It has been published before (an outfit in review for an edit keeps its existing bookings going). */
+  published: boolean;
 }
 
 export interface NewBooking {
