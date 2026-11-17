@@ -5,6 +5,7 @@ import { requireAdmin } from "@/shared/application/authorization";
 import { ForbiddenError, NotFoundError, PreconditionError, ValidationError } from "@/shared/domain/errors";
 import { parseInput } from "@/shared/contracts/validation";
 import { UPI_VPA } from "@/modules/users";
+import { formatInr } from "@/shared/domain/money";
 
 const BOOKING_STATUSES = [
   "PENDING_APPROVAL",
@@ -348,6 +349,17 @@ export function adminUseCases({
         before: { status: payout.status, reference: payout.payoutReference },
         after: { status: "PAID", reference, netPaise: payout.netPaise, upiVpa: payout.upiVpa },
       });
+      await notifications?.enqueue([
+        {
+          userId: payout.ownerId,
+          type: "payout.paid",
+          subject: `Payout of ${formatInr(payout.netPaise)} sent`,
+          body: `Peti recorded a payout of ${formatInr(payout.netPaise)} to ${payout.upiVpa} with reference ${reference}. It can take a day to appear in your account. Tell Peti if it does not arrive.`,
+          link: "/lend/earnings",
+          dedupeKey: `payout:${payoutId}:paid:${reference}`,
+          channels: ["IN_APP", "EMAIL"],
+        },
+      ]);
     },
 
     /**

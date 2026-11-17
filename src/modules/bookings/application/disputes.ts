@@ -254,9 +254,27 @@ export async function addDisputeMessage(deps: BookingsDeps, actor: Actor, input:
   const data = parseInput(disputeMessageSchema, input);
   return deps.uow.run(async (store) => {
     const booking = await loadBooking(store, data.bookingId, false);
-    requireRole(booking, actor, ["RENTER", "OWNER", "ADMIN"]);
+    const role = requireRole(booking, actor, ["RENTER", "OWNER", "ADMIN"]);
     const dispute = await store.getOpenDispute(booking.id);
     if (!dispute) throw new NotFoundError("Open dispute");
-    await store.addDisputeMessage(dispute.id, requireUser(actor).userId, data.body);
+    const authorId = requireUser(actor).userId;
+    await store.addDisputeMessage(dispute.id, authorId, data.body);
+    // The other side (both sides, when an administrator writes) hears about it.
+    const at = deps.clock.now().getTime();
+    const to = [
+      ...(role !== "OWNER" ? [{ userId: booking.ownerId, link: `/lend/requests/${booking.id}` }] : []),
+      ...(role !== "RENTER" ? [{ userId: booking.renterId, link: `/account/rentals/${booking.id}` }] : []),
+    ];
+    await store.notify(
+      to.map((r) => ({
+        userId: r.userId,
+        type: "dispute.message",
+        subject: `New message about the dispute on ${booking.reference}`,
+        body: "There is a new message in the dispute. Read it, and reply if you need to, on the booking page.",
+        link: r.link,
+        dedupeKey: `${booking.id}:dispute-message:${authorId}:${at}`,
+        channels: ["IN_APP", "EMAIL"] as const,
+      })),
+    );
   });
 }

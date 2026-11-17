@@ -67,6 +67,11 @@ const DECISION_MESSAGES: Partial<
     body: (note) =>
       `A Peti administrator asked for changes before it goes live: ${note ?? "see the listing"}. Edit it and submit it again.`,
   },
+  reinstate: {
+    subject: (title) => `${title} is no longer suspended`,
+    body: () =>
+      "A Peti administrator lifted the suspension. The listing is paused: resume it from My outfits when you want renters to find it.",
+  },
   suspend: {
     subject: (title) => `${title} is suspended`,
     body: (note) =>

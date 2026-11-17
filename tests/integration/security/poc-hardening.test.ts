@@ -10,7 +10,9 @@ import { usersUseCases } from "@/modules/users";
 import { prismaUserRepository } from "@/modules/users/infrastructure/prisma-user-repository";
 import type { UserActor } from "@/shared/application/actor";
 import { prismaAuditLog } from "@/shared/infrastructure/audit";
-import { buildApp } from "../support/app";
+import { listingsUseCases } from "@/modules/listings";
+import { prismaListingRepository } from "@/modules/listings/infrastructure/prisma-listing-repository";
+import { buildApp, clock, memoryPhotos } from "../support/app";
 import { buildBookingApp, photos, scenario } from "../support/booking-app";
 import { db, resetDatabase } from "../support/db";
 import { listingSetup } from "../support/listing-fixtures";
@@ -431,5 +433,64 @@ describe("suspending a member with open bookings (#16)", () => {
     });
     expect(notices.length).toBe(2);
     expect(notices[0]!.link).toBe(`/account/rentals/${bookingId}`);
+  });
+});
+
+describe("notifications that were missing (#27, #28, #29)", () => {
+  it("tells the owner their payout was paid, with the reference", async () => {
+    const { app, owner, admin, bookingId } = await returnedRental();
+    await app.bookings.confirmReturn(owner, { bookingId });
+    await db.ownerPayoutAccount.create({
+      data: { userId: owner.userId, upiVpa: "owner.one@okbank", accountHolderName: "Owner One" },
+    });
+    const payout = await db.payout.findFirstOrThrow({ where: { bookingId } });
+    const adminCases = adminUseCases({
+      admin: prismaAdminRepository(db),
+      audit: prismaAuditLog(db),
+      clock: app.clock,
+      notifications: prismaNotificationWriter(db),
+    });
+    await adminCases.markPayoutPaid(admin, { payoutId: payout.id, reference: "UTR123456789" });
+    const notice = await db.notification.findFirstOrThrow({
+      where: { userId: owner.userId, type: "payout.paid", channel: "IN_APP" },
+    });
+    expect(notice.body).toContain("UTR123456789");
+  });
+
+  it("tells the other party about a new dispute message", async () => {
+    const { app, owner, renter, bookingId } = await returnedRental();
+    await app.bookings.openDispute(owner, {
+      bookingId,
+      kind: "DAMAGE",
+      description: "The hem is torn along twenty centimetres.",
+      claimedRupees: "2000",
+    });
+    await app.bookings.addDisputeMessage(renter, { bookingId, body: "The tear was there at handover." });
+    expect(
+      await db.notification.count({ where: { userId: owner.userId, type: "dispute.message" } }),
+    ).toBeGreaterThan(0);
+    expect(await db.notification.count({ where: { userId: renter.userId, type: "dispute.message" } })).toBe(
+      0,
+    );
+  });
+
+  it("tells the owner when a suspended listing is reinstated", async () => {
+    const listingApp = listingsUseCases({
+      listings: prismaListingRepository(db),
+      photos: memoryPhotos,
+      audit: prismaAuditLog(db),
+      clock,
+      notifications: prismaNotificationWriter(db),
+    });
+    const { owner, admin, form } = await listingSetup();
+    const { id } = await listingApp.createListing(owner, form);
+    for (let i = 0; i < 3; i++) await listingApp.addPhoto(owner, id, new Uint8Array([1]), "");
+    await listingApp.submitForReview(owner, { outfitId: id });
+    await listingApp.approve(admin, { outfitId: id });
+    await listingApp.suspend(admin, { outfitId: id, note: "Checking a report about this listing." });
+    await listingApp.reinstate(admin, { outfitId: id });
+    expect(
+      await db.notification.count({ where: { userId: owner.userId, type: "listing.reinstate" } }),
+    ).toBeGreaterThan(0);
   });
 });
