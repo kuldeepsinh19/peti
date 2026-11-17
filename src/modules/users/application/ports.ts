@@ -39,8 +39,8 @@ export interface UserRepository {
   getAccountOverview(userId: string): Promise<AccountOverview | null>;
   updateProfile(userId: string, input: UpdateProfileInput): Promise<void>;
   listAddresses(userId: string): Promise<AddressView[]>;
-  countAddresses(userId: string): Promise<number>;
-  addAddress(userId: string, input: AddressInput): Promise<AddressView>;
+  /** Adds an address unless the user already has `max` (checked under the user's row lock). */
+  addAddress(userId: string, input: AddressInput, max: number): Promise<AddressView | "LIMIT">;
   /** Soft-deletes; returns false when the address does not belong to the user. */
   removeAddress(userId: string, addressId: string): Promise<boolean>;
   /** A listing that is not archived collects from this address. */

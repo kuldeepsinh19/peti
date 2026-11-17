@@ -60,10 +60,11 @@ export function usersUseCases({ users, audit, notifications }: UsersDeps) {
           localityId: ["Choose a locality."],
         });
       }
-      if ((await users.countAddresses(user.userId)) >= MAX_ADDRESSES) {
+      const added = await users.addAddress(user.userId, data, MAX_ADDRESSES);
+      if (added === "LIMIT") {
         throw new PreconditionError("ADDRESS_LIMIT", `You can keep up to ${MAX_ADDRESSES} addresses.`);
       }
-      return users.addAddress(user.userId, data);
+      return added;
     },
 
     async removeAddress(actor: Actor, input: unknown): Promise<void> {

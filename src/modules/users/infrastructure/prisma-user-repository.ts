@@ -95,11 +95,12 @@ export function prismaUserRepository(db: Db): UserRepository {
       return rows.map(toAddressView);
     },
 
-    countAddresses: (userId) => db.address.count({ where: { userId, deletedAt: null } }),
-
-    async addAddress(userId, input) {
+    async addAddress(userId, input, max) {
       return db.$transaction(async (tx) => {
+        // Serialises one user's additions: the cap and the single default hold under concurrent requests.
+        await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId}::uuid FOR NO KEY UPDATE`;
         const existing = await tx.address.count({ where: { userId, deletedAt: null } });
+        if (existing >= max) return "LIMIT" as const;
         const makeDefault = input.isDefault || existing === 0;
         if (makeDefault) {
           await tx.address.updateMany({ where: { userId, isDefault: true }, data: { isDefault: false } });

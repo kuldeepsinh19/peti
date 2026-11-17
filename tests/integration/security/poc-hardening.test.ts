@@ -395,6 +395,30 @@ describe("removing an address (#14)", () => {
   });
 });
 
+describe("adding addresses at once (#20)", () => {
+  it("never keeps more than five, and only one is the default", async () => {
+    const { owner, ownerUser, locality } = await listingSetup();
+    await db.address.deleteMany({ where: { userId: ownerUser.id } });
+    const users = usersUseCases({ users: prismaUserRepository(db) });
+    const results = await Promise.allSettled(
+      Array.from({ length: 8 }, (_, i) =>
+        users.addAddress(owner, {
+          line1: `${i + 1} Test Society`,
+          localityId: locality.id,
+          pincode: "380015",
+        }),
+      ),
+    );
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(5);
+    for (const r of results.filter((r) => r.status === "rejected")) {
+      expect(r).toMatchObject({ reason: { code: "ADDRESS_LIMIT" } });
+    }
+    const rows = await db.address.findMany({ where: { userId: ownerUser.id, deletedAt: null } });
+    expect(rows).toHaveLength(5);
+    expect(rows.filter((a) => a.isDefault)).toHaveLength(1);
+  });
+});
+
 describe("contact details after a rental (#15)", () => {
   it("are hidden two weeks after completion", async () => {
     const { app, owner, renter, bookingId } = await returnedRental();
