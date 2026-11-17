@@ -111,8 +111,10 @@ export async function listingStatusAction(formData: FormData): Promise<void> {
 }
 
 export async function savePayoutAccountAction(formData: FormData): Promise<void> {
-  const result = await runAction("savePayoutAccount", (actor) =>
-    container().users.savePayoutAccount(actor, formDataToObject(formData)),
+  const result = await runAction(
+    "savePayoutAccount",
+    (actor) => container().users.savePayoutAccount(actor, formDataToObject(formData)),
+    LIMITS.payoutAccount,
   );
   revalidatePath("/lend/earnings");
   const { redirect } = await import("next/navigation");

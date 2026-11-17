@@ -11,4 +11,7 @@ export const LIMITS = {
   disputeWrite: { name: "dispute-write", limit: 20, windowSeconds: 3600 },
   reviewWrite: { name: "review-write", limit: 20, windowSeconds: 3600 },
   savedToggle: { name: "saved-toggle", limit: 120, windowSeconds: 3600 },
+  accountWrite: { name: "account-write", limit: 30, windowSeconds: 3600 },
+  payoutAccount: { name: "payout-account", limit: 5, windowSeconds: 3600 },
+  calendarBlock: { name: "calendar-block", limit: 60, windowSeconds: 3600 },
 } as const satisfies Record<string, RateLimitRule>;

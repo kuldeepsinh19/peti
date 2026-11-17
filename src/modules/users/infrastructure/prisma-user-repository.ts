@@ -121,6 +121,9 @@ export function prismaUserRepository(db: Db): UserRepository {
       });
     },
 
+    addressInUse: async (addressId) =>
+      (await db.outfit.count({ where: { pickupAddressId: addressId, status: { not: "ARCHIVED" } } })) > 0,
+
     async removeAddress(userId, addressId) {
       const result = await db.address.updateMany({
         where: { id: addressId, userId, deletedAt: null },

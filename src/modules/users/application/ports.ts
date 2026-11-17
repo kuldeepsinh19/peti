@@ -43,6 +43,8 @@ export interface UserRepository {
   addAddress(userId: string, input: AddressInput): Promise<AddressView>;
   /** Soft-deletes; returns false when the address does not belong to the user. */
   removeAddress(userId: string, addressId: string): Promise<boolean>;
+  /** A listing that is not archived collects from this address. */
+  addressInUse(addressId: string): Promise<boolean>;
   setDefaultAddress(userId: string, addressId: string): Promise<boolean>;
   upsertPayoutAccount(userId: string, input: PayoutAccountInput): Promise<void>;
   localityExists(localityId: string): Promise<boolean>;
