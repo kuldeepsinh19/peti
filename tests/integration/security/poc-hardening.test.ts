@@ -654,3 +654,33 @@ describe("an outfit's calendar (#32)", () => {
     await expect(bookingApp.bookings.calendar(s.owner, "nope")).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });
+
+describe("saving an outfit for later (#33)", () => {
+  it("is possible only for a published outfit, and a double click saves it once", async () => {
+    const app = buildApp();
+    const s = await listingSetup();
+    const { id: draft } = await app.listings.createListing(s.owner, s.form);
+    await expect(app.search.setSaved(s.stranger, { outfitId: draft, save: "1" })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+
+    const live = await publishListing(
+      app,
+      { ...s.form, title: "Teal Banarasi silk saree" },
+      s.owner,
+      s.admin,
+    );
+    const twice = await Promise.allSettled([
+      app.search.setSaved(s.stranger, { outfitId: live, save: "1" }),
+      app.search.setSaved(s.stranger, { outfitId: live, save: "1" }),
+    ]);
+    expect(twice.map((r) => r.status)).toEqual(["fulfilled", "fulfilled"]);
+    expect(await db.savedOutfit.count({ where: { userId: s.stranger.userId } })).toBe(1);
+
+    // Removing always works, even after the listing is paused.
+    await db.outfit.update({ where: { id: live }, data: { status: "PAUSED" } });
+    await app.search.setSaved(s.stranger, { outfitId: live, save: "0" });
+    await app.search.setSaved(s.stranger, { outfitId: live, save: "0" });
+    expect(await db.savedOutfit.count({ where: { userId: s.stranger.userId } })).toBe(0);
+  });
+});

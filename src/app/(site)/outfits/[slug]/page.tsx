@@ -117,6 +117,7 @@ export default async function OutfitPage({
                 <form action={toggleSavedAction}>
                   <input type="hidden" name="outfitId" value={outfit.id} />
                   <input type="hidden" name="slug" value={outfit.slug} />
+                  <input type="hidden" name="save" value={saved ? "0" : "1"} />
                   <SubmitButton variant="quiet">
                     {saved ? "Saved — remove from your list" : "Save for later"}
                   </SubmitButton>

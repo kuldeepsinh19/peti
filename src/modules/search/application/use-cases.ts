@@ -37,10 +37,15 @@ export function searchUseCases({ catalogue, clock }: { catalogue: CatalogueQueri
       return outfit;
     },
 
-    async toggleSaved(actor: Actor, input: unknown) {
+    /** Saves or removes an outfit. The form says which (the state the user saw), so repeating it is harmless. */
+    async setSaved(actor: Actor, input: unknown): Promise<void> {
       const user = requireUser(actor);
-      const { outfitId } = parseInput(z.object({ outfitId: z.uuid() }), input);
-      return catalogue.toggleSaved(user.userId, outfitId);
+      const { outfitId, save } = parseInput(
+        z.object({ outfitId: z.uuid(), save: z.enum(["1", "0"]) }),
+        input,
+      );
+      if (save === "0") return catalogue.unsave(user.userId, outfitId);
+      if (!(await catalogue.save(user.userId, outfitId))) throw new NotFoundError("Outfit");
     },
 
     saved: (actor: Actor) => catalogue.savedOutfits(requireUser(actor).userId),

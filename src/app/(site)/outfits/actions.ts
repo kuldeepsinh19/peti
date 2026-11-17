@@ -12,7 +12,7 @@ export async function toggleSavedAction(formData: FormData): Promise<void> {
   const input = formDataToObject(formData);
   const result = await runAction(
     "toggleSaved",
-    (actor) => container().search.toggleSaved(actor, input),
+    (actor) => container().search.setSaved(actor, input),
     LIMITS.savedToggle,
   );
   const slug = typeof input.slug === "string" && /^[a-z0-9-]{1,200}$/.test(input.slug) ? input.slug : null;

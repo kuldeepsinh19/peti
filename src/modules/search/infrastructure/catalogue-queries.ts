@@ -270,14 +270,18 @@ export function prismaCatalogueQueries(db: Db): CatalogueQueries {
       return rows.map(toCard);
     },
 
-    async toggleSaved(userId, outfitId) {
-      const existing = await db.savedOutfit.findUnique({ where: { userId_outfitId: { userId, outfitId } } });
-      if (existing) {
-        await db.savedOutfit.delete({ where: { userId_outfitId: { userId, outfitId } } });
-        return false;
-      }
-      await db.savedOutfit.create({ data: { userId, outfitId } });
+    // Idempotent: a double click, or the same form sent twice, leaves one saved row.
+    async save(userId, outfitId) {
+      const visible = await db.outfit.count({
+        where: { id: outfitId, status: "ACTIVE", owner: { banned: { not: true } } },
+      });
+      if (visible === 0) return false;
+      await db.savedOutfit.createMany({ data: [{ userId, outfitId }], skipDuplicates: true });
       return true;
+    },
+
+    async unsave(userId, outfitId) {
+      await db.savedOutfit.deleteMany({ where: { userId, outfitId } });
     },
 
     async recentlyListed(limit) {

@@ -80,6 +80,8 @@ export interface CatalogueQueries {
   outfitBySlug(slug: string): Promise<OutfitDetail | null>;
   savedOutfitIds(userId: string): Promise<Set<string>>;
   savedOutfits(userId: string): Promise<OutfitCard[]>;
-  toggleSaved(userId: string, outfitId: string): Promise<boolean>;
+  /** Saves the outfit only while it is published (and its owner is not suspended); false otherwise. */
+  save(userId: string, outfitId: string): Promise<boolean>;
+  unsave(userId: string, outfitId: string): Promise<void>;
   recentlyListed(limit: number): Promise<OutfitCard[]>;
 }
