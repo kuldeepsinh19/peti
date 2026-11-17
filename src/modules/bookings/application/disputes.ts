@@ -60,6 +60,12 @@ function assertCanOpen(
   if (booking.status === "RETURNED" && booking.inspectionDeadline && now > booking.inspectionDeadline) {
     throw new PreconditionError("WINDOW_CLOSED", "The inspection window has closed.");
   }
+  if (kind === "LATE_FEE_CONTESTED" && !(booking.lateFeePaise && booking.lateFeePaise > 0)) {
+    throw new PreconditionError(
+      "NO_LATE_FEE",
+      "No late fee was charged on this rental, so there is nothing to contest.",
+    );
+  }
   const carriesClaim = kind === "DAMAGE" || kind === "MISSING_ITEMS";
   if (!carriesClaim && claimedPaise) {
     throw new ValidationError("Only damage or missing-item claims carry an amount.", {

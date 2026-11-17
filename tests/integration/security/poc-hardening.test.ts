@@ -419,6 +419,21 @@ describe("adding addresses at once (#20)", () => {
   });
 });
 
+describe("contesting a late fee (#22)", () => {
+  it("is refused when the rental came back on time and no fee was charged", async () => {
+    const { app, renter, bookingId } = await returnedRental();
+    expect((await db.booking.findUniqueOrThrow({ where: { id: bookingId } })).lateFeePaise ?? 0).toBe(0);
+    await expect(
+      app.bookings.openDispute(renter, {
+        bookingId,
+        kind: "LATE_FEE_CONTESTED",
+        description: "I returned it on the day it was due, so there is nothing to pay.",
+      }),
+    ).rejects.toMatchObject({ code: "NO_LATE_FEE" });
+    expect(await db.dispute.count({ where: { bookingId } })).toBe(0);
+  });
+});
+
 describe("contact details after a rental (#15)", () => {
   it("are hidden two weeks after completion", async () => {
     const { app, owner, renter, bookingId } = await returnedRental();

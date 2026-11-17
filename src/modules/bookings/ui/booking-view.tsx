@@ -94,6 +94,7 @@ export function BookingView({
   const role = b.viewerRole;
   const policy = readPolicySnapshot(b.policy);
   const handover = b.reports.find((r) => r.kind === "HANDOVER");
+  const disputeKinds = disputeKindsFor(b.status, role, b.money.lateFeePaise);
   const returned = b.reports.find((r) => r.kind === "RETURN");
   const counterpart = role === "RENTER" ? b.owner : b.renter;
   const cmd = { command, bookingId: b.id, returnTo };
@@ -352,7 +353,7 @@ export function BookingView({
         {(b.status === "CONFIRMED" && (today >= b.startDate || handover !== undefined)) ||
         b.status === "ACTIVE" ||
         b.status === "RETURNED" ? (
-          role !== "ADMIN" ? (
+          role !== "ADMIN" && disputeKinds.length > 0 ? (
             <details className="border-t border-rule pt-4">
               <summary className="cursor-pointer text-sm text-graphite">Report a problem</summary>
               <div className="mt-4">
@@ -363,7 +364,7 @@ export function BookingView({
                       <option value="" disabled>
                         Choose
                       </option>
-                      {disputeKindsFor(b.status, role).map(([value, text]) => (
+                      {disputeKinds.map(([value, text]) => (
                         <option key={value} value={value}>
                           {text}
                         </option>
@@ -672,7 +673,7 @@ function dayBefore(date: string): string {
   return d.toISOString().slice(0, 10);
 }
 
-function disputeKindsFor(status: string, role: Role): Array<[string, string]> {
+function disputeKindsFor(status: string, role: Role, lateFeePaise: number | null): Array<[string, string]> {
   const all: Record<string, string> = {
     HANDOVER_FAILED: "The handover did not happen",
     NOT_AS_DESCRIBED: "The outfit is not as described",
@@ -691,5 +692,7 @@ function disputeKindsFor(status: string, role: Role): Array<[string, string]> {
     ACTIVE: { OWNER: ["NOT_RETURNED", "OTHER"], RENTER: ["RETURN_NOT_ACKNOWLEDGED", "OTHER"] },
     RETURNED: { OWNER: ["DAMAGE", "MISSING_ITEMS"], RENTER: ["LATE_FEE_CONTESTED"] },
   };
-  return (allowed[status]?.[role] ?? []).map((k) => [k, all[k]!]);
+  return (allowed[status]?.[role] ?? [])
+    .filter((k) => k !== "LATE_FEE_CONTESTED" || (lateFeePaise ?? 0) > 0)
+    .map((k) => [k, all[k]!]);
 }
