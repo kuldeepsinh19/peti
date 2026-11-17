@@ -1,11 +1,11 @@
 import type { Actor } from "@/shared/application/actor";
 import { requireAdmin, requireUser } from "@/shared/application/authorization";
-import { NotFoundError, PreconditionError, ValidationError } from "@/shared/domain/errors";
+import { ForbiddenError, NotFoundError, PreconditionError, ValidationError } from "@/shared/domain/errors";
 import { addDays, localDateInIndia } from "@/shared/domain/local-date";
 import { parseInput } from "@/shared/contracts/validation";
 import type { BookingActorRole } from "../domain/booking-state-machine";
 import { disputeMessageSchema, openDisputeSchema, resolveDisputeSchema } from "./contracts";
-import { applyTransition, loadBooking, requireRole, settleMoney } from "./core";
+import { roleOn, applyTransition, loadBooking, requireRole, settleMoney } from "./core";
 import type { BookingRecord, BookingsDeps, BookingStore } from "./ports";
 
 type Kind = (typeof openDisputeSchema)["shape"]["kind"]["options"][number];
@@ -225,6 +225,10 @@ export async function resolveDispute(deps: BookingsDeps, actor: Actor, input: un
   const now = deps.clock.now();
   return deps.uow.run(async (store) => {
     const booking = await loadBooking(store, data.bookingId);
+    // An administrator who is the owner or renter of this rental is a party to the dispute, not its judge.
+    if (roleOn(booking, actor) !== "ADMIN") {
+      throw new ForbiddenError("You are part of this rental, so another administrator must decide it.");
+    }
     const retained = data.retainedFeeRupees * 100;
     const withheld = data.depositWithheldRupees * 100;
     const errors: Record<string, string[]> = {};

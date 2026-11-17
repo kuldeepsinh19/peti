@@ -140,6 +140,9 @@ export function listingsUseCases(deps: ListingsDeps) {
     const { outfitId, note } = parseInput(moderationSchema, input);
     const outfit = await listings.findOwned(outfitId);
     if (!outfit) throw new NotFoundError("Listing");
+    if (outfit.ownerId === admin.userId) {
+      throw new ForbiddenError("This listing is yours, so another administrator must review it.");
+    }
     if ((command === "reject" || command === "suspend") && !note) {
       throw new ValidationError("Please give a reason.", {
         note: ["A reason is required — the owner will see it."],

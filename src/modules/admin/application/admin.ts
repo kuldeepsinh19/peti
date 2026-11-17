@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Actor } from "@/shared/application/actor";
 import type { AuditLog } from "@/shared/application/audit";
 import { requireAdmin } from "@/shared/application/authorization";
-import { NotFoundError, PreconditionError, ValidationError } from "@/shared/domain/errors";
+import { ForbiddenError, NotFoundError, PreconditionError, ValidationError } from "@/shared/domain/errors";
 import { parseInput } from "@/shared/contracts/validation";
 import { UPI_VPA } from "@/modules/users";
 
@@ -128,6 +128,7 @@ export interface AdminRepository {
     id: string;
     status: string;
     bookingId: string;
+    ownerId: string;
     netPaise: number;
     upiVpa: string | null;
     payoutReference: string | null;
@@ -164,6 +165,9 @@ const payoutSchema = z.object({
   payoutId: z.uuid(),
   reference: z.string().trim().min(4, "Enter the UPI or bank reference (UTR).").max(64),
 });
+/** An administrator who also lends never records their own payouts. */
+const OWN_PAYOUT = "This payout is yours, so another administrator must record it.";
+
 const payoutFailureSchema = z.object({
   payoutId: z.uuid(),
   reason: z.string().trim().min(5, "Say what happened, for the record.").max(500),
@@ -277,6 +281,7 @@ export function adminUseCases({
       const { payoutId, reference } = parseInput(payoutSchema, input);
       const payout = await admin.findPayout(payoutId);
       if (!payout) throw new NotFoundError("Payout");
+      if (payout.ownerId === me.userId) throw new ForbiddenError(OWN_PAYOUT);
       if (payout.status !== "PENDING" && payout.status !== "FAILED")
         throw new PreconditionError("PAYOUT_NOT_PENDING", "This payout is not waiting to be paid.");
       if (payout.onHold) {
@@ -316,6 +321,7 @@ export function adminUseCases({
       const { payoutId, reason } = parseInput(payoutFailureSchema, input);
       const payout = await admin.findPayout(payoutId);
       if (!payout) throw new NotFoundError("Payout");
+      if (payout.ownerId === me.userId) throw new ForbiddenError(OWN_PAYOUT);
       if (payout.status !== "PAID")
         throw new PreconditionError("PAYOUT_NOT_PAID", "Only a payout recorded as paid can fail.");
       if (!(await admin.recordPayoutFailure(payoutId, reason))) {
