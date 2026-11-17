@@ -14,7 +14,7 @@ import { listingsUseCases } from "@/modules/listings";
 import { prismaListingRepository } from "@/modules/listings/infrastructure/prisma-listing-repository";
 import { buildApp, clock, memoryPhotos } from "../support/app";
 import { buildBookingApp, photos, scenario } from "../support/booking-app";
-import { db, resetDatabase } from "../support/db";
+import { db, insertBookingRow, resetDatabase } from "../support/db";
 import { listingSetup, publishListing } from "../support/listing-fixtures";
 
 beforeEach(async () => {
@@ -592,5 +592,45 @@ describe("a malformed id in the address bar (#24)", () => {
       await expect(app.listings.getForEdit(s.owner, id)).rejects.toMatchObject({ code: "NOT_FOUND" });
       await expect(bookingApp.bookings.detail(s.owner, id)).rejects.toMatchObject({ code: "NOT_FOUND" });
     }
+  });
+});
+
+describe("photographs of a listing that is not published (#25)", () => {
+  it("are shown only to its owner, administrators and renters who booked it", async () => {
+    const app = buildApp();
+    const s = await listingSetup();
+    const { id } = await app.listings.createListing(s.owner, s.form);
+    for (let i = 0; i < 3; i++) await app.listings.addPhoto(s.owner, id, new Uint8Array([1]), "");
+    const { storageKey } = await db.outfitImage.findFirstOrThrow({ where: { outfitId: id } });
+    const as = (actor: UserActor | null) => app.listings.photoVisibility(storageKey, async () => actor);
+
+    // A draft.
+    expect(await as(null)).toBeNull();
+    expect(await as(s.stranger)).toBeNull();
+    expect(await as(s.owner)).toBe("private");
+    expect(await as(s.admin)).toBe("private");
+
+    // Published: anyone, and cacheable.
+    await app.listings.submitForReview(s.owner, { outfitId: id });
+    await app.listings.approve(s.admin, { outfitId: id });
+    expect(await as(null)).toBe("public");
+    // ...unless its owner is suspended (search hides those listings too).
+    await db.user.update({ where: { id: s.owner.userId }, data: { banned: true } });
+    expect(await as(null)).toBeNull();
+    expect(await as(s.admin)).toBe("private");
+    await db.user.update({ where: { id: s.owner.userId }, data: { banned: false } });
+
+    // Paused: a renter who booked it still sees it on their booking page; others do not.
+    await db.outfit.update({ where: { id }, data: { status: "PAUSED" } });
+    expect(await as(null)).toBeNull();
+    expect(await as(s.stranger)).toBeNull();
+    await insertBookingRow({ outfitId: id, ownerId: s.owner.userId, renterId: s.stranger.userId });
+    expect(await as(s.stranger)).toBe("private");
+  });
+
+  it("are not served for a key that is no listing's photograph", async () => {
+    const app = buildApp();
+    const s = await listingSetup();
+    expect(await app.listings.photoVisibility("outfits/x/0.jpg", async () => s.admin)).toBeNull();
   });
 });

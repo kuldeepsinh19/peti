@@ -337,6 +337,26 @@ export function listingsUseCases(deps: ListingsDeps) {
 
     listMine: (actor: Actor) => listings.listForOwner(requireUser(actor).userId),
 
+    /**
+     * Who may see a stored listing photograph (POC hardening #25). "public" when the listing is published;
+     * "private" for its owner, an administrator, or a renter who booked it while it is not (or while its owner
+     * is suspended); null otherwise
+     * (and for a key that is not a listing photograph). The viewer is looked up only when needed.
+     */
+    async photoVisibility(
+      storageKey: string,
+      viewer: () => Promise<Actor | null>,
+    ): Promise<"public" | "private" | null> {
+      const photo = await listings.photoOwner(storageKey);
+      if (!photo) return null;
+      // Search hides the listings of a suspended member, so their photographs are not public either.
+      if (photo.status === "ACTIVE" && !photo.ownerSuspended) return "public";
+      const actor = await viewer();
+      if (!actor || actor.kind !== "user") return null;
+      if (actor.isAdmin || actor.userId === photo.ownerId) return "private";
+      return (await listings.hasBookedOutfit(actor.userId, photo.outfitId)) ? "private" : null;
+    },
+
     listForModeration(actor: Actor, statuses: Parameters<typeof listings.listForModeration>[0]) {
       requireAdmin(actor);
       return listings.listForModeration(statuses);

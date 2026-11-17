@@ -104,6 +104,26 @@ export function prismaListingRepository(db: Db): ListingRepository {
       });
     },
 
+    async photoOwner(storageKey) {
+      const row = await db.outfitImage.findFirst({
+        where: { storageKey },
+        select: {
+          outfit: { select: { id: true, ownerId: true, status: true, owner: { select: { banned: true } } } },
+        },
+      });
+      return row
+        ? {
+            outfitId: row.outfit.id,
+            ownerId: row.outfit.ownerId,
+            ownerSuspended: row.outfit.owner.banned === true,
+            status: row.outfit.status,
+          }
+        : null;
+    },
+
+    hasBookedOutfit: async (userId, outfitId) =>
+      (await db.booking.count({ where: { outfitId, renterId: userId } })) > 0,
+
     async findOwned(outfitId) {
       const o = await db.outfit.findUnique({
         where: { id: outfitId },

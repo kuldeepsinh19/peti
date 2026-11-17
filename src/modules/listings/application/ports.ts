@@ -99,6 +99,12 @@ export interface ListingRepository {
   /** Saves edits and the new status, only if the status is still `from`; false (nothing written) otherwise. */
   update(outfitId: string, data: ListingData, from: OutfitStatus, status: OutfitStatus): Promise<boolean>;
   findOwned(outfitId: string): Promise<OwnedOutfit | null>;
+  /** The listing a stored photograph belongs to; null when no listing has a photograph with that key. */
+  photoOwner(
+    storageKey: string,
+  ): Promise<{ outfitId: string; ownerId: string; ownerSuspended: boolean; status: OutfitStatus } | null>;
+  /** The user has (or had) a booking for this outfit, so its booking page shows the photograph. */
+  hasBookedOutfit(userId: string, outfitId: string): Promise<boolean>;
   getForEdit(outfitId: string): Promise<ListingEditView | null>;
   listForOwner(ownerId: string): Promise<OwnerListingRow[]>;
   /** Compare-and-swap: changes the status only if it is still `from`; false when someone else changed it. */
