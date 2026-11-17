@@ -124,3 +124,55 @@ describe("accounts left without a profile (#7)", () => {
     });
   });
 });
+
+describe("handover integrity (#5, #6)", () => {
+  async function paidRental() {
+    const app = buildBookingApp();
+    const s = await scenario();
+    const { bookingId } = await app.bookings.request(s.renter, {
+      outfitId: s.outfit.id,
+      startDate: "2026-12-10",
+      days: 3,
+      acceptTerms: "on",
+    });
+    await app.bookings.approve(s.owner, { bookingId });
+    await app.payThroughSandbox(s.renter, bookingId);
+    app.clock.set("2026-12-10T05:00:00Z");
+    return { app, ...s, bookingId };
+  }
+  const reportVersion = async (bookingId: string) =>
+    (
+      await db.conditionReport.findUniqueOrThrow({
+        where: { bookingId_kind: { bookingId, kind: "HANDOVER" } },
+      })
+    ).updatedAt.toISOString();
+
+  it("tells the renter the handover was recorded, so they know to acknowledge it", async () => {
+    const { app, owner, renter, bookingId } = await paidRental();
+    await app.bookings.submitHandoverReport(owner, { bookingId, grade: "GOOD", notes: "Fine." }, photos(3));
+    const notices = await db.notification.findMany({
+      where: { userId: renter.userId, type: "booking.handoverRecorded" },
+    });
+    expect(notices.map((n) => n.channel).sort()).toEqual(["EMAIL", "IN_APP"]);
+    expect(notices[0]!.link).toBe(`/account/rentals/${bookingId}`);
+  });
+
+  it("refuses an acknowledgement of a report the owner has since replaced", async () => {
+    const { app, owner, renter, bookingId } = await paidRental();
+    await app.bookings.submitHandoverReport(owner, { bookingId, grade: "GOOD", notes: "Set A." }, photos(3));
+    const seen = await reportVersion(bookingId);
+    await new Promise((r) => setTimeout(r, 5));
+    await app.bookings.submitHandoverReport(owner, { bookingId, grade: "FAIR", notes: "Set B." }, photos(3));
+
+    await expect(
+      app.bookings.acknowledgeHandover(renter, { bookingId, reportVersion: seen }),
+    ).rejects.toMatchObject({ code: "REPORT_CHANGED" });
+    expect((await db.booking.findUniqueOrThrow({ where: { id: bookingId } })).status).toBe("CONFIRMED");
+
+    await app.bookings.acknowledgeHandover(renter, {
+      bookingId,
+      reportVersion: await reportVersion(bookingId),
+    });
+    expect((await db.booking.findUniqueOrThrow({ where: { id: bookingId } })).status).toBe("ACTIVE");
+  });
+});

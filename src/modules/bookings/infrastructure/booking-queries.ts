@@ -212,6 +212,7 @@ export function prismaBookingQueries(db: Db): BookingQueries {
           notes: r.notes,
           authorName: name(r.author),
           createdAt: r.createdAt,
+          updatedAt: r.updatedAt,
           acknowledgedAt: r.acknowledgedAt,
           counterpartyNotes: r.counterpartyNotes,
           photoKeys: r.photos.map((p) => p.storageKey),

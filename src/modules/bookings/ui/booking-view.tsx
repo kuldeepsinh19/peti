@@ -259,6 +259,7 @@ export function BookingView({
                     label="It matches — I have the outfit"
                     variant="primary"
                   >
+                    <input type="hidden" name="reportVersion" value={handover.updatedAt.toISOString()} />
                     <label className="flex flex-col gap-1">
                       <span className="eyebrow text-graphite">Anything to note (optional)</span>
                       <input name="notes" maxLength={1000} className={field} />

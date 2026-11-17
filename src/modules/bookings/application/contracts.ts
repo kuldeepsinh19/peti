@@ -53,7 +53,12 @@ export const conditionReportSchema = z.object({
     .or(z.literal("").transform(() => undefined)),
 });
 
-export const acknowledgeSchema = z.object({ bookingId: z.uuid(), notes: optionalText(1000) });
+export const acknowledgeSchema = z.object({
+  bookingId: z.uuid(),
+  notes: optionalText(1000),
+  /** The handover report as the renter saw it (its last-changed time); refused if it changed since. */
+  reportVersion: z.iso.datetime().optional(),
+});
 
 export const DISPUTE_KINDS = [
   "DAMAGE",

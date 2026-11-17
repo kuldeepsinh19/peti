@@ -69,12 +69,25 @@ export async function submitHandoverReport(
       notes: data.notes,
       photos: keys.map((storageKey) => ({ storageKey, caption: null })),
     });
+    // The renter must acknowledge it; without being told, the rental would run into an automatic
+    // "handover failed" dispute after the end date.
+    await store.notify([
+      {
+        userId: booking.renterId,
+        type: "booking.handoverRecorded",
+        subject: `Handover recorded for ${booking.reference}`,
+        body: "The owner recorded the outfit's condition with photographs. Check them against the outfit, then acknowledge the handover (or report a problem) on the booking page.",
+        link: `/account/rentals/${booking.id}`,
+        dedupeKey: `${booking.id}:handover:${now.getTime()}`,
+        channels: ["IN_APP", "EMAIL"],
+      },
+    ]);
   });
 }
 
 /** The renter checks the outfit in person and acknowledges the owner's handover report: CONFIRMED → ACTIVE. */
 export async function acknowledgeHandover(deps: BookingsDeps, actor: Actor, input: unknown) {
-  const { bookingId, notes } = parseInput(acknowledgeSchema, input);
+  const { bookingId, notes, reportVersion } = parseInput(acknowledgeSchema, input);
   const now = deps.clock.now();
   return deps.uow.run(async (store) => {
     const booking = await loadBooking(store, bookingId);
@@ -82,6 +95,13 @@ export async function acknowledgeHandover(deps: BookingsDeps, actor: Actor, inpu
     const report = await store.getConditionReport(booking.id, "HANDOVER");
     if (!report || report.photoCount < booking.policy.minConditionPhotos) {
       throw new PreconditionError("NO_HANDOVER_REPORT", "The owner has not recorded the handover yet.");
+    }
+    // The renter acknowledges the report they looked at, not one the owner replaced in the meantime.
+    if (reportVersion && new Date(reportVersion).getTime() !== report.updatedAt.getTime()) {
+      throw new PreconditionError(
+        "REPORT_CHANGED",
+        "The owner has changed the handover report since you opened the page. Check it again before acknowledging.",
+      );
     }
     if (localDateInIndia(now) < addDays(booking.startDate, -1)) {
       throw new PreconditionError(

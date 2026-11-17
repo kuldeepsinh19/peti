@@ -26,6 +26,7 @@ export interface ConditionReportView {
   notes: string;
   authorName: string;
   createdAt: Date;
+  updatedAt: Date;
   acknowledgedAt: Date | null;
   counterpartyNotes: string | null;
   photoKeys: string[];

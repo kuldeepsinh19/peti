@@ -112,6 +112,8 @@ export interface ConditionReportRow {
   photoCount: number;
   acknowledgedAt: Date | null;
   lockedAt: Date | null;
+  /** Changes whenever the owner replaces the report (photographs or text). */
+  updatedAt: Date;
 }
 
 export type RefundReason =

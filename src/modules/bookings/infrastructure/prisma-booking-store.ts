@@ -381,6 +381,7 @@ export function prismaBookingStore(tx: Tx, notifications: NotificationWriter): B
             photoCount: r._count.photos,
             acknowledgedAt: r.acknowledgedAt,
             lockedAt: r.lockedAt,
+            updatedAt: r.updatedAt,
           }
         : null;
     },
