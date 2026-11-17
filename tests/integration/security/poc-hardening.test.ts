@@ -103,3 +103,24 @@ describe("administrators acting in their own favour (#3, #4, #35)", () => {
     expect((await db.outfit.findUniqueOrThrow({ where: { id } })).status).toBe("ACTIVE");
   });
 });
+
+describe("accounts left without a profile (#7)", () => {
+  it("can still have owner cancellations counted", async () => {
+    const app = buildBookingApp();
+    const s = await scenario();
+    const { bookingId } = await app.bookings.request(s.renter, {
+      outfitId: s.outfit.id,
+      startDate: "2026-12-10",
+      days: 3,
+      acceptTerms: "on",
+    });
+    await app.bookings.approve(s.owner, { bookingId });
+    await app.payThroughSandbox(s.renter, bookingId);
+    await db.userProfile.delete({ where: { userId: s.owner.userId } });
+
+    await app.bookings.cancel(s.owner, { bookingId });
+    expect(await db.userProfile.findUniqueOrThrow({ where: { userId: s.owner.userId } })).toMatchObject({
+      ownerCancellationCount: 1,
+    });
+  });
+});

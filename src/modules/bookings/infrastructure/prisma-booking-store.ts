@@ -3,6 +3,7 @@ import { Prisma } from "@/generated/prisma/client";
 import type { NotificationWriter } from "@/modules/notifications";
 import { PreconditionError } from "@/shared/domain/errors";
 import { prismaAuditLog } from "@/shared/infrastructure/audit";
+import { ensureProfile } from "@/shared/infrastructure/ensure-profile";
 import { registerConstraintError } from "@/shared/infrastructure/pg-error";
 import type { Tx } from "@/shared/infrastructure/prisma";
 import { localDateFromDb, localDateToDb } from "@/shared/domain/local-date";
@@ -360,6 +361,7 @@ export function prismaBookingStore(tx: Tx, notifications: NotificationWriter): B
     },
 
     async incrementOwnerCancellations(ownerId) {
+      await ensureProfile(tx, ownerId);
       await tx.userProfile.update({
         where: { userId: ownerId },
         data: { ownerCancellationCount: { increment: 1 } },

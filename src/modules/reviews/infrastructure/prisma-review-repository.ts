@@ -2,6 +2,7 @@ import "server-only";
 import { PreconditionError } from "@/shared/domain/errors";
 import type { Db, Tx } from "@/shared/infrastructure/prisma";
 import type { ReviewRepository, ReviewView } from "../application/reviews";
+import { ensureProfile } from "@/shared/infrastructure/ensure-profile";
 
 const name = (u: { name: string; profile: { displayName: string } | null }) =>
   u.profile?.displayName ?? u.name;
@@ -9,6 +10,7 @@ const person = { select: { name: true, profile: { select: { displayName: true } 
 
 /** Adds a now-visible review to the subject's integer rating aggregates. */
 async function addToAggregates(tx: Tx, review: { subjectId: string; direction: string; rating: number }) {
+  await ensureProfile(tx, review.subjectId);
   await tx.userProfile.update({
     where: { userId: review.subjectId },
     data:
