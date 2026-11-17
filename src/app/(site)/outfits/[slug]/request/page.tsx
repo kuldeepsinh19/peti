@@ -34,7 +34,7 @@ export default async function RequestPage({ params }: { params: Promise<{ slug: 
             Choose your <span className="display-italic">dates</span>
           </>
         }
-        lede="Pick a length and a start date. The owner has 24 hours to answer."
+        lede={`Pick a length and a start date. The owner has up to ${marketplacePolicy.approvalWindowHours} hours to answer, and must answer at least ${marketplacePolicy.approvalCutoffHoursBeforeStart} hours before the rental starts. Your booking page shows the exact deadline.`}
       />
       <div className="mt-10">
         <RequestForm

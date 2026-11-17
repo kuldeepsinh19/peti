@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { container } from "@/composition/container";
 import { requireActorOrRedirect } from "@/composition/session";
+import { marketplacePolicy } from "@/config/marketplace-policy";
 import { BookingList } from "@/modules/bookings/ui/booking-list";
 import { EmptyState } from "@/shared/ui/feedback";
 import { PageHeader, SectionIndex } from "@/shared/ui/layout";
@@ -21,7 +22,7 @@ export default async function RequestsPage() {
       <PageHeader
         eyebrow="Lending"
         title="Requests"
-        lede="Answer requests within 24 hours. Approving holds the dates while the renter pays."
+        lede={`Answer each request by its deadline: ${marketplacePolicy.approvalWindowHours} hours after it arrives, or ${marketplacePolicy.approvalCutoffHoursBeforeStart} hours before the rental starts if that is sooner. Approving holds the dates while the renter pays.`}
       />
       <section aria-labelledby="waiting">
         <SectionIndex index={1}>Needs your answer</SectionIndex>
