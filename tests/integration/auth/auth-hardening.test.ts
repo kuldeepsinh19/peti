@@ -158,3 +158,26 @@ describe("public demo: no self-service account management", () => {
     expect(res.status).toBe(200);
   });
 });
+
+describe("sign-up cannot attach a mobile number", () => {
+  it("refuses a phone number in the sign-up body, so nobody can claim a stranger's number", async () => {
+    const { call } = authFor();
+    const res = await call("/sign-up/email", {
+      name: "Squatter",
+      email: "squatter@example.in",
+      password: "a-long-enough-password",
+      phoneNumber: "+919876543210",
+    });
+    expect(res.status).toBe(400);
+    expect(await db.user.count({ where: { email: "squatter@example.in" } })).toBe(0);
+    expect(await db.user.count({ where: { phoneNumber: "+919876543210" } })).toBe(0);
+
+    const verifiedFlag = await call("/sign-up/email", {
+      name: "Squatter",
+      email: "squatter2@example.in",
+      password: "a-long-enough-password",
+      phoneNumberVerified: true,
+    });
+    expect(verifiedFlag.status).toBe(400);
+  });
+});

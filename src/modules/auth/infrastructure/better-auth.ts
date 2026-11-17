@@ -101,6 +101,17 @@ export function createAuth({ env, db, mail, sms, rateLimiter }: AuthDeps) {
     disabledPaths: [...DISABLED_PATHS, ...(allowsSelfServiceAccounts(env) ? [] : DEMO_DISABLED_PATHS)],
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
+        // A mobile number is attached only through the signed-in, code-verified flow. Better Auth would
+        // otherwise store one sent with the sign-up form, letting anyone claim (and so block) a stranger's
+        // number, which is unique.
+        if (ctx.path === "/sign-up/email") {
+          const body = (ctx.body ?? {}) as Record<string, unknown>;
+          if ("phoneNumber" in body || "phoneNumberVerified" in body) {
+            throw new APIError("BAD_REQUEST", {
+              message: "Add your mobile number after signing up, from your account.",
+            });
+          }
+        }
         const phonePath = ctx.path === "/phone-number/verify" || ctx.path === "/phone-number/send-otp";
         const session = phonePath ? await getSessionFromCtx(ctx) : null;
         // Phone numbers are only ever verified for, and attached to, the signed-in account: sending or
