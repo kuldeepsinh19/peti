@@ -25,12 +25,12 @@ describe("Explore outfits", () => {
     await app.listings.pause(owner, { outfitId: paused });
 
     const rejected = (await app.listings.createListing(owner, { ...form, title: "Rejected kurta set" })).id;
-    await app.listings.addPhoto(owner, rejected, new Uint8Array([1]), "");
+    for (let i = 0; i < 3; i++) await app.listings.addPhoto(owner, rejected, new Uint8Array([1]), "");
     await app.listings.submitForReview(owner, { outfitId: rejected });
     await app.listings.reject(admin, { outfitId: rejected, note: "The photographs are too dark." });
 
     const pending = (await app.listings.createListing(owner, { ...form, title: "Pending anarkali gown" })).id;
-    await app.listings.addPhoto(owner, pending, new Uint8Array([1]), "");
+    for (let i = 0; i < 3; i++) await app.listings.addPhoto(owner, pending, new Uint8Array([1]), "");
     await app.listings.submitForReview(owner, { outfitId: pending });
     await app.listings.createListing(owner, { ...form, title: "Draft indo-western jacket" });
 

@@ -15,7 +15,7 @@ import { prismaListingRepository } from "@/modules/listings/infrastructure/prism
 import { buildApp, clock, memoryPhotos } from "../support/app";
 import { buildBookingApp, photos, scenario } from "../support/booking-app";
 import { db, resetDatabase } from "../support/db";
-import { listingSetup } from "../support/listing-fixtures";
+import { listingSetup, publishListing } from "../support/listing-fixtures";
 
 beforeEach(async () => {
   await resetDatabase();
@@ -492,5 +492,54 @@ describe("notifications that were missing (#27, #28, #29)", () => {
     expect(
       await db.notification.count({ where: { userId: owner.userId, type: "listing.reinstate" } }),
     ).toBeGreaterThan(0);
+  });
+});
+
+describe("photograph counts under concurrent requests (#18, #19, decision 3)", () => {
+  it("two removals at once never leave a published listing below three photographs", async () => {
+    const app = buildApp();
+    const s = await listingSetup();
+    const id = await publishListing(app, s.form, s.owner, s.admin);
+    await app.listings.addPhoto(s.owner, id, new Uint8Array([1]), "");
+    const rows = await db.outfitImage.findMany({ where: { outfitId: id }, select: { id: true } });
+    expect(rows).toHaveLength(4);
+
+    const results = await Promise.allSettled(
+      rows.slice(0, 2).map((r) => app.listings.removePhoto(s.owner, { outfitId: id, photoId: r.id })),
+    );
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    expect(results.find((r) => r.status === "rejected")).toMatchObject({
+      reason: { code: "LISTING_NEEDS_PHOTOS" },
+    });
+    expect(await db.outfitImage.count({ where: { outfitId: id } })).toBe(3);
+  });
+
+  it("uploads at once never take a listing past eight photographs", async () => {
+    const app = buildApp();
+    const s = await listingSetup();
+    const { id } = await app.listings.createListing(s.owner, s.form);
+    for (let i = 0; i < 6; i++) await app.listings.addPhoto(s.owner, id, new Uint8Array([1]), "");
+
+    const results = await Promise.allSettled(
+      [0, 1, 2, 3].map(() => app.listings.addPhoto(s.owner, id, new Uint8Array([1]), "")),
+    );
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(2);
+    for (const r of results.filter((r) => r.status === "rejected")) {
+      expect(r).toMatchObject({ reason: { code: "TOO_MANY_PHOTOS" } });
+    }
+    expect(await db.outfitImage.count({ where: { outfitId: id } })).toBe(8);
+  });
+
+  it("a draft may have fewer than three photographs, but cannot be submitted with them", async () => {
+    const app = buildApp();
+    const s = await listingSetup();
+    const { id } = await app.listings.createListing(s.owner, s.form);
+    await app.listings.addPhoto(s.owner, id, new Uint8Array([1]), "");
+    const [only] = await db.outfitImage.findMany({ where: { outfitId: id }, select: { id: true } });
+    await app.listings.removePhoto(s.owner, { outfitId: id, photoId: only!.id });
+    expect(await db.outfitImage.count({ where: { outfitId: id } })).toBe(0);
+    await expect(app.listings.submitForReview(s.owner, { outfitId: id })).rejects.toMatchObject({
+      code: "LISTING_NEEDS_PHOTOS",
+    });
   });
 });

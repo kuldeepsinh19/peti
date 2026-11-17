@@ -53,6 +53,8 @@ export const marketplacePolicy = {
   autoDisputeOverdueDays: 3,
   reviewWindowDays: 14,
   minConditionPhotos: 3,
+  /** A listing needs this many photographs to be submitted, approved, or kept live. */
+  minListingPhotos: 3,
   maxListingPhotos: 8,
   maxUploadBytes: 8 * 1024 * 1024,
 } as const;

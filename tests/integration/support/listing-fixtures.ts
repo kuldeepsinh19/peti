@@ -57,7 +57,7 @@ export async function publishListing(
   admin: ReturnType<typeof actorFor>,
 ) {
   const { id } = await app.listings.createListing(owner, form);
-  await app.listings.addPhoto(owner, id, new Uint8Array([1]), "");
+  for (let i = 0; i < 3; i++) await app.listings.addPhoto(owner, id, new Uint8Array([1]), "");
   await app.listings.submitForReview(owner, { outfitId: id });
   await app.listings.approve(admin, { outfitId: id });
   return id;

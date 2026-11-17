@@ -128,7 +128,7 @@ describe("My outfits", () => {
       upcomingRentals: 1,
       nextRentalStart: "2027-03-05",
       openBookings: 3,
-      photoCount: 1,
+      photoCount: 3,
       minPricePaise: 350_000,
       minPriceDays: 3,
     });
@@ -197,7 +197,7 @@ describe("moderation decisions", () => {
     const { owner, admin, form } = await listingSetup();
     const submit = async (title: string) => {
       const { id } = await withNotices.createListing(owner, { ...form, title });
-      await withNotices.addPhoto(owner, id, new Uint8Array([1]), "");
+      for (let i = 0; i < 3; i++) await withNotices.addPhoto(owner, id, new Uint8Array([1]), "");
       await withNotices.submitForReview(owner, { outfitId: id });
       return id;
     };

@@ -79,6 +79,8 @@ const DECISION_MESSAGES: Partial<
   },
 };
 
+const NEEDS_PHOTOS_MESSAGE = `Add at least ${marketplacePolicy.minListingPhotos} photographs before submitting: front, back and a close-up of the work.`;
+
 export const PHOTO_UPLOADS_DISABLED_MESSAGE =
   "Photo upload isn't available in the public demo. Listings there use the photographs already added.";
 
@@ -125,8 +127,8 @@ export function listingsUseCases(deps: ListingsDeps) {
     const next = nextOutfitStatus(outfit.status, command, "owner");
     if (command === "submit") {
       requireVerifiedContact(actor);
-      if (outfit.photoCount === 0) {
-        throw new PreconditionError("LISTING_NEEDS_PHOTOS", "Add at least one photograph before submitting.");
+      if (outfit.photoCount < marketplacePolicy.minListingPhotos) {
+        throw new PreconditionError("LISTING_NEEDS_PHOTOS", NEEDS_PHOTOS_MESSAGE);
       }
     }
     if (command === "archive" && (await listings.countOpenBookings(outfitId)) > 0) {
@@ -158,10 +160,10 @@ export function listingsUseCases(deps: ListingsDeps) {
       });
     }
     const next = nextOutfitStatus(outfit.status, command, "admin");
-    if (command === "approve" && outfit.photoCount === 0) {
+    if (command === "approve" && outfit.photoCount < marketplacePolicy.minListingPhotos) {
       throw new PreconditionError(
         "LISTING_NEEDS_PHOTOS",
-        "A listing needs a photograph before it can go live.",
+        `A listing needs at least ${marketplacePolicy.minListingPhotos} photographs before it is published.`,
       );
     }
     // An edit to a paused listing is approved back to PAUSED: approval never overrides the owner's pause.
@@ -243,12 +245,24 @@ export function listingsUseCases(deps: ListingsDeps) {
         );
       }
       const stored = await photos.save(outfitId, bytes);
-      const photo = await listings.addPhoto(outfitId, {
-        storageKey: stored.storageKey,
-        width: stored.width,
-        height: stored.height,
-        altText: altText.trim().slice(0, 200) || outfit.title,
-      });
+      const photo = await listings.addPhoto(
+        outfitId,
+        {
+          storageKey: stored.storageKey,
+          width: stored.width,
+          height: stored.height,
+          altText: altText.trim().slice(0, 200) || outfit.title,
+        },
+        marketplacePolicy.maxListingPhotos,
+      );
+      if (photo === "FULL") {
+        // Another upload filled the last place while this one was being processed.
+        await photos.remove(stored.storageKey);
+        throw new PreconditionError(
+          "TOO_MANY_PHOTOS",
+          `A listing can have up to ${marketplacePolicy.maxListingPhotos} photographs.`,
+        );
+      }
       // A new photograph on a live listing is new content renters will see.
       if (editNeedsReview(outfit.status, true)) {
         await setStatusOrConflict(
@@ -265,17 +279,21 @@ export function listingsUseCases(deps: ListingsDeps) {
       const outfit = await owned(actor, outfitId);
       if (!isEditable(outfit.status))
         throw new PreconditionError("LISTING_FROZEN", "This listing cannot be edited.");
-      // A listing that is live, paused or waiting for review must keep a photograph (otherwise it could be
-      // approved with none).
-      const needsPhoto =
+      // A listing that is published, paused or waiting for review keeps the minimum number of photographs
+      // (otherwise it could be approved, or stay public, with fewer). Drafts may go below it.
+      const keepsMinimum =
         outfit.status === "ACTIVE" || outfit.status === "PAUSED" || outfit.status === "PENDING_REVIEW";
-      if (needsPhoto && outfit.photoCount <= 1) {
+      const removed = await listings.removePhoto(
+        outfitId,
+        photoId,
+        keepsMinimum ? marketplacePolicy.minListingPhotos : 0,
+      );
+      if (removed === "TOO_FEW") {
         throw new PreconditionError(
           "LISTING_NEEDS_PHOTOS",
-          "A listing that is live or in review needs at least one photograph.",
+          `A listing that is published or in review keeps at least ${marketplacePolicy.minListingPhotos} photographs. Add another before removing this one.`,
         );
       }
-      const removed = await listings.removePhoto(outfitId, photoId);
       if (!removed) throw new NotFoundError("Photograph");
       await photos.remove(removed.storageKey);
     },

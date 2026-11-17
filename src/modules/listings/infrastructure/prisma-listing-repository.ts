@@ -243,26 +243,34 @@ export function prismaListingRepository(db: Db): ListingRepository {
       return result.count === 1;
     },
 
-    async addPhoto(outfitId, photo) {
-      const last = await db.outfitImage.aggregate({ where: { outfitId }, _max: { sortOrder: true } });
-      const row = await db.outfitImage.create({
-        data: { outfitId, ...photo, sortOrder: (last._max.sortOrder ?? -1) + 1 },
+    async addPhoto(outfitId, photo, max) {
+      return db.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM outfits WHERE id = ${outfitId}::uuid FOR NO KEY UPDATE`;
+        if ((await tx.outfitImage.count({ where: { outfitId } })) >= max) return "FULL" as const;
+        const last = await tx.outfitImage.aggregate({ where: { outfitId }, _max: { sortOrder: true } });
+        const row = await tx.outfitImage.create({
+          data: { outfitId, ...photo, sortOrder: (last._max.sortOrder ?? -1) + 1 },
+        });
+        return {
+          id: row.id,
+          storageKey: row.storageKey,
+          altText: row.altText,
+          width: row.width,
+          height: row.height,
+          sortOrder: row.sortOrder,
+        };
       });
-      return {
-        id: row.id,
-        storageKey: row.storageKey,
-        altText: row.altText,
-        width: row.width,
-        height: row.height,
-        sortOrder: row.sortOrder,
-      };
     },
 
-    async removePhoto(outfitId, photoId) {
-      const row = await db.outfitImage.findFirst({ where: { id: photoId, outfitId } });
-      if (!row) return null;
-      await db.outfitImage.delete({ where: { id: row.id } });
-      return { ...row };
+    async removePhoto(outfitId, photoId, keepAtLeast) {
+      return db.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM outfits WHERE id = ${outfitId}::uuid FOR NO KEY UPDATE`;
+        const row = await tx.outfitImage.findFirst({ where: { id: photoId, outfitId } });
+        if (!row) return null;
+        if ((await tx.outfitImage.count({ where: { outfitId } })) <= keepAtLeast) return "TOO_FEW" as const;
+        await tx.outfitImage.delete({ where: { id: row.id } });
+        return { ...row };
+      });
     },
 
     async listPhotos(outfitId) {

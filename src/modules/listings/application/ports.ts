@@ -113,8 +113,21 @@ export interface ListingRepository {
       resumePausedAfterReview?: boolean;
     },
   ): Promise<boolean>;
-  addPhoto(outfitId: string, photo: Omit<ListingPhoto, "id" | "sortOrder">): Promise<ListingPhoto>;
-  removePhoto(outfitId: string, photoId: string): Promise<ListingPhoto | null>;
+  /** Adds a photograph unless the listing already has `max` (checked under the outfit's row lock). */
+  addPhoto(
+    outfitId: string,
+    photo: Omit<ListingPhoto, "id" | "sortOrder">,
+    max: number,
+  ): Promise<ListingPhoto | "FULL">;
+  /**
+   * Removes a photograph, unless that would leave fewer than `keepAtLeast` (checked under the outfit's row
+   * lock, so two removals at once cannot both pass). Null when it is not the listing's photograph.
+   */
+  removePhoto(
+    outfitId: string,
+    photoId: string,
+    keepAtLeast: number,
+  ): Promise<ListingPhoto | null | "TOO_FEW">;
   /** The listing's photographs, cover first. */
   listPhotos(outfitId: string): Promise<ListingPhoto[]>;
   /** Rewrites the sort order to match `orderedIds` (all of the listing's photographs), in one transaction. */

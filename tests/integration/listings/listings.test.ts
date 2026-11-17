@@ -70,7 +70,13 @@ describe("listing lifecycle", () => {
     await expect(app.listings.submitForReview(owner, { outfitId: id })).rejects.toMatchObject({
       code: "LISTING_NEEDS_PHOTOS",
     });
+    // Fewer than three photographs is still not enough (front, back and a close-up).
     await app.listings.addPhoto(owner, id, new Uint8Array([1]), "Front view");
+    await app.listings.addPhoto(owner, id, new Uint8Array([1]), "Back view");
+    await expect(app.listings.submitForReview(owner, { outfitId: id })).rejects.toMatchObject({
+      code: "LISTING_NEEDS_PHOTOS",
+    });
+    await app.listings.addPhoto(owner, id, new Uint8Array([1]), "Close-up of the work");
     await app.listings.submitForReview(owner, { outfitId: id });
 
     // Owners cannot approve their own listing; only administrators can.
@@ -87,7 +93,7 @@ describe("listing lifecycle", () => {
   it("requires verified contact details to submit for review", async () => {
     const { owner, form } = await setup();
     const { id } = await app.listings.createListing(owner, form);
-    await app.listings.addPhoto(owner, id, new Uint8Array([1]), "");
+    for (let i = 0; i < 3; i++) await app.listings.addPhoto(owner, id, new Uint8Array([1]), "");
     await expect(
       app.listings.submitForReview({ ...owner, phoneVerified: false }, { outfitId: id }),
     ).rejects.toMatchObject({ code: "PHONE_NOT_VERIFIED" });
@@ -118,7 +124,7 @@ describe("listing lifecycle", () => {
   it("sends a live listing back for review when its content changes, but not for a price change", async () => {
     const { owner, admin, form } = await setup();
     const { id } = await app.listings.createListing(owner, form);
-    await app.listings.addPhoto(owner, id, new Uint8Array([1]), "");
+    for (let i = 0; i < 3; i++) await app.listings.addPhoto(owner, id, new Uint8Array([1]), "");
     await app.listings.submitForReview(owner, { outfitId: id });
     await app.listings.approve(admin, { outfitId: id });
 
@@ -138,7 +144,7 @@ describe("listing lifecycle", () => {
     const { owner, admin, form } = await setup();
     const { id } = await app.listings.createListing(owner, form);
     await expect(app.listings.approve(admin, { outfitId: id })).rejects.toBeInstanceOf(PreconditionError);
-    await app.listings.addPhoto(owner, id, new Uint8Array([1]), "");
+    for (let i = 0; i < 3; i++) await app.listings.addPhoto(owner, id, new Uint8Array([1]), "");
     await app.listings.submitForReview(owner, { outfitId: id });
     await expect(app.listings.reject(admin, { outfitId: id })).rejects.toBeInstanceOf(ValidationError);
     await app.listings.reject(admin, { outfitId: id, note: "Please photograph the full length." });
@@ -157,7 +163,7 @@ describe("discovery", () => {
     admin: ReturnType<typeof actorFor>,
   ) {
     const { id } = await app.listings.createListing(owner, form);
-    await app.listings.addPhoto(owner, id, new Uint8Array([1]), "");
+    for (let i = 0; i < 3; i++) await app.listings.addPhoto(owner, id, new Uint8Array([1]), "");
     await app.listings.submitForReview(owner, { outfitId: id });
     await app.listings.approve(admin, { outfitId: id });
     return id;
