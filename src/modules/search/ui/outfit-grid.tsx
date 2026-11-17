@@ -61,11 +61,14 @@ export function OutfitCardView({
   large,
   priority,
   availableFrom,
+  privatePhotos = false,
 }: {
   item: OutfitCard;
   large?: boolean;
   priority?: boolean;
   availableFrom?: string | undefined;
+  /** The listing may not be published: load the photograph with the viewer's session (#25). */
+  privatePhotos?: boolean;
 }) {
   return (
     <Link href={`/outfits/${item.slug}`} className="group block no-underline">
@@ -78,6 +81,7 @@ export function OutfitCardView({
             priority={priority}
             sizes={large ? "(min-width: 64rem) 50vw, 100vw" : "(min-width: 64rem) 25vw, 50vw"}
             className="object-cover transition-transform duration-700 ease-(--ease-editorial) group-hover:scale-[1.02]"
+            unoptimized={privatePhotos}
           />
         ) : null}
         {availableFrom ? (

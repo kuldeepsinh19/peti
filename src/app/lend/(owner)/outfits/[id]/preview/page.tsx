@@ -91,7 +91,7 @@ export default async function ListingPreviewPage({
           </p>
         </div>
         <div className="max-w-xs lg:col-span-4 lg:col-start-6">
-          <OutfitCardView item={cardFromDetail(outfit)} />
+          <OutfitCardView item={cardFromDetail(outfit)} privatePhotos />
         </div>
       </section>
 
@@ -104,6 +104,7 @@ export default async function ListingPreviewPage({
           <OutfitDetailView
             outfit={outfit}
             breadcrumb={false}
+            privatePhotos
             policies={
               <RentalPolicies depositPaise={outfit.depositPaise} turnaroundDays={outfit.turnaroundDays} />
             }

@@ -100,7 +100,14 @@ export default async function AdminListingsPage({
             <li key={r.id} className="grid gap-6 border-b border-rule py-6 md:grid-cols-[6rem_1fr]">
               <div className="relative aspect-[3/4] w-24 overflow-hidden bg-sand">
                 {r.photoKey ? (
-                  <Image src={fileUrl(r.photoKey)} alt="" fill sizes="96px" className="object-cover" />
+                  <Image
+                    src={fileUrl(r.photoKey)}
+                    alt=""
+                    fill
+                    sizes="96px"
+                    className="object-cover"
+                    unoptimized
+                  />
                 ) : null}
               </div>
               <div className="flex flex-col gap-3">

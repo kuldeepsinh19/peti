@@ -66,6 +66,7 @@ export function OutfitDetailView({
   availability,
   policies,
   breadcrumb = true,
+  privatePhotos = false,
 }: {
   outfit: OutfitDetail;
   /** The booking panel, owner links or a preview note. */
@@ -74,6 +75,8 @@ export function OutfitDetailView({
   availability?: ReactNode;
   policies?: ReactNode;
   breadcrumb?: boolean;
+  /** The owner's preview of a listing that may not be published (#25). */
+  privatePhotos?: boolean;
 }) {
   const measurements = Object.entries(outfit.measurementsMm).filter(([, mm]) => mm !== null) as Array<
     [string, number]
@@ -95,7 +98,7 @@ export function OutfitDetailView({
       <div className="grid gap-10 lg:grid-cols-12">
         <section aria-label="Photographs" className="lg:col-span-7">
           <div className="lg:sticky lg:top-6">
-            <OutfitGallery title={outfit.title} photos={outfit.photos} />
+            <OutfitGallery title={outfit.title} photos={outfit.photos} privatePhotos={privatePhotos} />
           </div>
         </section>
 

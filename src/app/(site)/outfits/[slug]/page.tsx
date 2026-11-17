@@ -71,6 +71,7 @@ export default async function OutfitPage({
       ) : null}
       <OutfitDetailView
         outfit={outfit}
+        privatePhotos={outfit.status !== "ACTIVE"}
         reviews={reviews}
         availability={
           outfit.status === "ACTIVE" ? (

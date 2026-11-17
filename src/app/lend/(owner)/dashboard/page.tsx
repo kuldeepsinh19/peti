@@ -185,7 +185,14 @@ export default async function MyOutfitsPage({
                 aria-label={`Preview ${row.title}`}
               >
                 {row.photoKey ? (
-                  <Image src={fileUrl(row.photoKey)} alt="" fill sizes="128px" className="object-cover" />
+                  <Image
+                    src={fileUrl(row.photoKey)}
+                    alt=""
+                    fill
+                    sizes="128px"
+                    className="object-cover"
+                    unoptimized
+                  />
                 ) : (
                   <span className="absolute inset-0 flex items-center justify-center p-2 text-center eyebrow text-graphite">
                     No photograph

@@ -184,6 +184,7 @@ export function PhotoManager({
                   fill
                   sizes="25vw"
                   className="object-cover"
+                  unoptimized
                 />
                 {i === 0 ? (
                   <span className="absolute top-0 left-0 bg-burgundy px-2 py-1 eyebrow text-paper">

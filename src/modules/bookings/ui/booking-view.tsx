@@ -107,7 +107,14 @@ export function BookingView({
         <div className="flex gap-6">
           {b.outfit.photoKey ? (
             <div className="relative aspect-[3/4] w-20 shrink-0 overflow-hidden bg-sand">
-              <Image src={fileUrl(b.outfit.photoKey)} alt="" fill sizes="80px" className="object-cover" />
+              <Image
+                src={fileUrl(b.outfit.photoKey)}
+                alt=""
+                fill
+                sizes="80px"
+                className="object-cover"
+                unoptimized
+              />
             </div>
           ) : null}
           <div className="flex flex-col gap-2">

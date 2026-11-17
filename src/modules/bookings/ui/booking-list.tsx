@@ -35,7 +35,14 @@ export function BookingList({
           cell: (r) =>
             r.photoKey ? (
               <span className="relative block aspect-[3/4] w-12 overflow-hidden bg-sand">
-                <Image src={fileUrl(r.photoKey)} alt="" fill sizes="48px" className="object-cover" />
+                <Image
+                  src={fileUrl(r.photoKey)}
+                  alt=""
+                  fill
+                  sizes="48px"
+                  className="object-cover"
+                  unoptimized
+                />
               </span>
             ) : null,
         },

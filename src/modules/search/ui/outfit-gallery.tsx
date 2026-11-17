@@ -12,9 +12,12 @@ import { cn } from "@/shared/ui/cn";
 export function OutfitGallery({
   title,
   photos,
+  privatePhotos = false,
 }: {
   title: string;
   photos: ReadonlyArray<{ key: string; alt: string }>;
+  /** The listing may not be published: load photographs with the viewer's session, not the image optimiser. */
+  privatePhotos?: boolean;
 }) {
   const [index, setIndex] = useState(0);
   if (photos.length === 0) {
@@ -44,6 +47,7 @@ export function OutfitGallery({
           priority={index === 0}
           sizes="(min-width: 64rem) 55vw, 100vw"
           className="object-cover"
+          unoptimized={privatePhotos}
         />
         {photos.length > 1 ? (
           <figcaption className="absolute right-0 bottom-0 bg-paper/90 px-3 py-1 eyebrow text-ink numeral">
@@ -65,7 +69,14 @@ export function OutfitGallery({
                   i === index ? "outline-2 outline-ink" : "opacity-70 hover:opacity-100",
                 )}
               >
-                <Image src={fileUrl(photo.key)} alt="" fill sizes="10vw" className="object-cover" />
+                <Image
+                  src={fileUrl(photo.key)}
+                  alt=""
+                  fill
+                  sizes="10vw"
+                  className="object-cover"
+                  unoptimized={privatePhotos}
+                />
               </button>
             </li>
           ))}
