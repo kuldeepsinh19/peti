@@ -84,7 +84,11 @@ export function listingsUseCases(deps: ListingsDeps) {
     if (!(await listings.setStatus(...args))) throw new ConcurrencyError();
   }
 
-  async function validated(ownerId: string, input: unknown): Promise<ListingData> {
+  async function validated(
+    ownerId: string,
+    input: unknown,
+    currentCategoryId?: string,
+  ): Promise<ListingData> {
     const data = toListingData(parseInput(listingFormSchema, input));
     const fieldErrors: Record<string, string[]> = Object.fromEntries(
       Object.entries(validateListingMoney(data)).map(([k, v]) => [k, [v]]),
@@ -92,7 +96,7 @@ export function listingsUseCases(deps: ListingsDeps) {
     if (!(await listings.addressBelongsTo(data.pickupAddressId, ownerId))) {
       fieldErrors.pickupAddressId = ["Choose one of your saved addresses."];
     }
-    if (!(await listings.categoryAndLocalityExist(data.categoryId, data.localityId))) {
+    if (!(await listings.categoryAndLocalityExist(data.categoryId, data.localityId, currentCategoryId))) {
       fieldErrors.categoryId = ["Choose a category and locality from the lists."];
     }
     if (Object.keys(fieldErrors).length > 0) {
@@ -206,7 +210,7 @@ export function listingsUseCases(deps: ListingsDeps) {
       if (!isEditable(outfit.status)) {
         throw new PreconditionError("LISTING_FROZEN", "Suspended or archived listings cannot be edited.");
       }
-      const data = await validated(outfit.ownerId, input);
+      const data = await validated(outfit.ownerId, input, outfit.categoryId);
       const contentChanged =
         data.title !== outfit.title ||
         data.description !== outfit.description ||

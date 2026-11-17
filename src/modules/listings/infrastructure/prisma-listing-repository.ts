@@ -294,9 +294,11 @@ export function prismaListingRepository(db: Db): ListingRepository {
     addressBelongsTo: async (addressId, userId) =>
       (await db.address.count({ where: { id: addressId, userId, deletedAt: null } })) === 1,
 
-    async categoryAndLocalityExist(categoryId, localityId) {
+    async categoryAndLocalityExist(categoryId, localityId, keepCategoryId) {
       const [c, l] = await Promise.all([
-        db.outfitCategory.count({ where: { id: categoryId, isActive: true } }),
+        db.outfitCategory.count({
+          where: { id: categoryId, ...(categoryId === keepCategoryId ? {} : { isActive: true }) },
+        }),
         db.locality.count({ where: { id: localityId, isActive: true } }),
       ]);
       return c === 1 && l === 1;

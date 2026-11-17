@@ -121,7 +121,11 @@ export interface ListingRepository {
   setPhotoOrder(outfitId: string, orderedIds: readonly string[]): Promise<void>;
   countOpenBookings(outfitId: string): Promise<number>;
   addressBelongsTo(addressId: string, userId: string): Promise<boolean>;
-  categoryAndLocalityExist(categoryId: string, localityId: string): Promise<boolean>;
+  /**
+   * The category and locality exist and are active. `keepCategoryId`: a listing already in that category may
+   * stay in it after an administrator hides the category.
+   */
+  categoryAndLocalityExist(categoryId: string, localityId: string, keepCategoryId?: string): Promise<boolean>;
   listForModeration(statuses: readonly OutfitStatus[]): Promise<ModerationRow[]>;
 }
 
