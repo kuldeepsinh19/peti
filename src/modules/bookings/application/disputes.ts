@@ -229,8 +229,8 @@ export async function resolveDispute(deps: BookingsDeps, actor: Actor, input: un
     if (roleOn(booking, actor) !== "ADMIN") {
       throw new ForbiddenError("You are part of this rental, so another administrator must decide it.");
     }
-    const retained = data.retainedFeeRupees * 100;
-    const withheld = data.depositWithheldRupees * 100;
+    const retained = Math.round(data.retainedFeeRupees * 100);
+    const withheld = Math.round(data.depositWithheldRupees * 100);
     const errors: Record<string, string[]> = {};
     if (retained > booking.rentalFeePaise) errors.retainedFeeRupees = ["Cannot exceed the rental fee."];
     if (withheld > booking.depositPaise) errors.depositWithheldRupees = ["Cannot exceed the deposit."];

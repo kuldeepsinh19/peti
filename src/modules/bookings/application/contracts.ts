@@ -85,11 +85,17 @@ export const openDisputeSchema = z.object({
   ),
 });
 
+/** Rupees with at most two decimals (whole paise): late fees are rarely whole rupees. */
+const rupeesAndPaise = z.coerce
+  .number()
+  .min(0)
+  .refine((v) => Math.abs(v * 100 - Math.round(v * 100)) < 1e-6, "Use at most two decimals.");
+
 export const resolveDisputeSchema = z.object({
   bookingId: z.uuid(),
   outcome: z.enum(["COMPLETE", "CANCEL"]),
-  depositWithheldRupees: z.coerce.number().int().min(0),
-  retainedFeeRupees: z.coerce.number().int().min(0),
+  depositWithheldRupees: rupeesAndPaise,
+  retainedFeeRupees: rupeesAndPaise,
   notes: z.string().trim().min(10, "Explain the decision for the record.").max(3000),
 });
 
