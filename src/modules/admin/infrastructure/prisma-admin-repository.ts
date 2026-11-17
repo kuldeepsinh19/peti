@@ -214,6 +214,17 @@ export function prismaAdminRepository(db: Db): AdminRepository {
         : null;
     },
 
+    openBookingsOf: (userId) =>
+      db.booking.findMany({
+        where: {
+          OR: [{ ownerId: userId }, { renterId: userId }],
+          status: {
+            in: ["PENDING_APPROVAL", "AWAITING_PAYMENT", "CONFIRMED", "ACTIVE", "RETURNED", "DISPUTED"],
+          },
+        },
+        select: { id: true, reference: true, ownerId: true, renterId: true },
+      }),
+
     async markPayoutPaid(payoutId, reference, paidBy, at) {
       // Re-checked in the write itself: the payout account must still exist and no chargeback may have
       // opened since the checks above.

@@ -142,7 +142,11 @@ function build() {
     fileAccess: {
       canView: (actor: UserActor, key: string) => bookings.canViewReportPhoto(actor, key),
     },
-    users: usersUseCases({ users: prismaUserRepository(db) }),
+    users: usersUseCases({
+      users: prismaUserRepository(db),
+      audit: prismaAuditLog(db),
+      notifications: prismaNotificationWriter(db),
+    }),
     listings: listingsUseCases({
       listings: prismaListingRepository(db),
       photos: storagePhotoStore(storage, images),
@@ -156,7 +160,12 @@ function build() {
     payments: paymentsRef,
     reviews,
     inbox: inboxUseCases({ inbox: prismaInboxRepository(db), clock }),
-    admin: adminUseCases({ admin: prismaAdminRepository(db), audit: prismaAuditLog(db), clock }),
+    admin: adminUseCases({
+      admin: prismaAdminRepository(db),
+      audit: prismaAuditLog(db),
+      clock,
+      notifications: prismaNotificationWriter(db),
+    }),
     /** Money pipeline health: the admin page, the booking timeline and the monitoring endpoint. */
     money: moneyUseCases(prismaMoneyQueries(db)),
     /** Background work: deadlines, refunds and emails. Idempotent and safe to run concurrently. */

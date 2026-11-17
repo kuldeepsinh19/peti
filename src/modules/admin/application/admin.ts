@@ -120,6 +120,10 @@ export interface AdminRepository {
   users(search: string | undefined): Promise<AdminUserRow[]>;
   findUser(userId: string): Promise<{ id: string; role: string; banned: boolean } | null>;
   setBanned(userId: string, banned: boolean, reason: string | null): Promise<void>;
+  /** Bookings still in progress (requested through returned or disputed) where the user is a party. */
+  openBookingsOf(
+    userId: string,
+  ): Promise<Array<{ id: string; reference: string; ownerId: string; renterId: string }>>;
   bookings(status: string | undefined): Promise<AdminBookingRow[]>;
   openDisputes(): Promise<AdminBookingRow[]>;
   payouts(status: string | undefined): Promise<AdminPayoutRow[]>;
@@ -195,9 +199,24 @@ export function adminUseCases({
   admin,
   audit,
   clock,
+  notifications,
 }: {
   admin: AdminRepository;
   audit: AuditLog;
+  /** Tells the other party of open bookings when a member is suspended. */
+  notifications?: {
+    enqueue(
+      drafts: ReadonlyArray<{
+        userId: string;
+        type: string;
+        subject: string;
+        body: string;
+        link?: string;
+        dedupeKey: string;
+        channels: ReadonlyArray<"IN_APP" | "EMAIL">;
+      }>,
+    ): Promise<void>;
+  };
   clock: { now(): Date };
 }) {
   return {
@@ -242,6 +261,24 @@ export function adminUseCases({
       if (user.role === "admin")
         throw new PreconditionError("ADMIN_TARGET", "Administrators cannot be suspended here.");
       await admin.setBanned(userId, true, reason);
+      // Bookings are not cancelled automatically (money decisions stay with an administrator), but the
+      // other side of each one is told, so nobody waits on a member who can no longer act.
+      const open = await admin.openBookingsOf(userId);
+      const at = clock.now().getTime();
+      await notifications?.enqueue(
+        open.map((b) => {
+          const counterpartIsRenter = b.ownerId === userId;
+          return {
+            userId: counterpartIsRenter ? b.renterId : b.ownerId,
+            type: "booking.counterpartySuspended",
+            subject: `About booking ${b.reference}`,
+            body: `Peti has suspended the other member of booking ${b.reference}, so they cannot act on it. The booking is not cancelled automatically: a Peti administrator will review it, and any money you paid stays protected. Contact Peti if you need help.`,
+            link: counterpartIsRenter ? `/account/rentals/${b.id}` : `/lend/requests/${b.id}`,
+            dedupeKey: `${b.id}:counterparty-suspended:${at}`,
+            channels: ["IN_APP", "EMAIL"] as const,
+          };
+        }),
+      );
       await audit.record({
         actorUserId: me.userId,
         actorRole: "ADMIN",
@@ -249,9 +286,10 @@ export function adminUseCases({
         entityType: "user",
         entityId: userId,
         before: { banned: user.banned },
-        after: { banned: true },
+        after: { banned: true, openBookings: open.map((b) => b.reference) },
         reason,
       });
+      return { openBookings: open };
     },
 
     async reinstateUser(actor: Actor, input: unknown) {

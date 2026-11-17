@@ -5,6 +5,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { adminUseCases } from "@/modules/admin";
 import { prismaAdminRepository } from "@/modules/admin/infrastructure/prisma-admin-repository";
+import { prismaNotificationWriter } from "@/modules/notifications/infrastructure/notification-writer";
+import { usersUseCases } from "@/modules/users";
+import { prismaUserRepository } from "@/modules/users/infrastructure/prisma-user-repository";
 import type { UserActor } from "@/shared/application/actor";
 import { prismaAuditLog } from "@/shared/infrastructure/audit";
 import { buildApp } from "../support/app";
@@ -273,5 +276,160 @@ describe("the price the renter saw (#9)", () => {
     expect(await db.booking.findUniqueOrThrow({ where: { id: bookingId } })).toMatchObject({
       depositPaise: outfit.depositPaise + 100_000,
     });
+  });
+});
+
+describe("a category hidden by an administrator (#10)", () => {
+  it("does not stop the owner changing prices on a listing already in it", async () => {
+    const app = buildApp();
+    const { owner, admin, form, category } = await listingSetup();
+    const { id } = await app.listings.createListing(owner, form);
+    for (let i = 0; i < 3; i++) await app.listings.addPhoto(owner, id, new Uint8Array([1]), "");
+    await app.listings.submitForReview(owner, { outfitId: id });
+    await app.listings.approve(admin, { outfitId: id });
+    await db.outfitCategory.update({ where: { id: category.id }, data: { isActive: false } });
+
+    await app.listings.updateListing(owner, id, { ...form, price3: "3900" });
+    expect((await db.outfit.findUniqueOrThrow({ where: { id } })).minPricePaise).toBe(390_000);
+
+    // Moving a listing *into* a hidden category is still refused.
+    const { id: other } = await app.listings.createListing(owner, {
+      ...form,
+      categoryId: (
+        await db.outfitCategory.create({ data: { slug: "other-x", name: "Other X", audience: "MEN" } })
+      ).id,
+    });
+    await expect(app.listings.updateListing(owner, other, { ...form })).rejects.toMatchObject({
+      code: "VALIDATION_FAILED",
+    });
+  });
+});
+
+describe("an administrator's dispute decision (#11)", () => {
+  it("accepts amounts in rupees and paise, such as an exact late fee", async () => {
+    const { app, owner, admin, bookingId } = await returnedRental();
+    await app.bookings.openDispute(owner, {
+      bookingId,
+      kind: "DAMAGE",
+      description: "The hem is torn along twenty centimetres.",
+      claimedRupees: "5000",
+    });
+    await app.bookings.resolveDispute(admin, {
+      bookingId,
+      outcome: "COMPLETE",
+      depositWithheldRupees: "214.29",
+      retainedFeeRupees: "4500",
+      notes: "A small tear, repair estimated at the stated amount.",
+    });
+    const b = await db.booking.findUniqueOrThrow({ where: { id: bookingId }, include: { deposit: true } });
+    expect(b.deposit?.withheldPaise).toBe(21_429);
+    await expect(
+      app.bookings.resolveDispute(admin, {
+        bookingId,
+        outcome: "COMPLETE",
+        depositWithheldRupees: "1.005",
+        retainedFeeRupees: "0",
+        notes: "Fractions of a paisa are refused.",
+      }),
+    ).rejects.toBeTruthy();
+  });
+});
+
+describe("the completion notice (#12)", () => {
+  it("never promises a deposit refund when the whole deposit was withheld", async () => {
+    const { app, owner, renter, bookingId } = await returnedRental();
+    const booking = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
+    await app.bookings.openDispute(owner, {
+      bookingId,
+      kind: "DAMAGE",
+      description: "The hem is torn along twenty centimetres.",
+      claimedRupees: String(booking.depositPaise / 100),
+    });
+    await app.bookings.acceptClaim(renter, { bookingId });
+    const completed = await db.notification.findFirstOrThrow({
+      where: { userId: renter.userId, channel: "IN_APP", subject: { startsWith: "Completed" } },
+    });
+    expect(completed.body).not.toMatch(/deposit refund has been initiated/i);
+  });
+});
+
+describe("payout account changes (#13)", () => {
+  it("are audited and the account holder is told", async () => {
+    const { owner, ownerUser } = await listingSetup();
+    const users = usersUseCases({
+      users: prismaUserRepository(db),
+      audit: prismaAuditLog(db),
+      notifications: prismaNotificationWriter(db),
+    });
+    await users.savePayoutAccount(owner, { upiVpa: "owner.one@okbank", accountHolderName: "Owner One" });
+    await users.savePayoutAccount(owner, { upiVpa: "someone.else@okbank", accountHolderName: "Owner One" });
+
+    const audits = await db.auditLog.findMany({
+      where: { entityId: ownerUser.id, action: "user.payoutAccount" },
+    });
+    expect(audits).toHaveLength(2);
+    expect(audits[1]!.after).toMatchObject({ upiVpa: "someone.else@okbank" });
+    const notices = await db.notification.findMany({
+      where: { userId: ownerUser.id, type: "account.payoutAccountChanged" },
+    });
+    expect(notices.map((n) => n.channel).sort()).toEqual(["EMAIL", "EMAIL", "IN_APP", "IN_APP"]);
+  });
+});
+
+describe("removing an address (#14)", () => {
+  it("is refused while a listing collects from it", async () => {
+    const app = buildApp();
+    const { owner, form } = await listingSetup();
+    await app.listings.createListing(owner, form);
+    const users = usersUseCases({ users: prismaUserRepository(db) });
+    await expect(
+      users.removeAddress(owner, { addressId: String(form.pickupAddressId) }),
+    ).rejects.toMatchObject({ code: "ADDRESS_IN_USE" });
+    expect(await db.address.findUniqueOrThrow({ where: { id: String(form.pickupAddressId) } })).toMatchObject(
+      {
+        deletedAt: null,
+      },
+    );
+  });
+});
+
+describe("contact details after a rental (#15)", () => {
+  it("are hidden two weeks after completion", async () => {
+    const { app, owner, renter, bookingId } = await returnedRental();
+    await app.bookings.confirmReturn(owner, { bookingId });
+    expect((await app.bookings.detail(renter, bookingId)).owner.phone).not.toBeNull();
+
+    app.clock.advance(15 * 24 * 60 * 60 * 1000);
+    const later = await app.bookings.detail(renter, bookingId);
+    expect(later.owner.phone).toBeNull();
+    expect(later.pickupAddress).toBeNull();
+    expect((await app.bookings.detail(owner, bookingId)).renter.phone).toBeNull();
+  });
+});
+
+describe("suspending a member with open bookings (#16)", () => {
+  it("tells the other side of each open booking", async () => {
+    const app = buildBookingApp();
+    const s = await scenario();
+    const { bookingId } = await app.bookings.request(s.renter, {
+      outfitId: s.outfit.id,
+      startDate: "2026-12-10",
+      days: 3,
+      acceptTerms: "on",
+    });
+    await app.bookings.approve(s.owner, { bookingId });
+    await app.payThroughSandbox(s.renter, bookingId);
+    const adminCases = adminUseCases({
+      admin: prismaAdminRepository(db),
+      audit: prismaAuditLog(db),
+      clock: app.clock,
+      notifications: prismaNotificationWriter(db),
+    });
+    await adminCases.suspendUser(s.admin, { userId: s.owner.userId, reason: "Repeated no-shows reported." });
+    const notices = await db.notification.findMany({
+      where: { userId: s.renter.userId, type: "booking.counterpartySuspended" },
+    });
+    expect(notices.length).toBe(2);
+    expect(notices[0]!.link).toBe(`/account/rentals/${bookingId}`);
   });
 });
