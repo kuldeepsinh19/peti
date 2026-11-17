@@ -281,7 +281,9 @@ export function BookingView({
                 </p>
               )
             ) : null}
-            {role !== "ADMIN" ? (
+            {/* Same rule as the cancel use case: once the handover is recorded or the rental has started,
+                problems go through a dispute instead. */}
+            {role !== "ADMIN" && handover === undefined && today < b.startDate ? (
               <details className="border-t border-rule pt-4">
                 <summary className="cursor-pointer text-sm text-graphite">Cancel this booking</summary>
                 <p className="mt-3 text-sm text-graphite">
