@@ -25,9 +25,11 @@ export interface ImageProcessor {
   process(input: Uint8Array): Promise<ProcessedImage>;
 }
 
-/** Storage keys are namespaced by visibility: listing photos are public, condition-report photos are not. */
+/**
+ * Storage keys are namespaced: `outfits/` (listing photographs: public while the listing is published, see
+ * the files route) and `avatars/` are public; everything else (`reports/`, `disputes/`) is private.
+ */
 export const PUBLIC_PREFIXES = ["outfits/", "avatars/"] as const;
-export const PRIVATE_PREFIXES = ["reports/", "disputes/"] as const;
 
 export function isSafeKey(key: string): boolean {
   return /^[a-z]+\/[a-zA-Z0-9/_-]+\.(jpg|jpeg|png|webp)$/.test(key) && !key.includes("..");

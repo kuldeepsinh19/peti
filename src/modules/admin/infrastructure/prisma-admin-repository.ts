@@ -1,4 +1,5 @@
 import "server-only";
+import { OPEN_STATUSES } from "@/modules/bookings";
 import type { Db } from "@/shared/infrastructure/prisma";
 import { localDateFromDb } from "@/shared/domain/local-date";
 import type { AdminBookingRow, AdminRepository, Metrics } from "../application/admin";
@@ -218,9 +219,7 @@ export function prismaAdminRepository(db: Db): AdminRepository {
       db.booking.findMany({
         where: {
           OR: [{ ownerId: userId }, { renterId: userId }],
-          status: {
-            in: ["PENDING_APPROVAL", "AWAITING_PAYMENT", "CONFIRMED", "ACTIVE", "RETURNED", "DISPUTED"],
-          },
+          status: { in: [...OPEN_STATUSES] },
         },
         select: { id: true, reference: true, ownerId: true, renterId: true },
       }),

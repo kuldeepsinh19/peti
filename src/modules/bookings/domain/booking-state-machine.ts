@@ -96,10 +96,6 @@ export function holdsCalendar(status: BookingStatus): boolean {
   return HOLDING_STATUSES.includes(status);
 }
 
-export function isTerminal(status: BookingStatus): boolean {
-  return TERMINAL_STATUSES.includes(status);
-}
-
 export class InvalidTransitionError extends PreconditionError {
   constructor(from: BookingStatus, command: BookingCommand, role: BookingActorRole) {
     super(

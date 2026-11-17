@@ -57,10 +57,6 @@ export const signInSchema = z.object({
   password: z.string().min(1, "Enter your password."),
 });
 
-export const phoneSchema = z.object({
-  phone: z.string().trim().min(10, "Enter your 10-digit mobile number."),
-});
-
 export const otpSchema = z.object({
   code: z
     .string()
