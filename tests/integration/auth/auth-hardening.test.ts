@@ -160,6 +160,8 @@ describe("public demo: no self-service account management", () => {
 });
 
 describe("sign-up cannot attach a mobile number", () => {
+  // Better Auth's phone plugin refuses it (PHONE_NUMBER_CANNOT_BE_SET); this pins that behaviour, since a
+  // number set at sign-up would let anyone claim, and so block, a stranger's (unique) number.
   it("refuses a phone number in the sign-up body, so nobody can claim a stranger's number", async () => {
     const { call } = authFor();
     const res = await call("/sign-up/email", {
