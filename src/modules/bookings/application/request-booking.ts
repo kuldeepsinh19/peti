@@ -39,6 +39,16 @@ export async function requestBooking(deps: BookingsDeps, actor: Actor, input: un
     const option = await store.findPriceOption(outfit.id, data.days);
     if (!option)
       throw new PreconditionError("DURATION_NOT_OFFERED", "The owner does not offer that rental length.");
+    // The renter accepts the amounts they were shown, not whatever the owner set a moment later.
+    const priceMoved = data.quotedPricePaise !== undefined && data.quotedPricePaise !== option.pricePaise;
+    const depositMoved =
+      data.quotedDepositPaise !== undefined && data.quotedDepositPaise !== outfit.depositPaise;
+    if (priceMoved || depositMoved) {
+      throw new PreconditionError(
+        "PRICE_CHANGED",
+        "The owner has changed the price or deposit since you opened this page. Reload it to see the new amounts.",
+      );
+    }
 
     const dates = rentalDates(startDate, data.days);
     const range = holdRange(dates, outfit.turnaroundDays);

@@ -77,6 +77,9 @@ describe("RequestForm", () => {
       days: 3,
       note: "",
       acceptTerms: true,
+      // The amounts shown, so the server can refuse the request if the owner changed them meanwhile.
+      quotedPricePaise: 450_000,
+      quotedDepositPaise: 800_000,
     });
     expect(push).toHaveBeenCalledWith("/account/rentals/b1?requested=1");
   });

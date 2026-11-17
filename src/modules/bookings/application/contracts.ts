@@ -26,6 +26,9 @@ export const requestBookingSchema = z.object({
       "Choose a rental length.",
     ),
   note: optionalText(500),
+  /** What the request page showed the renter (paise). A request is refused if the listing changed since. */
+  quotedPricePaise: z.coerce.number().int().min(0).optional(),
+  quotedDepositPaise: z.coerce.number().int().min(0).optional(),
   acceptTerms: accepted,
 });
 export type RequestBookingInput = z.input<typeof requestBookingSchema>;

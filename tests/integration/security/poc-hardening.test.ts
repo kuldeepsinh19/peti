@@ -238,3 +238,40 @@ describe("an outfit never published", () => {
     });
   });
 });
+
+describe("the price the renter saw (#9)", () => {
+  it("refuses a request whose quoted price or deposit no longer matches the listing", async () => {
+    const app = buildBookingApp();
+    const s = await scenario();
+    const option = await db.outfitPriceOption.findFirstOrThrow({
+      where: { outfitId: s.outfit.id, durationDays: 3 },
+    });
+    const outfit = await db.outfit.findUniqueOrThrow({ where: { id: s.outfit.id } });
+    const request = (quote: { quotedPricePaise: number; quotedDepositPaise: number }) =>
+      app.bookings.request(s.renter, {
+        outfitId: s.outfit.id,
+        startDate: "2026-12-10",
+        days: 3,
+        acceptTerms: "on",
+        ...quote,
+      });
+
+    // The owner raises the deposit after the renter opened the page.
+    await db.outfit.update({
+      where: { id: s.outfit.id },
+      data: { depositPaise: outfit.depositPaise + 100_000 },
+    });
+    await expect(
+      request({ quotedPricePaise: option.pricePaise, quotedDepositPaise: outfit.depositPaise }),
+    ).rejects.toMatchObject({ code: "PRICE_CHANGED" });
+    expect(await db.booking.count()).toBe(0);
+
+    const { bookingId } = await request({
+      quotedPricePaise: option.pricePaise,
+      quotedDepositPaise: outfit.depositPaise + 100_000,
+    });
+    expect(await db.booking.findUniqueOrThrow({ where: { id: bookingId } })).toMatchObject({
+      depositPaise: outfit.depositPaise + 100_000,
+    });
+  });
+});

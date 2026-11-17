@@ -79,7 +79,15 @@ export function RequestForm({
     setPending(true);
     setError(null);
     try {
-      const result = await action({ outfitId, startDate: toIso(start), days, note, acceptTerms: accepted });
+      const result = await action({
+        outfitId,
+        startDate: toIso(start),
+        days,
+        note,
+        acceptTerms: accepted,
+        quotedPricePaise: price,
+        quotedDepositPaise: depositPaise,
+      });
       if (!result.ok) {
         setError(Object.values(result.error.fieldErrors ?? {})[0]?.[0] ?? result.error.message);
         setPending(false);
