@@ -157,11 +157,11 @@ function draftsFor(b: BookingRecord, to: BookingStatus, historyId: number): Noti
       return [
         toRenter(
           `Completed: ${b.outfitTitle}`,
-          `Booking ${b.reference} is complete. Your deposit refund has been initiated. You can now leave a review.`,
+          `Booking ${b.reference} is complete. Any deposit refund due to you has been started; the booking page shows the amounts. You can now leave a review.`,
         ),
         toOwner(
           `Completed: ${b.outfitTitle}`,
-          `Booking ${b.reference} is complete and your payout is recorded. You can now review the renter.`,
+          `Booking ${b.reference} is complete. Any payout due to you is recorded; the booking page shows the amounts. You can now review the renter.`,
         ),
       ];
     default:
