@@ -30,6 +30,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:reset": "prisma migrate reset --force",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:bookings": "tsx --conditions=react-server prisma/seed-bookings.ts",
     "db:drift": "prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code",
     "db:test:prepare": "tsx scripts/prepare-test-db.ts",
     "jobs:sweep": "tsx scripts/sweep.ts",
