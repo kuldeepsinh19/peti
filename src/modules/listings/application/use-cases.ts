@@ -20,6 +20,7 @@ import {
   photoIdSchema,
 } from "./contracts";
 import type { ListingData, ListingsDeps, OwnedOutfit } from "./ports";
+import { isUuid } from "@/shared/domain/ids";
 
 function toListingData(form: ListingFormData): ListingData {
   const prices = marketplacePolicy.durationOptionsDays
@@ -115,7 +116,7 @@ export function listingsUseCases(deps: ListingsDeps) {
   /** Loads an outfit and checks the actor owns it (admins are not owners: they use moderation). */
   async function owned(actor: Actor, outfitId: string): Promise<OwnedOutfit> {
     const user = requireUser(actor);
-    const outfit = await listings.findOwned(outfitId);
+    const outfit = isUuid(outfitId) ? await listings.findOwned(outfitId) : null;
     if (!outfit) throw new NotFoundError("Listing");
     if (outfit.ownerId !== user.userId) throw new ForbiddenError("Only the owner can change this listing.");
     return outfit;

@@ -16,6 +16,7 @@ import type { BookingsDeps } from "./ports";
 import type { BookingDetail, BookingQueries } from "./queries";
 import { requestBooking } from "./request-booking";
 import { runBookingSweep } from "./sweep";
+import { isUuid } from "@/shared/domain/ids";
 
 /** Contact details and the pickup address are shared only once a booking is paid. */
 const CONTACT_DAYS_AFTER_COMPLETION = 14;
@@ -58,7 +59,7 @@ export function bookingsUseCases(deps: BookingsDeps & { queries: BookingQueries 
       bookingId: string,
     ): Promise<BookingDetail & { viewerRole: "RENTER" | "OWNER" | "ADMIN" }> {
       const user = requireUser(actor);
-      const d = await queries.detail(bookingId);
+      const d = isUuid(bookingId) ? await queries.detail(bookingId) : null;
       if (!d) throw new NotFoundError("Booking");
       const viewerRole =
         user.userId === d.owner.id

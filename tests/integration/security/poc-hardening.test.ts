@@ -582,3 +582,15 @@ describe("photograph counts under concurrent requests (#18, #19, decision 3)", (
     });
   });
 });
+
+describe("a malformed id in the address bar (#24)", () => {
+  it("is not found, not a server error", async () => {
+    const app = buildApp();
+    const bookingApp = buildBookingApp();
+    const s = await listingSetup();
+    for (const id of ["not-a-uuid", "1", "' OR 1=1 --"]) {
+      await expect(app.listings.getForEdit(s.owner, id)).rejects.toMatchObject({ code: "NOT_FOUND" });
+      await expect(bookingApp.bookings.detail(s.owner, id)).rejects.toMatchObject({ code: "NOT_FOUND" });
+    }
+  });
+});
