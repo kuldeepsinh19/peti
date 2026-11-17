@@ -1,4 +1,5 @@
 import "server-only";
+import { legalDocuments } from "@/config/site";
 import { prismaAdapter } from "@better-auth/prisma-adapter";
 import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
@@ -101,6 +102,19 @@ export function createAuth({ env, db, mail, sms, rateLimiter }: AuthDeps) {
     disabledPaths: [...DISABLED_PATHS, ...(allowsSelfServiceAccounts(env) ? [] : DEMO_DISABLED_PATHS)],
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
+        // Sign-up is checked here, before Better Auth writes anything: the browser form is a convenience,
+        // and a request that skips it must not create an account without consent or with a name the
+        // profile cannot hold (which used to leave an account with no profile).
+        if (ctx.path === "/sign-up/email") {
+          const body = (ctx.body ?? {}) as { name?: unknown; acceptTerms?: unknown };
+          if (body.acceptTerms !== true) {
+            throw new APIError("BAD_REQUEST", { message: "Please accept the terms to continue." });
+          }
+          const name = typeof body.name === "string" ? body.name.trim() : "";
+          if (name.length < 2 || name.length > 60) {
+            throw new APIError("BAD_REQUEST", { message: "Enter a name between 2 and 60 characters." });
+          }
+        }
         const phonePath = ctx.path === "/phone-number/verify" || ctx.path === "/phone-number/send-otp";
         const session = phonePath ? await getSessionFromCtx(ctx) : null;
         // Phone numbers are only ever verified for, and attached to, the signed-in account: sending or
@@ -180,14 +194,25 @@ export function createAuth({ env, db, mail, sms, rateLimiter }: AuthDeps) {
         "/phone-number/verify": { window: 300, max: 10 },
       },
     },
+    user: {
+      // Written only by the sign-up hook below, never from the request body.
+      additionalFields: {
+        termsAcceptedAt: { type: "date", required: false, input: false },
+        termsVersion: { type: "string", required: false, input: false },
+      },
+    },
     databaseHooks: {
       user: {
         create: {
+          // Sign-up reaches here only with the terms accepted (checked in hooks.before).
+          before: async (user) => ({
+            data: { ...user, termsAcceptedAt: new Date(), termsVersion: legalDocuments.version },
+          }),
           // Every account gets an app-owned profile row.
           after: async (user) => {
             await db.userProfile.upsert({
               where: { userId: user.id },
-              create: { userId: user.id, displayName: user.name.slice(0, 60) },
+              create: { userId: user.id, displayName: user.name.trim().slice(0, 60) },
               update: {},
             });
           },

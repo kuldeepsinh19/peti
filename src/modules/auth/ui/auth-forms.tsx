@@ -34,8 +34,10 @@ export function SignUpForm() {
       name: values.name.trim(),
       email: values.email.trim().toLowerCase(),
       password: values.password,
+      // Checked and recorded by the server; the account is not created without it.
+      acceptTerms: values.acceptTerms,
       callbackURL: "/account?verified=1",
-    });
+    } as Parameters<typeof authClient.signUp.email>[0]);
     if (error) {
       setFormError(
         error.code === "USER_ALREADY_EXISTS" || error.status === 422

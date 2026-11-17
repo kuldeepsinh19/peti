@@ -4,6 +4,7 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { parseEnv, type Env } from "@/config/env";
+import { legalDocuments } from "@/config/site";
 import { DEMO_DISABLED_PATHS, DISABLED_PATHS, createAuth } from "@/modules/auth/infrastructure/better-auth";
 import { systemClock } from "@/shared/domain/clock";
 import { postgresRateLimiter } from "@/shared/infrastructure/rate-limiter";
@@ -148,6 +149,7 @@ describe("public demo: no self-service account management", () => {
       name: "Rohan",
       email: "rohan@peti.local",
       password: "peti-demo-password",
+      acceptTerms: true,
     });
     const { call } = authFor(demoEnv);
     const res = await call(
@@ -168,6 +170,7 @@ describe("sign-up cannot attach a mobile number", () => {
       name: "Squatter",
       email: "squatter@example.in",
       password: "a-long-enough-password",
+      acceptTerms: true,
       phoneNumber: "+919876543210",
     });
     expect(res.status).toBe(400);
@@ -178,8 +181,58 @@ describe("sign-up cannot attach a mobile number", () => {
       name: "Squatter",
       email: "squatter2@example.in",
       password: "a-long-enough-password",
+      acceptTerms: true,
       phoneNumberVerified: true,
     });
     expect(verifiedFlag.status).toBe(400);
+  });
+});
+
+describe("sign-up consent and name (#7, #17)", () => {
+  const signUp = (call: ReturnType<typeof authFor>["call"], body: Record<string, unknown>) =>
+    call("/sign-up/email", { password: "a-long-enough-password", ...body });
+
+  it("creates nothing without accepted terms or with a name the profile cannot hold", async () => {
+    const { call } = authFor();
+    for (const body of [
+      { name: "Asha Mehta", email: "no-terms@example.in" },
+      { name: "Asha Mehta", email: "false-terms@example.in", acceptTerms: false },
+      { name: "x", email: "short@example.in", acceptTerms: true },
+      { name: "   ", email: "blank@example.in", acceptTerms: true },
+      { name: "a".repeat(61), email: "long@example.in", acceptTerms: true },
+    ]) {
+      expect((await signUp(call, body)).status).toBe(400);
+    }
+    expect(await db.user.count()).toBe(0);
+  });
+
+  it("records when the terms were accepted, and which version, with the profile", async () => {
+    const { call } = authFor();
+    const res = await signUp(call, { name: "  Asha Mehta ", email: "asha@example.in", acceptTerms: true });
+    expect(res.status).toBe(200);
+    const user = await db.user.findUniqueOrThrow({
+      where: { email: "asha@example.in" },
+      include: { profile: true },
+    });
+    expect(user.termsVersion).toBe(legalDocuments.version);
+    expect(user.termsAcceptedAt).toBeInstanceOf(Date);
+    expect(user.profile?.displayName).toBe("Asha Mehta");
+  });
+
+  it("cannot be given an acceptance date by the request", async () => {
+    const { call } = authFor();
+    await signUp(call, {
+      name: "Asha Mehta",
+      email: "forged@example.in",
+      acceptTerms: true,
+      termsAcceptedAt: "2001-01-01T00:00:00Z",
+      termsVersion: "forged",
+    });
+    const user = await db.user.findUnique({ where: { email: "forged@example.in" } });
+    // Either refused outright, or stamped by the server — never the values sent.
+    if (user) {
+      expect(user.termsVersion).toBe(legalDocuments.version);
+      expect(user.termsAcceptedAt!.getFullYear()).not.toBe(2001);
+    }
   });
 });

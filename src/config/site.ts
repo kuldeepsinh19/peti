@@ -9,6 +9,15 @@ export const site = {
   repositoryUrl: "https://github.com/kuldeepsinh19/peti",
 } as const;
 
+/**
+ * Versions of the terms and privacy notice a member accepts at sign-up (stored on the account). Bump when
+ * either document changes; the pages show the same date.
+ */
+export const legalDocuments = {
+  version: "2026-11-12",
+  updated: "12 November 2026",
+} as const;
+
 export const primaryNav = [
   { href: "/explore", label: "Explore outfits" },
   { href: "/how-it-works", label: "How it works" },

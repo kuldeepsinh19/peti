@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { legalDocuments } from "@/config/site";
 import { marketplacePolicy as policy } from "@/config/marketplace-policy";
 import { Notice } from "@/shared/ui/feedback";
 import { Article } from "../../_components/article";
@@ -10,7 +11,7 @@ export default function TermsPage() {
     <Article
       eyebrow="Terms of use"
       title="Terms"
-      updated="12 November 2026"
+      updated={legalDocuments.updated}
       lede="These are the working terms of an open-source early release. They describe how the product behaves; they have not been reviewed by a lawyer and must be before Peti handles real money."
       aside={
         <Notice tone="warning" title="Draft">

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { legalDocuments } from "@/config/site";
 import { Notice } from "@/shared/ui/feedback";
 import { Article } from "../../_components/article";
 
@@ -9,7 +10,7 @@ export default function PrivacyPage() {
     <Article
       eyebrow="Privacy notice"
       title="Privacy"
-      updated="12 November 2026"
+      updated={legalDocuments.updated}
       lede="Peti collects the minimum it needs to run rentals between people who have never met. This notice lists exactly what that is."
       aside={
         <Notice tone="warning" title="Draft">
