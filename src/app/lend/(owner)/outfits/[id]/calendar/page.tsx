@@ -30,7 +30,7 @@ export default async function CalendarPage({
     if (error instanceof DomainError) notFound();
     throw error;
   });
-  const entries = await bookings.calendar(id);
+  const entries = await bookings.calendar(actor, id);
   const query = await searchParams;
   const today = localDateInIndia(clock.now());
 

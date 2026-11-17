@@ -1,6 +1,6 @@
 import type { Actor } from "@/shared/application/actor";
 import { requireUser } from "@/shared/application/authorization";
-import { NotFoundError } from "@/shared/domain/errors";
+import { ForbiddenError, NotFoundError } from "@/shared/domain/errors";
 import { holdsCalendar } from "../domain/booking-state-machine";
 import { addOwnerBlock, removeOwnerBlock } from "./calendar";
 import { acknowledgeHandover, confirmReturn, recordReturn, submitHandoverReport } from "./rental";
@@ -86,8 +86,16 @@ export function bookingsUseCases(deps: BookingsDeps & { queries: BookingQueries 
       };
     },
 
-    /** Owner's view of an outfit's calendar (holds and blocks). */
-    calendar: (outfitId: string) => queries.calendar(outfitId),
+    /** Owner's view of an outfit's calendar (holds, blocks, booking references and block notes). */
+    async calendar(actor: Actor, outfitId: string) {
+      const user = requireUser(actor);
+      const ownerId = isUuid(outfitId) ? await queries.outfitOwnerId(outfitId) : null;
+      if (!ownerId) throw new NotFoundError("Outfit");
+      if (ownerId !== user.userId && !user.isAdmin) {
+        throw new ForbiddenError("Only the owner can see this calendar.");
+      }
+      return queries.calendar(outfitId);
+    },
     /** Public: the date ranges an outfit is unavailable, without saying why. */
     async unavailableRanges(outfitId: string) {
       return (await queries.calendar(outfitId)).map((h) => ({

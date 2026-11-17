@@ -141,6 +141,7 @@ export interface BookingQueries extends SweepCandidates {
   forOwner(userId: string, statuses?: readonly BookingStatus[]): Promise<BookingListRow[]>;
   detail(bookingId: string): Promise<BookingDetail | null>;
   calendar(outfitId: string): Promise<CalendarEntry[]>;
+  outfitOwnerId(outfitId: string): Promise<string | null>;
   isParticipant(userId: string, bookingId: string): Promise<boolean>;
   bookingIdForReportPhoto(storageKey: string): Promise<string | null>;
 }

@@ -290,6 +290,9 @@ export function prismaBookingQueries(db: Db): BookingQueries {
       }));
     },
 
+    outfitOwnerId: async (outfitId) =>
+      (await db.outfit.findUnique({ where: { id: outfitId }, select: { ownerId: true } }))?.ownerId ?? null,
+
     isParticipant: async (userId, bookingId) =>
       (await db.booking.count({
         where: { id: bookingId, OR: [{ ownerId: userId }, { renterId: userId }] },

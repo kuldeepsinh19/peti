@@ -634,3 +634,23 @@ describe("photographs of a listing that is not published (#25)", () => {
     expect(await app.listings.photoVisibility("outfits/x/0.jpg", async () => s.admin)).toBeNull();
   });
 });
+
+describe("an outfit's calendar (#32)", () => {
+  it("is shown only to its owner and administrators", async () => {
+    const app = buildApp();
+    const bookingApp = buildBookingApp();
+    const s = await listingSetup();
+    const id = await publishListing(app, s.form, s.owner, s.admin);
+    await bookingApp.bookings.addOwnerBlock(s.owner, {
+      outfitId: id,
+      from: "2027-02-01",
+      to: "2027-02-03",
+      note: "Family wedding",
+    });
+
+    expect(await bookingApp.bookings.calendar(s.owner, id)).toMatchObject([{ note: "Family wedding" }]);
+    expect(await bookingApp.bookings.calendar(asAdmin(s.stranger), id)).toHaveLength(1);
+    await expect(bookingApp.bookings.calendar(s.stranger, id)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(bookingApp.bookings.calendar(s.owner, "nope")).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+});
