@@ -74,9 +74,10 @@ export default function HowItWorksPage() {
                   confirmed.
                 </li>
                 <li>
-                  <strong>Create the listing.</strong> Photographs (up to {policy.maxListingPhotos}), an
-                  honest description, the category and occasions it suits, its retail value, real
-                  measurements, its condition, your locality and a price for each duration you offer.
+                  <strong>Create the listing.</strong> Photographs (at least {policy.minListingPhotos}, up to{" "}
+                  {policy.maxListingPhotos}), an honest description, the category and occasions it suits, its
+                  retail value, real measurements, its condition, your locality and a price for each duration
+                  you offer.
                 </li>
                 <li>
                   <strong>Set the deposit and cleaning days.</strong> The deposit is refundable and must be at

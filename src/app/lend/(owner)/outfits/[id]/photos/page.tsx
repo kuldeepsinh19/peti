@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { container } from "@/composition/container";
 import { requireActorOrRedirect } from "@/composition/session";
+import { marketplacePolicy } from "@/config/marketplace-policy";
 import { allowsPhotoUploads } from "@/config/env";
 import { type ListingEditView, PHOTO_UPLOADS_DISABLED_MESSAGE } from "@/modules/listings";
 import { ListingSteps } from "@/modules/listings/ui/listing-steps";
@@ -32,7 +33,8 @@ export default async function ListingPhotosPage({
     throw error;
   }
   const frozen = view.status === "SUSPENDED" || view.status === "ARCHIVED";
-  const hasPhotos = view.photos.length > 0;
+  const min = marketplacePolicy.minListingPhotos;
+  const hasEnough = view.photos.length >= min;
 
   return (
     <div className="pb-16">
@@ -43,7 +45,7 @@ export default async function ListingPhotosPage({
             Show it <span className="display-italic">off</span>
           </>
         }
-        lede="Renters decide on the photographs. Three or four good ones in daylight do more than eight dim ones."
+        lede={`Renters decide on the photographs. Add at least ${marketplacePolicy.minListingPhotos}: the front, the back and a close-up of the work. Good ones in daylight do more than eight dim ones.`}
       />
       <ListingSteps current="photos" outfitId={view.id} />
       <div className="mt-8 flex flex-col gap-4">
@@ -74,10 +76,12 @@ export default async function ListingPhotosPage({
         )}
       </div>
       <div className="mt-12 flex flex-wrap items-center gap-4 border-t border-ink pt-6">
-        {hasPhotos ? (
+        {hasEnough ? (
           <ButtonLink href={`/lend/outfits/${view.id}/preview`}>Continue to preview</ButtonLink>
         ) : (
-          <p className="text-sm text-graphite">Add at least one photograph to continue.</p>
+          <p className="text-sm text-graphite">
+            Add at least {min} photographs to continue ({view.photos.length} so far).
+          </p>
         )}
         <ButtonLink href={`/lend/outfits/${view.id}/edit`} variant="quiet">
           Back to details

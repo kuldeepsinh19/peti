@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { container } from "@/composition/container";
 import { requireActorOrRedirect } from "@/composition/session";
+import { marketplacePolicy } from "@/config/marketplace-policy";
 import { outfitStatusLabel, type ListingEditView } from "@/modules/listings";
 import { RentalPolicies } from "@/modules/bookings/ui/rental-policies";
 import { ListingSteps } from "@/modules/listings/ui/listing-steps";
@@ -39,7 +40,8 @@ export default async function ListingPreviewPage({
   }
   const outfit = await container().search.outfit(actor, view.slug);
   const s = view.status;
-  const canSubmit = (s === "DRAFT" || s === "REJECTED") && view.photos.length > 0;
+  const enoughPhotos = view.photos.length >= marketplacePolicy.minListingPhotos;
+  const canSubmit = (s === "DRAFT" || s === "REJECTED") && enoughPhotos;
 
   return (
     <div className="pb-16">
@@ -69,9 +71,10 @@ export default async function ListingPreviewPage({
             {view.moderationNote}
           </Notice>
         ) : null}
-        {view.photos.length === 0 ? (
-          <Notice tone="warning" title="Add a photograph first">
-            A listing needs at least one photograph before it can be submitted.
+        {!enoughPhotos ? (
+          <Notice tone="warning" title="Add more photographs first">
+            A listing needs at least {marketplacePolicy.minListingPhotos} photographs before it can be
+            submitted: the front, the back and a close-up of the work. It has {view.photos.length}.
           </Notice>
         ) : null}
       </div>

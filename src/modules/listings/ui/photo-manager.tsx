@@ -272,7 +272,8 @@ export function PhotoManager({
           </span>
           <span className="max-w-md text-sm text-graphite">
             Drop them here or <span className="text-burgundy underline">choose from your device</span>. JPEG,
-            PNG or WebP; up to {room} more. Large phone photos are resized for you.
+            PNG or WebP; up to {room} more. A listing needs at least {marketplacePolicy.minListingPhotos}{" "}
+            before it can be submitted. Large phone photos are resized for you.
           </span>
           <input
             id={inputId}

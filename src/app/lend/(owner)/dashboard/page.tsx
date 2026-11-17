@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { container } from "@/composition/container";
 import { requireActorOrRedirect } from "@/composition/session";
+import { marketplacePolicy } from "@/config/marketplace-policy";
 import { type OwnerListingRow, outfitStatusLabel } from "@/modules/listings";
 import { outfitStatusExplanation, outfitStatusTone } from "@/modules/listings/ui/status";
 import { fileUrl } from "@/modules/media";
@@ -60,7 +61,7 @@ function Actions({ row }: { row: OwnerListingRow }) {
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
       {s === "DRAFT" || s === "REJECTED" ? (
-        row.photoCount > 0 ? (
+        row.photoCount >= marketplacePolicy.minListingPhotos ? (
           <ButtonLink href={`/lend/outfits/${row.id}/preview`} size="sm">
             Preview and submit
           </ButtonLink>
