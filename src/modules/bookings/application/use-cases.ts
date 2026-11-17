@@ -18,6 +18,8 @@ import { requestBooking } from "./request-booking";
 import { runBookingSweep } from "./sweep";
 
 /** Contact details and the pickup address are shared only once a booking is paid. */
+const CONTACT_DAYS_AFTER_COMPLETION = 14;
+const DAY_MS = 24 * 60 * 60 * 1000;
 const CONTACT_VISIBLE = new Set(["CONFIRMED", "ACTIVE", "RETURNED", "DISPUTED", "COMPLETED"]);
 
 export function bookingsUseCases(deps: BookingsDeps & { queries: BookingQueries }) {
@@ -67,7 +69,13 @@ export function bookingsUseCases(deps: BookingsDeps & { queries: BookingQueries 
               ? "ADMIN"
               : null;
       if (!viewerRole) throw new NotFoundError("Booking");
-      if (CONTACT_VISIBLE.has(d.status) || viewerRole === "ADMIN") return { ...d, viewerRole };
+      // Shared once paid, and for the review window after completion; not indefinitely.
+      const afterRental =
+        d.status === "COMPLETED" &&
+        d.completedAt !== null &&
+        deps.clock.now().getTime() - d.completedAt.getTime() > CONTACT_DAYS_AFTER_COMPLETION * DAY_MS;
+      if ((CONTACT_VISIBLE.has(d.status) && !afterRental) || viewerRole === "ADMIN")
+        return { ...d, viewerRole };
       return {
         ...d,
         viewerRole,
