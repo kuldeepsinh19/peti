@@ -30,7 +30,8 @@ export interface PaymentRepository {
     provider: ProviderId,
     amountPaise: number,
   ): Promise<{ id: string; status: string; providerOrderId: string | null; provider: string }>;
-  setOrderId(paymentId: string, providerOrderId: string): Promise<void>;
+  /** Stores the order id unless one is already stored; returns the stored one (the first writer wins). */
+  setOrderId(paymentId: string, providerOrderId: string): Promise<string>;
   findByOrder(provider: ProviderId, providerOrderId: string): Promise<PaymentRef | null>;
   findForBooking(bookingId: string): Promise<PaymentRef | null>;
   /** Orders to ask the provider about again (recent, and not checked lately), least recently checked first. */
@@ -298,14 +299,14 @@ export function paymentsUseCases(deps: PaymentsDeps) {
       let orderId = payment.providerOrderId;
       if (!orderId) {
         // Provider calls never happen inside a database transaction.
-        orderId = (
-          await provider.createOrder({
-            reference: payment.id,
-            amountPaise: booking.money.renterTotalPaise,
-            notes: { bookingId: booking.id, paymentId: payment.id },
-          })
-        ).providerOrderId;
-        await payments.setOrderId(payment.id, orderId);
+        const created = await provider.createOrder({
+          reference: payment.id,
+          amountPaise: booking.money.renterTotalPaise,
+          notes: { bookingId: booking.id, paymentId: payment.id },
+        });
+        // A concurrent checkout may have stored its order first: use that one. The other order is never
+        // shown to the renter, so nothing can be paid on it (an unpaid order simply lapses).
+        orderId = await payments.setOrderId(payment.id, created.providerOrderId);
       }
       return provider.checkoutSession(orderId, booking.money.renterTotalPaise, {
         callbackUrl: `${deps.appUrl}/api/payments/callback/${provider.id}`,

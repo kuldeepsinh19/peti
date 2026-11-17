@@ -58,7 +58,17 @@ export function prismaPaymentRepository(db: Db): PaymentRepository {
     },
 
     async setOrderId(paymentId, providerOrderId) {
-      await db.payment.update({ where: { id: paymentId }, data: { providerOrderId } });
+      // Compare-and-swap: two checkouts started at once both create an order; only the first is stored,
+      // and both callers continue with the stored one.
+      await db.payment.updateMany({
+        where: { id: paymentId, providerOrderId: null },
+        data: { providerOrderId },
+      });
+      const row = await db.payment.findUniqueOrThrow({
+        where: { id: paymentId },
+        select: { providerOrderId: true },
+      });
+      return row.providerOrderId!;
     },
 
     async findByOrder(provider, providerOrderId) {

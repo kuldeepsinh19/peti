@@ -435,3 +435,21 @@ describe("payment reconciliation sweep", () => {
     expect(await app.payments.reconcilePayments()).toEqual({ checked: 0, applied: 0, errors: 0 });
   });
 });
+
+describe("starting checkout twice at once", () => {
+  it("creates one provider order, and the renter's payment on either session confirms the booking", async () => {
+    const app = buildBookingApp();
+    const booking = await approvedBooking(app);
+    const sessions = await Promise.all([
+      app.payments.startCheckout(booking.renter, booking.bookingId),
+      app.payments.startCheckout(booking.renter, booking.bookingId),
+    ]);
+    const orderIds = sessions.map((s) => (s as { url: string }).url.split("/").pop()!);
+    expect(orderIds[0]).toBe(orderIds[1]);
+    const stored = await db.payment.findUniqueOrThrow({ where: { bookingId: booking.bookingId } });
+    expect(stored.providerOrderId).toBe(orderIds[0]);
+
+    const sim = await app.sandbox.simulate(orderIds[1]!, "pay-callback-only");
+    expect((await app.payments.handleCallback(sim.callback!)).outcome).toBe("CONFIRMED");
+  });
+});
