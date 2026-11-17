@@ -13,6 +13,7 @@ import { hashPassword } from "better-auth/crypto";
 import sharp from "sharp";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { parseEnv } from "../src/config/env";
+import { marketplacePolicy } from "../src/config/marketplace-policy";
 import { filesystemStorage, s3Storage } from "../src/modules/media/infrastructure/storage";
 import { categories, demoPassword, localities, outfits, users } from "./seed-data";
 
@@ -93,10 +94,45 @@ async function seedUsers(): Promise<Map<string, string>> {
   return ids;
 }
 
-async function storePhoto(file: string, outfitSlug: string, index: number) {
-  const source = await readFile(path.join(import.meta.dirname, "seed-assets", file));
-  const { data, info } = await sharp(source)
-    .rotate()
+/**
+ * A seeded photograph: a whole asset, or a crop of one. Listings need at least
+ * `marketplacePolicy.minListingPhotos` photographs, and there is one licensed asset per garment, so the extra
+ * photographs are crops of the garment's own picture (the upper part, and a close-up of the centre). Their alt
+ * text says so; nothing is invented.
+ */
+type SeedPhoto = { file: string; alt: string; crop?: "upper" | "centre" };
+
+function seedPhotosFor(o: (typeof outfits)[number]): SeedPhoto[] {
+  const list: SeedPhoto[] = [...o.photos];
+  const first = o.photos[0]!;
+  const crops: SeedPhoto[] = [
+    { file: first.file, alt: `Closer view of the upper part: ${first.alt}`, crop: "upper" },
+    { file: first.file, alt: `Close-up of the work: ${first.alt}`, crop: "centre" },
+  ];
+  for (const c of crops) if (list.length < marketplacePolicy.minListingPhotos) list.push(c);
+  return list;
+}
+
+async function storePhoto(photo: SeedPhoto, outfitSlug: string, index: number) {
+  const source = await readFile(path.join(import.meta.dirname, "seed-assets", photo.file));
+  const upright = await sharp(source).rotate().toBuffer();
+  let image = sharp(upright);
+  if (photo.crop) {
+    const meta = await sharp(upright).metadata();
+    const w = meta.width!;
+    const h = meta.height!;
+    const region =
+      photo.crop === "upper"
+        ? { left: Math.round(w * 0.1), top: 0, width: Math.round(w * 0.8), height: Math.round(h * 0.55) }
+        : {
+            left: Math.round(w * 0.25),
+            top: Math.round(h * 0.3),
+            width: Math.round(w * 0.5),
+            height: Math.round(h * 0.4),
+          };
+    image = image.extract(region);
+  }
+  const { data, info } = await image
     .resize({ width: 1400, height: 1400, fit: "inside", withoutEnlargement: true })
     .jpeg({ quality: 80, mozjpeg: true })
     .toBuffer({ resolveWithObject: true });
@@ -112,7 +148,28 @@ async function seedOutfits(userIds: Map<string, string>) {
 
   for (const o of outfits) {
     const slug = slugify(`${o.title}-${o.owner}`);
-    if (await db.outfit.findUnique({ where: { slug } })) continue;
+    const existing = await db.outfit.findUnique({
+      where: { slug },
+      select: { id: true, _count: { select: { images: true } } },
+    });
+    if (existing) {
+      // Listings seeded before the photograph minimum get the missing crops; nothing else is touched.
+      const wanted = seedPhotosFor(o);
+      for (let i = existing._count.images; i < wanted.length; i++) {
+        const stored = await storePhoto(wanted[i]!, slug, i);
+        await db.outfitImage.create({
+          data: {
+            outfitId: existing.id,
+            storageKey: stored.key,
+            altText: wanted[i]!.alt,
+            width: stored.width,
+            height: stored.height,
+            sortOrder: i,
+          },
+        });
+      }
+      continue;
+    }
     const ownerId = userIds.get(o.owner)!;
     const localityId = localityBySlug.get(o.locality)!;
 
@@ -129,8 +186,8 @@ async function seedOutfits(userIds: Map<string, string>) {
     });
 
     const photos = [];
-    for (const [i, p] of o.photos.entries())
-      photos.push({ ...(await storePhoto(p.file, slug, i)), alt: p.alt });
+    for (const [i, p] of seedPhotosFor(o).entries())
+      photos.push({ ...(await storePhoto(p, slug, i)), alt: p.alt });
     const m = o.measurementsCm;
     const mm = (cm?: number) => (cm === undefined ? null : cm * 10);
     const status = o.status ?? "ACTIVE";
