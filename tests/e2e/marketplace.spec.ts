@@ -45,7 +45,7 @@ test("Journey A: list an outfit — details, photographs, cover, preview, submit
   await owner.getByLabel("Locality shown to renters").selectOption({ index: 1 });
   await owner.getByRole("button", { name: "Save and add photographs" }).click();
 
-  // Step 2: two photographs, then the second becomes the cover.
+  // Step 2: photographs. Two are not enough to continue; the third (a listing needs three) is.
   await expect(owner).toHaveURL(/\/lend\/outfits\/[0-9a-f-]+\/photos\?created=1/);
   await expect(owner.getByText("Details saved as a draft")).toBeVisible();
   await owner.waitForLoadState("networkidle");
@@ -54,6 +54,11 @@ test("Journey A: list an outfit — details, photographs, cover, preview, submit
     .setInputFiles([fixture("outfit-front.jpg"), fixture("outfit-detail.jpg")]);
   const photos = owner.getByRole("list", { name: "Photographs" }).getByRole("listitem");
   await expect(photos).toHaveCount(2, { timeout: 30_000 });
+  await expect(owner.getByText("Add at least 3 photographs to continue (2 so far).")).toBeVisible();
+  await expect(owner.getByRole("link", { name: "Continue to preview" })).toHaveCount(0);
+  await owner.getByLabel("Choose photographs").setInputFiles(fixture("outfit-back.jpg"));
+  await expect(photos).toHaveCount(3, { timeout: 30_000 });
+  // The second photograph becomes the cover.
   const secondBefore = await photos.nth(1).getByRole("img").getAttribute("src");
   await owner.getByRole("button", { name: "Make photo 2 the cover" }).click();
   await expect(photos.first().getByRole("img")).toHaveAttribute("src", secondBefore!);
