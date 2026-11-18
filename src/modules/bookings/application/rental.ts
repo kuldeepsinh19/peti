@@ -27,12 +27,20 @@ async function storePhotos(deps: BookingsDeps, bookingId: string, photos: Uint8A
  * The owner records the outfit's condition at handover (at least the policy's minimum number of photos).
  * Allowed from the day before the start date until the renter acknowledges it.
  */
+export const CONDITION_REPORTS_DISABLED_MESSAGE =
+  "Condition reports are switched off in the public demo: their photographs cannot be stored there. Try the handover and return in the local POC.";
+
+function refuseInPublicDemo(deps: BookingsDeps) {
+  if (deps.publicDemo) throw new PreconditionError("DEMO_READ_ONLY", CONDITION_REPORTS_DISABLED_MESSAGE);
+}
+
 export async function submitHandoverReport(
   deps: BookingsDeps,
   actor: Actor,
   input: unknown,
   photos: Uint8Array[],
 ) {
+  refuseInPublicDemo(deps);
   const data = parseInput(conditionReportSchema, input);
   const now = deps.clock.now();
   const precheck = await deps.uow.run(async (store) => {
@@ -123,6 +131,7 @@ export async function acknowledgeHandover(deps: BookingsDeps, actor: Actor, inpu
  * end date and the late fee (capped at the deposit) is fixed now; the inspection window starts.
  */
 export async function recordReturn(deps: BookingsDeps, actor: Actor, input: unknown, photos: Uint8Array[]) {
+  refuseInPublicDemo(deps);
   const data = parseInput(conditionReportSchema, input);
   const now = deps.clock.now();
   const today = localDateInIndia(now);

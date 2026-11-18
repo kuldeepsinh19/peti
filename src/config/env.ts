@@ -219,6 +219,11 @@ export function allowsPhotoUploads(env: Env = getEnv()): boolean {
   return env.APP_ENV !== "demo";
 }
 
+/** The public demo: shared fictional accounts, nothing stored that would change what other visitors see. */
+export function isPublicDemo(env: Env = getEnv()): boolean {
+  return env.APP_ENV === "demo";
+}
+
 /** Which /dev routes exist: the sandbox checkout follows sandbox payments, everything else dev tooling. */
 export function devRouteAllowed(pathname: string, env: Env = getEnv()): boolean {
   if (pathname === "/dev/sandbox-checkout" || pathname.startsWith("/dev/sandbox-checkout/")) {

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { container } from "@/composition/container";
 import { requireActorOrRedirect } from "@/composition/session";
-import { allowsPhotoUploads } from "@/config/env";
+import { allowsPhotoUploads, isPublicDemo } from "@/config/env";
 import {
   type ListingEditView,
   mmToCm,
@@ -158,7 +158,16 @@ export default async function EditListingPage({
         ) : null}
         {s === "PENDING_REVIEW" ? (
           <Notice title="Pending approval">
-            A Peti administrator checks every listing before it is published.
+            {isPublicDemo()
+              ? "No administrator reviews listings in the public demo, so this one stays pending."
+              : "A Peti administrator checks every listing before it is published."}
+          </Notice>
+        ) : null}
+        {isPublicDemo() && (s === "ACTIVE" || s === "PAUSED") ? (
+          <Notice tone="neutral" title="Public demo">
+            Price, deposit, size and availability changes save as usual. Changing the title, description or
+            category would need an administrator review, which the demo does not have, so it is switched off
+            here.
           </Notice>
         ) : null}
       </div>
@@ -175,6 +184,7 @@ export default async function EditListingPage({
           remove={removePhotoAction}
           makeCover={setCoverPhotoAction}
           uploadsDisabledReason={allowsPhotoUploads() ? null : PHOTO_UPLOADS_DISABLED_MESSAGE}
+          canRemove={!isPublicDemo()}
         />
       </section>
 

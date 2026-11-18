@@ -20,6 +20,7 @@ export type {
   ClaimOutcome,
 } from "./application/payment-events";
 export { DatesUnavailableError } from "./application/core";
+export { CONDITION_REPORTS_DISABLED_MESSAGE } from "./application/rental";
 export { bookingsUseCases, type BookingsUseCases } from "./application/use-cases";
 export {
   BOOKING_STATUSES,

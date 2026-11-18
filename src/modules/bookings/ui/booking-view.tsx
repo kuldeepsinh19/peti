@@ -47,6 +47,8 @@ export interface BookingViewProps {
   flash?: { done?: string; error?: string; payment?: string; requested?: string };
   /** The sandbox payment provider is in use: payments are simulated and labelled as such. */
   simulatedPayments?: boolean;
+  /** Shown instead of the condition-report forms where reports cannot be stored (the public demo). */
+  reportsDisabledReason?: string | null;
 }
 
 /** What a successful command did, in words (shown after the page reloads). */
@@ -125,6 +127,7 @@ export function BookingView({
   checkout,
   flash,
   simulatedPayments = false,
+  reportsDisabledReason = null,
 }: BookingViewProps) {
   const role = b.viewerRole;
   const policy = readPolicySnapshot(b.policy);
@@ -295,12 +298,18 @@ export function BookingView({
                     When you hand the outfit over, photograph it and record its condition. The renter checks
                     it against this report.
                   </p>
-                  <ConditionReportForm
-                    bookingId={b.id}
-                    kind="HANDOVER"
-                    minPhotos={policy.minConditionPhotos}
-                    submit={report}
-                  />
+                  {reportsDisabledReason ? (
+                    <Notice tone="neutral" title="Not available here">
+                      {reportsDisabledReason}
+                    </Notice>
+                  ) : (
+                    <ConditionReportForm
+                      bookingId={b.id}
+                      kind="HANDOVER"
+                      minPhotos={policy.minConditionPhotos}
+                      submit={report}
+                    />
+                  )}
                 </div>
               ) : (
                 <p className="text-graphite">
@@ -363,13 +372,19 @@ export function BookingView({
                 The outfit is due back on {formatLocalDate(b.endDate)}. When it is returned, photograph it and
                 record its condition.
               </p>
-              <ConditionReportForm
-                bookingId={b.id}
-                kind="RETURN"
-                minPhotos={policy.minConditionPhotos}
-                submit={report}
-                showReturnDate
-              />
+              {reportsDisabledReason ? (
+                <Notice tone="neutral" title="Not available here">
+                  {reportsDisabledReason}
+                </Notice>
+              ) : (
+                <ConditionReportForm
+                  bookingId={b.id}
+                  kind="RETURN"
+                  minPhotos={policy.minConditionPhotos}
+                  submit={report}
+                  showReturnDate
+                />
+              )}
             </div>
           ) : (
             <p className="text-graphite">

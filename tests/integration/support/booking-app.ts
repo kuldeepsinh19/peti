@@ -21,7 +21,7 @@ const noLimits: RateLimiter = { consume: async () => {} };
 /** Bookings + payments wired exactly as in production, against the test database and sandbox provider. */
 export function buildBookingApp(
   start = "2026-12-01T06:30:00Z",
-  opts: { wrapProvider?: (provider: PaymentProvider) => PaymentProvider } = {},
+  opts: { wrapProvider?: (provider: PaymentProvider) => PaymentProvider; publicDemo?: boolean } = {},
 ) {
   const clock = fixedClock(start); // 12:00 IST on 1 Dec 2026
   const sandbox = sandboxProvider(db, SANDBOX_SECRETS);
@@ -40,6 +40,7 @@ export function buildBookingApp(
     },
     queries: prismaBookingQueries(db),
     paymentReconciler: { reconcile: (id) => payments?.reconcile(id) ?? Promise.resolve() },
+    publicDemo: opts.publicDemo,
   });
   payments = paymentsUseCases({
     provider: opts.wrapProvider ? opts.wrapProvider(sandbox.provider) : sandbox.provider,

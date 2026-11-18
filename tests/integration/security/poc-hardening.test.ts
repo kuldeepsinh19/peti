@@ -684,3 +684,46 @@ describe("saving an outfit for later (#33)", () => {
     expect(await db.savedOutfit.count({ where: { userId: s.stranger.userId } })).toBe(0);
   });
 });
+
+describe("the public demo keeps its shared listings intact (batch 5)", () => {
+  it("refuses removing photographs and edits that would send a published listing to a review", async () => {
+    const local = buildApp();
+    const s = await listingSetup();
+    const id = await publishListing(local, s.form, s.owner, s.admin);
+    const demo = buildApp({ publicDemo: true });
+    const [photo] = await db.outfitImage.findMany({ where: { outfitId: id }, select: { id: true } });
+
+    await expect(
+      demo.listings.removePhoto(s.owner, { outfitId: id, photoId: photo!.id }),
+    ).rejects.toMatchObject({
+      code: "DEMO_READ_ONLY",
+    });
+    await expect(
+      demo.listings.updateListing(s.owner, id, { ...s.form, title: "A different title for everyone" }),
+    ).rejects.toMatchObject({ code: "DEMO_READ_ONLY" });
+    // Price changes do not need a review, so they still save.
+    await demo.listings.updateListing(s.owner, id, { ...s.form, price3: "3600" });
+    const outfit = await db.outfit.findUniqueOrThrow({ where: { id } });
+    expect(outfit).toMatchObject({ status: "ACTIVE", title: s.form.title });
+    expect(await db.outfitImage.count({ where: { outfitId: id } })).toBe(3);
+  });
+
+  it("refuses condition reports before storing anything", async () => {
+    const app = buildBookingApp(undefined, { publicDemo: true });
+    const s = await scenario();
+    const { bookingId } = await app.bookings.request(s.renter, {
+      outfitId: s.outfit.id,
+      startDate: "2026-12-10",
+      days: 3,
+      acceptTerms: "on",
+    });
+    await app.bookings.approve(s.owner, { bookingId });
+    await app.payThroughSandbox(s.renter, bookingId);
+    app.clock.set("2026-12-10T05:00:00Z");
+    await expect(
+      app.bookings.submitHandoverReport(s.owner, { bookingId, grade: "GOOD", notes: "Fine." }, photos(3)),
+    ).rejects.toMatchObject({ code: "DEMO_READ_ONLY" });
+    expect(app.reportKeys).toHaveLength(0);
+    expect(await db.conditionReport.count({ where: { bookingId } })).toBe(0);
+  });
+});

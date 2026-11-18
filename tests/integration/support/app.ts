@@ -21,13 +21,14 @@ export const memoryPhotos: PhotoStore & { saved: string[] } = {
 
 export const clock = fixedClock("2026-12-01T06:30:00Z"); // 12:00 IST
 
-export function buildApp() {
+export function buildApp(opts: { publicDemo?: boolean } = {}) {
   return {
     listings: listingsUseCases({
       listings: prismaListingRepository(db),
       photos: memoryPhotos,
       audit: prismaAuditLog(db),
       clock,
+      publicDemo: opts.publicDemo,
     }),
     search: searchUseCases({ catalogue: prismaCatalogueQueries(db), clock }),
   };

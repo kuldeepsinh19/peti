@@ -282,4 +282,6 @@ export interface BookingsDeps {
   reportPhotos: ReportPhotoStore;
   /** Before expiring an unpaid booking, ask the payment provider whether the order was paid after all. */
   paymentReconciler?: { reconcile(bookingId: string): Promise<void> };
+  /** The public demo: condition-report photographs cannot be stored there, so reports are refused. */
+  publicDemo?: boolean;
 }

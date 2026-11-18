@@ -1,5 +1,5 @@
 import "server-only";
-import { allowsPhotoUploads, allowsSandboxPayments, getEnv } from "@/config/env";
+import { allowsPhotoUploads, allowsSandboxPayments, getEnv, isPublicDemo } from "@/config/env";
 import { marketplacePolicy } from "@/config/marketplace-policy";
 import { adminUseCases, moneyUseCases } from "@/modules/admin";
 import { prismaAdminRepository } from "@/modules/admin/infrastructure/prisma-admin-repository";
@@ -113,6 +113,7 @@ function build() {
     clock,
     rateLimiter,
     reportPhotos: storageReportPhotoStore(storage, images),
+    publicDemo: isPublicDemo(env),
     queries: prismaBookingQueries(db),
     paymentReconciler: { reconcile: (bookingId) => payments?.reconcile(bookingId) ?? Promise.resolve() },
   });
@@ -153,6 +154,7 @@ function build() {
       audit: prismaAuditLog(db),
       clock,
       photoUploadsEnabled: allowsPhotoUploads(env),
+      publicDemo: isPublicDemo(env),
       notifications: prismaNotificationWriter(db),
     }),
     search: searchUseCases({ catalogue: prismaCatalogueQueries(db), clock }),

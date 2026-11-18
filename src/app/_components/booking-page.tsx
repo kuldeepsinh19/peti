@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { container } from "@/composition/container";
-import { allowsSandboxPayments } from "@/config/env";
+import { allowsSandboxPayments, isPublicDemo } from "@/config/env";
+import { CONDITION_REPORTS_DISABLED_MESSAGE } from "@/modules/bookings";
 import { BookingView } from "@/modules/bookings/ui/booking-view";
 import type { UserActor } from "@/shared/application/actor";
 import { DomainError } from "@/shared/domain/errors";
@@ -46,6 +47,7 @@ export async function BookingPage({
       checkout={startCheckoutAction.bind(null, booking.id)}
       flash={flash}
       simulatedPayments={allowsSandboxPayments(env) && env.PAYMENT_PROVIDER === "sandbox"}
+      reportsDisabledReason={isPublicDemo(env) ? CONDITION_REPORTS_DISABLED_MESSAGE : null}
     />
   );
 }

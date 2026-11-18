@@ -50,6 +50,7 @@ export function PhotoManager({
   remove,
   makeCover,
   uploadsDisabledReason = null,
+  canRemove = true,
 }: {
   outfitId: string;
   photos: ListingPhoto[];
@@ -58,6 +59,8 @@ export function PhotoManager({
   makeCover: Action<undefined>;
   /** Shown instead of the drop zone when photographs cannot be added here (the public demo). */
   uploadsDisabledReason?: string | null;
+  /** False in the public demo, where the seeded photographs are shared by every visitor. */
+  canRemove?: boolean;
 }) {
   const router = useRouter();
   const inputId = useId();
@@ -206,15 +209,17 @@ export function PhotoManager({
                     Make cover
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => run(remove, p.id)}
-                  disabled={busyPhoto !== null}
-                  className="text-burgundy underline disabled:opacity-50"
-                  aria-label={`Remove photo ${i + 1}`}
-                >
-                  Remove
-                </button>
+                {canRemove ? (
+                  <button
+                    type="button"
+                    onClick={() => run(remove, p.id)}
+                    disabled={busyPhoto !== null}
+                    className="text-burgundy underline disabled:opacity-50"
+                    aria-label={`Remove photo ${i + 1}`}
+                  >
+                    Remove
+                  </button>
+                ) : null}
               </div>
             </li>
           ))}

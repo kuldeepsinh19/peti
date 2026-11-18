@@ -82,6 +82,12 @@ const DECISION_MESSAGES: Partial<
 
 const NEEDS_PHOTOS_MESSAGE = `Add at least ${marketplacePolicy.minListingPhotos} photographs before submitting: front, back and a close-up of the work.`;
 
+const DEMO_READ_ONLY = (what: string) =>
+  new PreconditionError(
+    "DEMO_READ_ONLY",
+    `${what} is switched off in the public demo, which every visitor shares and where no administrator reviews listings. Try it in the local POC.`,
+  );
+
 export const PHOTO_UPLOADS_DISABLED_MESSAGE =
   "Photo upload isn't available in the public demo. Listings there use the photographs already added.";
 
@@ -226,6 +232,10 @@ export function listingsUseCases(deps: ListingsDeps) {
       const status = editNeedsReview(outfit.status, contentChanged)
         ? nextOutfitStatus(outfit.status, "contentEdited", "system")
         : outfit.status;
+      if (deps.publicDemo && status === "PENDING_REVIEW" && outfit.status !== "PENDING_REVIEW") {
+        // It would wait for a review that never comes, hidden from every other visitor.
+        throw DEMO_READ_ONLY("Changing the title, description or category of a published listing");
+      }
       // Compare-and-swap on the status we read: an edit must never undo a suspension (or any other status
       // change) that happened while the owner was saving.
       if (!(await listings.update(outfitId, data, outfit.status, status))) throw new ConcurrencyError();
@@ -278,6 +288,7 @@ export function listingsUseCases(deps: ListingsDeps) {
     async removePhoto(actor: Actor, input: unknown) {
       const { outfitId, photoId } = parseInput(photoIdSchema, input);
       const outfit = await owned(actor, outfitId);
+      if (deps.publicDemo) throw DEMO_READ_ONLY("Removing photographs");
       if (!isEditable(outfit.status))
         throw new PreconditionError("LISTING_FROZEN", "This listing cannot be edited.");
       // A listing that is published, paused or waiting for review keeps the minimum number of photographs

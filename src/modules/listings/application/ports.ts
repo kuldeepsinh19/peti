@@ -161,6 +161,11 @@ export interface ListingsDeps {
   clock: { now(): Date };
   /** False where photographs cannot be stored (the public demo); defaults to true. */
   photoUploadsEnabled?: boolean;
+  /**
+   * The public demo: every visitor shares the seeded listings and no administrator reviews anything, so
+   * removing photographs and edits that would send a published listing back to review are refused.
+   */
+  publicDemo?: boolean;
   /** Tells the owner what an administrator decided about their listing (in-app and email). */
   notifications?: {
     enqueue(

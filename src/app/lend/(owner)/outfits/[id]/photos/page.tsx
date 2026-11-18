@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { container } from "@/composition/container";
 import { requireActorOrRedirect } from "@/composition/session";
 import { marketplacePolicy } from "@/config/marketplace-policy";
-import { allowsPhotoUploads } from "@/config/env";
+import { allowsPhotoUploads, isPublicDemo } from "@/config/env";
 import { type ListingEditView, PHOTO_UPLOADS_DISABLED_MESSAGE } from "@/modules/listings";
 import { ListingSteps } from "@/modules/listings/ui/listing-steps";
 import { PhotoManager } from "@/modules/listings/ui/photo-manager";
@@ -72,6 +72,7 @@ export default async function ListingPhotosPage({
             remove={removePhotoAction}
             makeCover={setCoverPhotoAction}
             uploadsDisabledReason={allowsPhotoUploads() ? null : PHOTO_UPLOADS_DISABLED_MESSAGE}
+            canRemove={!isPublicDemo()}
           />
         )}
       </div>
