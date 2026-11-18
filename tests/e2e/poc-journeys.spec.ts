@@ -181,6 +181,42 @@ test("Journeys 6 and 8: a declined payment, then payment, cancellation and the r
   await expect(renter.getByText(/sent to the payment provider|refunded/).first()).toBeVisible();
 });
 
+test("Journeys 9 and 10: every account, owner and administration page opens", async ({ browser }) => {
+  const owner = await signedIn(browser, "aarav@peti.local");
+  const admin = await signedIn(browser, "admin@peti.local");
+  const visits: Array<[Page, string]> = [
+    ...[
+      "/account",
+      "/account/rentals",
+      "/account/saved",
+      "/account/reviews",
+      "/account/addresses",
+      "/account/notifications",
+      "/lend/dashboard",
+      "/lend/requests",
+      "/lend/history",
+      "/lend/earnings",
+    ].map((url): [Page, string] => [owner, url]),
+    ...[
+      "/admin",
+      "/admin/listings",
+      "/admin/bookings",
+      "/admin/disputes",
+      "/admin/payouts",
+      "/admin/money",
+      "/admin/users",
+      "/admin/categories",
+      "/admin/activity",
+    ].map((url): [Page, string] => [admin, url]),
+  ];
+  for (const [page, url] of visits) {
+    const response = await page.goto(url);
+    expect(response?.status(), url).toBe(200);
+    await expect(page.getByRole("heading", { level: 1 }), url).toBeVisible();
+    await expect(page.getByText("That did not work."), url).toHaveCount(0);
+  }
+});
+
 test("key pages have no serious or critical accessibility problems", async ({ browser }) => {
   const renter = await signedIn(browser, "rohan@peti.local");
   const anonymous = await (await browser.newContext()).newPage();
