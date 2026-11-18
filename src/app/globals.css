@@ -23,6 +23,7 @@
   --color-olive-deep: #454830;
   --color-brass: #b0832f; /* rules, numerals, large text only */
   --color-brass-deep: #86601a; /* brass when used as body-size text */
+  --color-brass-light: #d9b46a; /* brass on olive or ink backgrounds (4.8:1 on olive-deep) */
 
   /* Colour — feedback (contrast-checked on paper) */
   --color-success: #3f5a2c;

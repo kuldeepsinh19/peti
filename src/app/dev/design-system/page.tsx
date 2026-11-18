@@ -29,6 +29,7 @@ const colours = [
   ["olive", "bg-olive", "#5B5E3F", "Secondary accent"],
   ["olive-deep", "bg-olive-deep", "#454830", "Dark sections"],
   ["brass", "bg-brass", "#B0832F", "Rules and numerals only"],
+  ["brass-light", "bg-brass-light", "#D9B46A", "Numerals on olive or ink"],
 ] as const;
 
 const sampleRows = [

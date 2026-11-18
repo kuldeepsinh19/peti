@@ -284,7 +284,7 @@ function HowLendingWorks() {
       <Page className="page-grid gap-y-12">
         <div className="col-span-4 lg:col-span-5">
           <p className="flex items-center gap-3 eyebrow text-sand">
-            <span className="text-brass numeral">05</span>
+            <span className="text-brass-light numeral">05</span>
             <span aria-hidden className="h-px w-8 bg-sand/50" />
             <span>For lenders</span>
           </p>
@@ -302,7 +302,7 @@ function HowLendingWorks() {
         <ol className="col-span-4 border-t border-sand/40 lg:col-span-6 lg:col-start-7">
           {steps.map((step) => (
             <li key={step.numeral} className="grid grid-cols-[3.5rem_1fr] gap-4 border-b border-sand/25 py-8">
-              <span className="font-display text-4xl text-brass">{step.numeral}</span>
+              <span className="font-display text-4xl text-brass-light">{step.numeral}</span>
               <div>
                 <h3 className="text-2xl text-paper">{step.title}</h3>
                 <p className="mt-2 text-sand">{step.body}</p>
