@@ -60,8 +60,8 @@ async function seedReferenceData() {
   }
 }
 
-// `--without-admin` (used for the public demo): no administrator account, because the demo's dev outbox
-// is public and anyone could read a password-reset link for it.
+// `--without-admin` (used for the public demo): no administrator account, because the demo accounts share a
+// published password, so an administrator account there would let any visitor moderate listings and money.
 const withoutAdmin = process.argv.includes("--without-admin");
 const seededUsers = users.filter((u) => !(withoutAdmin && u.role === "admin"));
 
