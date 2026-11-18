@@ -20,7 +20,7 @@ export default async function SandboxCheckoutPage({ params }: { params: Promise<
   return (
     <Page className="max-w-3xl pb-16">
       <PageHeader
-        eyebrow="Sandbox payment provider"
+        eyebrow="Simulated payment provider (sandbox)"
         title="Checkout"
         lede={`${payment.booking.outfit.title} · ${payment.booking.reference}`}
       />
@@ -32,8 +32,8 @@ export default async function SandboxCheckoutPage({ params }: { params: Promise<
           <CheckoutPanel orderId={orderId} bookingUrl={`/account/rentals/${payment.bookingId}`} />
         )}
         <p className="text-caption text-stone">
-          No real money moves. In production this page is the payment provider&rsquo;s checkout (Razorpay in
-          test mode), and this route does not exist.
+          Simulated: no real money moves and no card details are asked for. In a deployment with a real
+          payment provider this page is the provider&rsquo;s own checkout, and this route does not exist.
         </p>
       </div>
     </Page>

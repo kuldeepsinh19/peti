@@ -6,15 +6,37 @@ import { Button } from "@/shared/ui/button";
 import { FormMessage } from "@/shared/ui/form";
 import { completeSandboxCheckout } from "./actions";
 
+// Plain-language outcomes first; the technical detail (what the provider sends) is the note.
 const OUTCOMES = [
-  { value: "pay", label: "Pay — callback and webhook", note: "The normal path." },
-  { value: "pay-webhook-only", label: "Pay — webhook only", note: "As if the renter closed the browser." },
-  { value: "pay-callback-only", label: "Pay — callback only", note: "As if the webhook were delayed." },
-  { value: "pay-duplicate-webhook", label: "Pay — webhook delivered twice", note: "Tests idempotency." },
+  {
+    value: "pay",
+    label: "Pay",
+    note: "The usual case: you come back to Peti and the provider confirms in the background (callback and webhook).",
+  },
+  {
+    value: "fail",
+    label: "Card declined",
+    note: "Nothing is taken; the booking keeps waiting for payment (no callback, a failure webhook).",
+  },
+  {
+    value: "pay-webhook-only",
+    label: "Pay, then close the tab",
+    note: "Only the background confirmation arrives (webhook only).",
+  },
+  {
+    value: "pay-callback-only",
+    label: "Pay, confirmation delayed",
+    note: "You come back to Peti before the provider confirms (callback only).",
+  },
+  {
+    value: "pay-duplicate-webhook",
+    label: "Pay, confirmation sent twice",
+    note: "The webhook is delivered twice; Peti applies it once.",
+  },
   {
     value: "pay-twice",
-    label: "Pay twice on one order",
-    note: "Two authorisations: Peti captures one and leaves the other to be returned.",
+    label: "Pay twice",
+    note: "Two authorisations on one order: Peti captures one and leaves the other to be released.",
   },
   {
     value: "pay-captured",
@@ -24,9 +46,8 @@ const OUTCOMES = [
   {
     value: "pay-wrong-amount",
     label: "Pay the wrong amount",
-    note: "Never captured: the booking stays awaiting payment.",
+    note: "Never captured: the booking keeps waiting for payment.",
   },
-  { value: "fail", label: "Payment fails", note: "The booking stays awaiting payment." },
 ] as const;
 
 export function CheckoutPanel({ orderId, bookingUrl }: { orderId: string; bookingUrl: string }) {
@@ -46,7 +67,7 @@ export function CheckoutPanel({ orderId, bookingUrl }: { orderId: string; bookin
         // Submit the signed callback as a real form POST, like a provider's checkout page does.
         requestAnimationFrame(() => formRef.current?.submit());
       } else {
-        router.push(bookingUrl);
+        router.push(outcome === "fail" ? `${bookingUrl}?payment=failed` : bookingUrl);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
