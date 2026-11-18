@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { demoAccounts } from "@/config/site";
+import { demoAccounts, localSeedAccounts } from "@/config/site";
 import { Notice } from "@/shared/ui/feedback";
 
 /** The public demo's shared accounts, shown on the sign-in page. */
@@ -14,6 +14,25 @@ export function DemoAccounts() {
         </span>
       ))}
       . Payments go through a sandbox; no real money moves.
+    </Notice>
+  );
+}
+
+/** The local POC's seeded accounts (development tooling only). */
+export function LocalAccounts() {
+  return (
+    <Notice tone="neutral" title="Local POC: seeded accounts">
+      <p>
+        Password <code className="numeral">{localSeedAccounts.password}</code> for each. Shown only on this
+        computer, never on a deployment.
+      </p>
+      <ul className="mt-2 flex flex-col gap-1" data-testid="local-accounts">
+        {localSeedAccounts.accounts.map((a) => (
+          <li key={a.email}>
+            <code>{a.email}</code> — {a.role}
+          </li>
+        ))}
+      </ul>
     </Notice>
   );
 }

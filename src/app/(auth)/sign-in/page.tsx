@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { allowsSelfServiceAccounts } from "@/config/env";
+import { allowsSelfServiceAccounts, isDevToolingEnabled } from "@/config/env";
 import { SignInForm } from "@/modules/auth/ui/auth-forms";
 import { Notice } from "@/shared/ui/feedback";
 import { SectionIndex } from "@/shared/ui/layout";
-import { DemoAccounts } from "../demo-notice";
+import { DemoAccounts, LocalAccounts } from "../demo-notice";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -27,6 +27,7 @@ export default async function SignInPage({
         </Notice>
       ) : null}
       {allowsSelfServiceAccounts() ? null : <DemoAccounts />}
+      {isDevToolingEnabled() ? <LocalAccounts /> : null}
       <SignInForm next={next} />
       {allowsSelfServiceAccounts() ? (
         <p className="text-sm text-graphite">

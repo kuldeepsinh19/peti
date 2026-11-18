@@ -58,3 +58,19 @@ export const demoAccounts = {
     { email: "meera@peti.local", role: "Owner" },
   ],
 } as const;
+
+/**
+ * Every account `pnpm db:seed` creates, including the administrator. Shown on the sign-in page of the LOCAL
+ * POC only (never on the public demo, where an administrator account would let anyone moderate).
+ */
+export const localSeedAccounts = {
+  password: demoAccounts.password,
+  accounts: [
+    { email: "rohan@peti.local", role: "Renter (has the ready-made bookings)" },
+    { email: "aarav@peti.local", role: "Owner" },
+    { email: "kabir@peti.local", role: "Owner" },
+    { email: "meera@peti.local", role: "Owner" },
+    { email: "isha@peti.local", role: "Owner" },
+    { email: "admin@peti.local", role: "Administrator" },
+  ],
+} as const;
