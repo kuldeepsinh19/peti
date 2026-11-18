@@ -8,8 +8,11 @@ and earns a commission only on rentals that go ahead. Peti never owns, stores or
 
 ![Landing page](docs/screenshots/home-desktop.jpg)
 
-> **Status:** a working MVP with demonstration data. There are no real users or rentals. Payments run
-> through a local sandbox provider (or Razorpay in test mode); no real money moves.
+> **Status:** a proof of concept with demonstration data. There are no real users or rentals. Payments run
+> through a simulated sandbox provider; a Razorpay adapter exists but has never been run, not even in test
+> mode. No real money moves, and no email or text message leaves a local machine. The
+> [POC demo guide](docs/development/poc-demo-guide.md) walks through every journey; the
+> [hardening report](docs/audits/POC-HARDENING-REPORT.md) lists what was checked and what is still open.
 
 ## Why it is built this way
 
@@ -21,18 +24,19 @@ return, and a dispute process. That is what this codebase concentrates on.
 
 ## Features
 
-| Area           | What works                                                                                                                                                                                     |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Accounts       | Sign-up, sign-in, password reset, email confirmation by link, mobile verification by one-time code, profile, addresses, payout UPI ID                                                          |
-| Listings       | Create and edit with photographs (sanitised, location data stripped), real measurements, condition, prices for 2/3/5/7 days, deposit, cleaning days; submit for review; pause, resume, archive |
-| Discovery      | Keyword search tolerant of misspellings, filters for category, occasion, size, locality, price, chest/waist measurements and dates (shows only outfits free on those dates)                    |
-| Booking        | Date picker with held dates struck out, live price breakdown, request → owner approval → payment window → confirmation only after verified payment                                             |
-| Rental         | Handover report with photographs, renter acknowledgement, return report, late fees, 48-hour inspection window, automatic completion                                                            |
-| Money          | Integer paise everywhere; rental fee, deposit, commission, refunds and payouts recorded separately; refunds sent through an outbox; a reconciliation view proves every closed booking balances |
-| Cancellations  | Renter tiers (full / half / none by notice), owner cancellations refunded in full and counted                                                                                                  |
-| Trust          | Double-blind reviews after completion, disputes (accept, withdraw, administrator decision), contact details revealed only after payment, no identity documents collected                       |
-| Administration | Overview metrics, listing moderation, users (suspend/reinstate), bookings, disputes, payouts (mark paid with reference), failed-refund retry, categories, append-only activity log             |
-| Operations     | Idempotent sweep for deadlines, refunds, emails and reviews; dev outbox for emails and codes; sandbox checkout that signs callbacks and webhooks like a real provider                          |
+| Area           | What works                                                                                                                                                                                                                                                                                                   |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Accounts       | Sign-up with recorded terms acceptance, sign-in, password reset, email confirmation by link, mobile verification by one-time code, profile, addresses, payout UPI ID (changes audited and announced)                                                                                                         |
+| Listings       | A guided three-step flow (details, at least three photographs, preview); sanitised photographs with location data stripped, real measurements, condition, prices for 2/3/5/7 days, deposit, cleaning days; administrator approval; pause, resume, archive; My outfits with requests and next rental          |
+| Discovery      | Keyword search tolerant of misspellings, filters for category, occasion, size, locality, price, chest/waist measurements and dates (shows only outfits free on those dates)                                                                                                                                  |
+| Booking        | Date picker with held dates struck out, live price breakdown, request → owner approval → payment window → confirmation only after verified payment                                                                                                                                                           |
+| Rental         | Handover report with photographs, renter acknowledgement, return report, late fees, 48-hour inspection window, automatic completion                                                                                                                                                                          |
+| Money          | Integer paise everywhere; rental fee, deposit, commission, refunds and payouts recorded separately; refunds sent through an outbox; a reconciliation view proves every closed booking balances                                                                                                               |
+| Cancellations  | Renter tiers (full / half / none by notice), owner cancellations refunded in full and counted                                                                                                                                                                                                                |
+| Trust          | Double-blind reviews after completion, disputes (accept, withdraw, administrator decision), contact details revealed only after payment, no identity documents collected                                                                                                                                     |
+| Administration | Overview metrics, listing moderation, users (suspend/reinstate, with the other side of open bookings told), bookings with a money timeline, disputes, payouts (mark paid with reference), failed-refund retry, money health checks and chargebacks, categories (add, rename, hide), append-only activity log |
+| Notifications  | In-app inbox and email for every booking step, moderation decisions, payouts, dispute messages and account changes                                                                                                                                                                                           |
+| Operations     | Idempotent sweep for deadlines, refunds, emails and reviews; dev outbox for emails and codes; sandbox checkout that signs callbacks and webhooks like a real provider; local POC tools page with "Run background jobs now"                                                                                   |
 
 ## Architecture
 
@@ -106,13 +110,15 @@ cp .env.example .env              # then replace the placeholder secrets
 docker compose up -d              # PostgreSQL 18 (+ a peti_test database)
 pnpm db:migrate                   # apply migrations
 pnpm db:seed                      # localities, categories, demo accounts and listings
+pnpm db:seed:bookings             # optional: ready-made bookings dated relative to today
 pnpm dev                          # http://localhost:3000
 ```
 
 Demo accounts (fictional) all use the password `peti-demo-password`: `admin@peti.local`,
 `aarav@peti.local`, `meera@peti.local`, `kabir@peti.local`, `isha@peti.local`, `rohan@peti.local`.
-Emails and one-time codes appear at `/dev/outbox`; payments go through `/dev/sandbox-checkout`.
-Full guide: [local setup](docs/development/local-setup.md).
+Emails and one-time codes appear at `/dev/outbox`; payments go through `/dev/sandbox-checkout`; `/dev` runs
+the background jobs on demand. Full guide: [local setup](docs/development/local-setup.md); demonstrating the
+journeys: [POC demo guide](docs/development/poc-demo-guide.md).
 
 ## Tests
 
@@ -143,11 +149,14 @@ end-to-end journeys in Chromium. See the [testing guide](docs/development/testin
 - No real money: the sandbox provider is for local and test use, and the Razorpay adapter accepts test
   keys only. Owner payouts are recorded and marked paid by an administrator; automated settlement needs a
   marketplace product such as Razorpay Route.
-- SMS codes are delivered to the dev outbox. There is no SMS provider yet, so `APP_ENV=production` refuses
-  to start until one (with DLT registration) is added.
+- SMS codes are delivered to the dev outbox. An MSG91 adapter exists (`SMS_DRIVER=msg91`) but has never
+  been run against MSG91 (no account or DLT registration yet), so no code has reached a real phone.
+  `APP_ENV=production` refuses to start with the outbox.
+- Razorpay: the adapter is written and unit-tested against stubs only; it has not been run in test mode.
 - An independent security review found issues that were fixed with regression tests; a few lower-risk
   items remain open and are listed in the [security architecture](docs/architecture/security-architecture.md#review-findings-and-fixes).
-- Identity verification is an interface only; nobody is ever shown as identity-verified.
+- Identity verification is not built: there is only a status that is always "not verified", and the
+  interface says so. No identity documents are collected.
 - Terms and privacy pages are drafts that need legal review; GST and TDS are not modelled.
 - One city. No in-app chat, delivery or insurance.
 

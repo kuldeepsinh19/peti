@@ -4,10 +4,11 @@ How to run Peti outside a developer machine. The repository contains no hosting 
 Dockerfile, no platform manifest and no infrastructure code. This guide describes what any host must
 provide and what the application enforces.
 
-> **Status:** Peti is an MVP. It runs with Razorpay **test-mode** keys only and is not ready to take real
-> money or real users. With `APP_ENV=production` it **refuses to start** until a real SMS provider is
-> implemented (see below); use `APP_ENV=staging` for a hosted test deployment. Read
-> [Not production-ready yet](#not-production-ready-yet) before deploying anything public.
+> **Status:** Peti is a proof of concept and is not ready to take real money or real users. The Razorpay
+> adapter accepts test-mode keys only and **has never been run, even in test mode**; the MSG91 SMS adapter
+> has never been run against MSG91. With `APP_ENV=production` the app **refuses to start** with simulated
+> payments, the email or SMS outbox, or filesystem storage; use `APP_ENV=staging` for a hosted test
+> deployment. Read [Not production-ready yet](#not-production-ready-yet) before deploying anything public.
 
 See also: [local setup](local-setup.md), [API overview](../api/api-overview.md),
 [payment architecture](../architecture/payment-architecture.md), [SECURITY.md](../../SECURITY.md).
