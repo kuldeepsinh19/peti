@@ -8,6 +8,7 @@ import { DefinitionList, PageHeader, SectionIndex } from "@/shared/ui/layout";
 import { Ledger } from "@/shared/ui/ledger";
 import { savePayoutAccountAction } from "../actions";
 import { signedError } from "@/app/_lib/flash";
+import { payoutStatusLabel } from "@/modules/bookings/ui/labels";
 
 export const metadata: Metadata = { title: "Earnings" };
 
@@ -145,7 +146,7 @@ export default async function EarningsPage({
                   p.status === "PAID" ? (
                     <Tag tone="success">Paid {p.paidAt ? day.format(p.paidAt) : ""}</Tag>
                   ) : (
-                    <Tag tone="warning">{p.status.toLowerCase()}</Tag>
+                    <Tag tone="warning">{payoutStatusLabel(p.status)}</Tag>
                   ),
               },
             ]}

@@ -4,6 +4,7 @@ import { formatInr } from "@/shared/domain/money";
 import { Tag } from "@/shared/ui/feedback";
 import { DefinitionList } from "@/shared/ui/layout";
 import { Ledger } from "@/shared/ui/ledger";
+import { providerLabel } from "@/modules/bookings/ui/labels";
 
 const instant = new Intl.DateTimeFormat("en-IN", {
   dateStyle: "medium",
@@ -47,7 +48,10 @@ export async function MoneyTimeline({ actor, bookingId }: { actor: UserActor; bo
       {payment ? (
         <DefinitionList
           items={[
-            { term: "Payment", value: `${payment.status.toLowerCase()} (${payment.provider})` },
+            {
+              term: "Payment",
+              value: `${payment.status.toLowerCase()} (${providerLabel(payment.provider)})`,
+            },
             { term: "Amount", value: formatInr(payment.amountPaise) },
             { term: "Refunded", value: formatInr(payment.refundedPaise) },
             ...(payment.captureAttempts

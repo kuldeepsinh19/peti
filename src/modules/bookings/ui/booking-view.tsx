@@ -13,6 +13,20 @@ import type { BookingDetail } from "../application/queries";
 import { readPolicySnapshot } from "../domain/booking-rules";
 import { statusLabel } from "../domain/booking-state-machine";
 import { ConditionReportForm, PayButton } from "./booking-client";
+import {
+  closedReasonLabel,
+  DISPUTE_KIND_LABELS,
+  depositStatusLabel,
+  disputeKindLabel,
+  disputeResolutionLabel,
+  disputeStatusLabel,
+  paymentStatusLabel,
+  payoutStatusLabel,
+  providerLabel,
+  refundReasonLabel,
+  refundStatusLabel,
+  roleLabel,
+} from "./labels";
 import { bookingStatusTone } from "./status";
 
 type Role = "RENTER" | "OWNER" | "ADMIN";
@@ -396,7 +410,7 @@ export function BookingView({
         ) : null}
         {b.status === "CANCELLED" || b.status === "REJECTED" || b.status === "EXPIRED" ? (
           <p className="text-graphite">
-            This booking is closed ({(b.closedReason ?? "").toLowerCase().replace(/_/g, " ")}).
+            This booking is closed{b.closedReason ? `: ${closedReasonLabel(b.closedReason)}` : ""}.
           </p>
         ) : null}
 
@@ -488,26 +502,26 @@ export function BookingView({
               {
                 term: "Payment",
                 value: b.payment
-                  ? `${b.payment.status.toLowerCase()} (${b.payment.provider})`
+                  ? `${paymentStatusLabel(b.payment.status)} (${providerLabel(b.payment.provider)})`
                   : "Not started",
               },
               ...(b.deposit
                 ? [
                     {
                       term: "Deposit",
-                      value: `${b.deposit.status.toLowerCase().replace("_", " ")}${b.deposit.withheldPaise ? ` · ${formatInr(b.deposit.withheldPaise)} withheld` : ""}`,
+                      value: `${depositStatusLabel(b.deposit.status)}${b.deposit.withheldPaise ? ` · ${formatInr(b.deposit.withheldPaise)} withheld` : ""}`,
                     },
                   ]
                 : []),
               ...b.refunds.map((r) => ({
-                term: `Refund · ${r.reason.toLowerCase().replace(/_/g, " ")}`,
-                value: `${formatInr(r.amountPaise)} · ${r.status.toLowerCase()}`,
+                term: `Refund · ${refundReasonLabel(r.reason)}`,
+                value: `${formatInr(r.amountPaise)} · ${refundStatusLabel(r.status)}`,
               })),
               ...(b.payout && role !== "RENTER"
                 ? [
                     {
                       term: "Payout to owner",
-                      value: `${formatInr(b.payout.netPaise)} · ${b.payout.status.toLowerCase()}${b.payout.reference ? ` · ref ${b.payout.reference}` : ""}`,
+                      value: `${formatInr(b.payout.netPaise)} · ${payoutStatusLabel(b.payout.status)}${b.payout.reference ? ` · ref ${b.payout.reference}` : ""}`,
                     },
                   ]
                 : []),
@@ -594,13 +608,13 @@ export function BookingView({
         <section aria-labelledby="dispute" className="lg:col-span-7">
           <SectionIndex index={3}>Dispute</SectionIndex>
           <h2 id="dispute" className="mt-3 text-display-sm">
-            {b.dispute.kind.toLowerCase().replace(/_/g, " ")}
+            {disputeKindLabel(b.dispute.kind)}
           </h2>
           <p className="mt-2 text-sm text-graphite">
-            Opened by the {b.dispute.openedByRole.toLowerCase()}
+            Opened by the {roleLabel(b.dispute.openedByRole)}
             {b.dispute.claimedAmountPaise ? ` · claim ${formatInr(b.dispute.claimedAmountPaise)}` : ""} ·{" "}
-            {b.dispute.status.toLowerCase()}
-            {b.dispute.resolution ? ` · ${b.dispute.resolution.toLowerCase().replace(/_/g, " ")}` : ""}
+            {disputeStatusLabel(b.dispute.status)}
+            {b.dispute.resolution ? ` · ${disputeResolutionLabel(b.dispute.resolution)}` : ""}
           </p>
           <p className="mt-4">{b.dispute.description}</p>
           {b.dispute.resolutionNotes ? (
@@ -702,7 +716,7 @@ export function BookingView({
             <li key={i} className="grid grid-cols-[1fr_auto] gap-4 border-b border-rule py-3 text-sm">
               <span>
                 {statusLabel[h.toStatus as keyof typeof statusLabel] ?? h.toStatus}
-                <span className="text-stone"> · {h.actorRole.toLowerCase()}</span>
+                <span className="text-stone"> · {roleLabel(h.actorRole)}</span>
                 {h.reason ? <span className="block text-graphite">{h.reason}</span> : null}
               </span>
               <span className="text-graphite numeral">{instant.format(h.createdAt)}</span>
@@ -724,16 +738,7 @@ function dayBefore(date: string): string {
 }
 
 function disputeKindsFor(status: string, role: Role, lateFeePaise: number | null): Array<[string, string]> {
-  const all: Record<string, string> = {
-    HANDOVER_FAILED: "The handover did not happen",
-    NOT_AS_DESCRIBED: "The outfit is not as described",
-    NOT_RETURNED: "The outfit has not been returned",
-    RETURN_NOT_ACKNOWLEDGED: "I returned it but it is not recorded",
-    DAMAGE: "It came back damaged",
-    MISSING_ITEMS: "Pieces are missing",
-    LATE_FEE_CONTESTED: "I disagree with the late fee",
-    OTHER: "Something else",
-  };
+  const all = DISPUTE_KIND_LABELS;
   const allowed: Record<string, Partial<Record<Role, string[]>>> = {
     CONFIRMED: {
       RENTER: ["HANDOVER_FAILED", "NOT_AS_DESCRIBED", "OTHER"],

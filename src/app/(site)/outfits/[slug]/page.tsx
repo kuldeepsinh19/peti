@@ -6,6 +6,7 @@ import { getActor } from "@/composition/session";
 import { marketplacePolicy } from "@/config/marketplace-policy";
 import { AvailabilityCalendar } from "@/modules/bookings/ui/availability-calendar";
 import { RentalPolicies } from "@/modules/bookings/ui/rental-policies";
+import { type OutfitStatus, outfitStatusLabel } from "@/modules/listings";
 import { OutfitDetailView } from "@/modules/search/ui/outfit-detail-view";
 import { addDays, localDateInIndia } from "@/shared/domain/local-date";
 import { NotFoundError } from "@/shared/domain/errors";
@@ -65,8 +66,8 @@ export default async function OutfitPage({
       ) : null}
       {outfit.status !== "ACTIVE" ? (
         <Notice tone="warning" title="Not visible to renters" className="mb-8">
-          This listing is {outfit.status.toLowerCase().replace("_", " ")}. Only you and administrators can see
-          it.
+          This listing is {(outfitStatusLabel[outfit.status as OutfitStatus] ?? outfit.status).toLowerCase()}.
+          Only you and administrators can see it.
         </Notice>
       ) : null}
       <OutfitDetailView

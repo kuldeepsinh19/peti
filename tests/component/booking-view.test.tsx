@@ -150,3 +150,38 @@ describe("booking page: what just happened", () => {
     expect(screen.getByText(/Booking cancelled/)).toBeInTheDocument();
   });
 });
+
+describe("booking page: plain words, not codes", () => {
+  it("explains why a booking closed and where a refund is", () => {
+    show(
+      booking({
+        status: "CANCELLED",
+        closedReason: "RENTER_CANCELLED",
+        payment: {
+          id: "p1",
+          status: "CAPTURED",
+          provider: "sandbox",
+          amountPaise: 950_000,
+          refundedPaise: 0,
+          capturedAt: new Date("2026-11-21T08:00:00Z"),
+        },
+        refunds: [
+          {
+            id: "r1",
+            reason: "CANCELLATION",
+            amountPaise: 950_000,
+            status: "PENDING",
+            createdAt: new Date("2026-11-25T08:00:00Z"),
+          },
+        ],
+      }),
+      "RENTER",
+      "2026-11-25",
+    );
+    expect(screen.getByText("This booking is closed: cancelled by the renter.")).toBeInTheDocument();
+    expect(screen.getByText("paid (simulated sandbox)")).toBeInTheDocument();
+    expect(screen.getByText("Refund · cancellation")).toBeInTheDocument();
+    expect(screen.getByText(/queued, sent with the next background run/)).toBeInTheDocument();
+    expect(screen.queryByText(/RENTER_CANCELLED|_/)).not.toBeInTheDocument();
+  });
+});
