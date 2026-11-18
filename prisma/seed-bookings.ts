@@ -9,8 +9,9 @@
  * a SIMULATED sandbox payment delivered as signed webhooks, condition reports), with this script's clock set
  * to the moment each step would have happened. Nothing is written directly to booking tables.
  *
- * Run it again on the same day and it does nothing; run it on a later day and it adds that day's set (earlier
- * ones stay, as booking history is append-only). It refuses to run anywhere but local and test.
+ * Run it again on the same day and it does nothing for bookings still at their stage; one a demo has moved on
+ * is replaced by a fresh one, and a later day gets its own set (earlier ones stay: booking history is
+ * append-only). It refuses to run anywhere but local and test.
  */
 import "dotenv/config";
 import { parseEnv } from "../src/config/env";
@@ -149,16 +150,47 @@ const scenarios: Scenario[] = [
 const RENTER = "rohan@peti.local";
 const DAYS = 3;
 
-type Created = { reference: string; outfit?: string; owner?: string };
+type Created = {
+  scenario: string;
+  stage: Stage;
+  bookingId: string;
+  reference: string;
+  /** Its status now (an earlier demo today may have moved it on). */
+  status: string;
+  outfit: string;
+  owner: string;
+  createdNow: boolean;
+};
+
+const BOOKING_SUMMARY = {
+  id: true,
+  reference: true,
+  status: true,
+  outfit: { select: { title: true, owner: { select: { email: true } } } },
+} as const;
 
 async function create(s: Scenario, renter: UserActor): Promise<Created> {
   const note = `Ready-made demo booking for the local POC (${s.name}, seeded ${today}).`;
-  // Already seeded today, unless that one was cancelled or expired during a demo (then a fresh one is made).
+  // Already seeded today and still at its stage. One that a demo today has moved on (handed over, paid,
+  // cancelled...) no longer shows that stage, so a fresh one is made: the demo can be rehearsed again.
   const existing = await db.booking.findFirst({
-    where: { renterNote: note, status: { notIn: ["CANCELLED", "EXPIRED", "REJECTED"] } },
-    select: { reference: true },
+    where: { renterNote: note, status: s.stage },
+    select: BOOKING_SUMMARY,
   });
-  if (existing) return { reference: existing.reference };
+  const summary = (
+    b: { id: string; reference: string; status: string; outfit: { title: string; owner: { email: string } } },
+    createdNow: boolean,
+  ): Created => ({
+    scenario: s.name,
+    stage: s.stage,
+    bookingId: b.id,
+    reference: b.reference,
+    status: b.status,
+    outfit: b.outfit.title,
+    owner: b.outfit.owner.email,
+    createdNow,
+  });
+  if (existing) return summary(existing, false);
 
   const candidates = await db.outfit.findMany({
     where: {
@@ -229,23 +261,34 @@ async function create(s: Scenario, renter: UserActor): Promise<Created> {
       }
     }
 
-    const row = await db.booking.findUniqueOrThrow({ where: { id: bookingId }, select: { reference: true } });
-    return { reference: row.reference, outfit: outfit.title, owner: outfit.owner.email };
+    return summary(
+      await db.booking.findUniqueOrThrow({ where: { id: bookingId }, select: BOOKING_SUMMARY }),
+      true,
+    );
   }
   throw new Error(`No listing is free from ${s.start} for the "${s.name}" booking.`);
 }
 
 async function main() {
+  const json = process.argv.includes("--json");
   const renter = await actor(RENTER);
   // Expire anything whose deadline has passed (as the background sweep would), so stale demo bookings from
   // an earlier run do not hold dates or count as seeded.
   clock.set(new Date());
   await bookings.sweep();
+  const created: Created[] = [];
+  for (const s of scenarios) created.push(await create(s, renter));
+  if (json) {
+    // For the end-to-end tests: { renter, bookings: [...] }.
+    console.log(JSON.stringify({ renter: RENTER, bookings: created }));
+    return;
+  }
   console.log(`Ready-made demo bookings for ${today}. Renter: ${RENTER}. Payments are SIMULATED (sandbox).`);
-  for (const s of scenarios) {
-    const r = await create(s, renter);
-    const detail = r.outfit ? ` (${r.outfit}; owner ${r.owner})` : " (already seeded today)";
-    console.log(`  ${r.reference.padEnd(10)} ${s.stage.padEnd(16)} ${s.shows}${detail}`);
+  for (const [i, r] of created.entries()) {
+    const now = r.createdNow ? "" : " [already seeded today]";
+    console.log(
+      `  ${r.reference.padEnd(10)} ${r.stage.padEnd(16)} ${scenarios[i]!.shows} (${r.outfit}; owner ${r.owner})${now}`,
+    );
   }
   console.log("Sign in as the renter or the owner and open My rentals or Rental requests.");
 }
