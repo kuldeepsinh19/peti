@@ -81,7 +81,7 @@ serialisable DTOs (money as paise numbers, dates as `YYYY-MM-DD` strings).
 | Module          | Responsibility                                                                                                                                        |
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `auth`          | Better Auth configuration, session → actor, sign-up hooks                                                                                             |
-| `users`         | Profiles, addresses, contact verification state, identity-verification port (status only)                                                             |
+| `users`         | Profiles, addresses, contact verification state, identity-verification status (always unverified; no port or provider yet)                            |
 | `listings`      | Outfits, photos, measurements, price options, moderation workflow                                                                                     |
 | `search`        | Discovery query (keyword, filters, date availability), category and locality reads, saved outfits                                                     |
 | `bookings`      | Request, approve, reject, cancel, handover, return, disputes, owner blocks, sweep; state machine, history, calendar holds and booking-side money rows |

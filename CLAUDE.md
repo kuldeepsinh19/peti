@@ -19,8 +19,8 @@ Product docs: [docs/product](docs/product). Lifecycle and money rules:
 Non-negotiables:
 
 - No company-owned inventory, no e-commerce "buy" flows.
-- Never claim a user is identity-verified. Identity verification is a port with no real adapter; status
-  stays `UNVERIFIED`. Never collect Aadhaar numbers or ID documents.
+- Never claim a user is identity-verified. Identity verification is not built: there is no port or
+  adapter, only a status that stays `UNVERIFIED`. Never collect Aadhaar numbers or ID documents.
 - Never mark a payment as succeeded without a signature-verified, provider-confirmed capture.
 - Peti captures payments explicitly, one per booking ([ADR-006](docs/decisions/ADR-006-payment-reliability.md)).
   Every report of a payment goes through `applyProviderPayment`; a payment that does not fit its booking is
@@ -76,8 +76,7 @@ Modular monolith, see [ADR-002](docs/decisions/ADR-002-modular-monolith.md). Eac
   `payment-events.ts`); simple CRUD use cases of a module may share `use-cases.ts`. Prefer functions taking a
   `deps` object over classes. No god services.
 - Add an abstraction only when there are two implementations or a real test seam (ports for payment,
-  storage, mail, SMS, identity, clock). Repositories are ports where a use case needs a seam; simple
-  read queries can live in the module's `infrastructure/queries.ts` exposed through a query port.
+  storage, mail, SMS, clock). Repositories are ports where a use case needs a seam; simple read queries can live in the module's `infrastructure/queries.ts` exposed through a query port.
 - No circular dependencies, ever.
 
 Modules: `auth`, `users`, `listings`, `search` (discovery and category reads), `bookings` (lifecycle, calendar holds,
