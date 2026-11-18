@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { container } from "@/composition/container";
+import { allowsSandboxPayments } from "@/config/env";
 import { requireActorOrRedirect } from "@/composition/session";
 import { formatInr } from "@/shared/domain/money";
 import { EmptyState, Notice, Tag } from "@/shared/ui/feedback";
@@ -40,6 +41,11 @@ export default async function EarningsPage({
         </Notice>
       ) : null}
       {params.saved === "1" ? <Notice tone="success" title="Payout details saved" /> : null}
+      {allowsSandboxPayments() ? (
+        <Notice tone="neutral" title="Simulated: no money moves here">
+          Payments in this environment go through a sandbox, so payouts are only recorded, never sent.
+        </Notice>
+      ) : null}
 
       <section aria-labelledby="totals" className="grid gap-10 lg:grid-cols-12">
         <div className="lg:col-span-5">

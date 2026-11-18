@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { container } from "@/composition/container";
+import { allowsSandboxPayments } from "@/config/env";
 import { requireAdminOrNotFound } from "@/composition/session";
 import { formatInr } from "@/shared/domain/money";
 import { SubmitButton } from "@/shared/ui/submit-button";
@@ -43,6 +44,12 @@ export default async function AdminPayoutsPage({
         </Notice>
       ) : null}
       {params.done === "markPayoutPaid" ? <Notice tone="success" title="Payout recorded as paid" /> : null}
+      {allowsSandboxPayments() ? (
+        <Notice tone="neutral" title="Simulated: no money moves here">
+          Renter payments in this environment are sandbox payments. Recording a payout here only records it;
+          send nothing.
+        </Notice>
+      ) : null}
       {params.done === "recordPayoutFailure" ? (
         <Notice tone="success" title="Payout recorded as failed">
           It is back under &ldquo;To pay&rdquo;, to be sent again once the cause is fixed.
