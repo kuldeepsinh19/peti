@@ -47,7 +47,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             </Link>
           </p>
         ) : null}
-        <SiteHeader viewer={viewer} />
+        <SiteHeader viewer={viewer} canJoin={allowsSelfServiceAccounts()} />
         <main id="main" className="flex-1">
           {children}
         </main>

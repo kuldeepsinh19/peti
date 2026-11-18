@@ -28,7 +28,7 @@ export default async function SignInPage({
       ) : null}
       {allowsSelfServiceAccounts() ? null : <DemoAccounts />}
       {isDevToolingEnabled() ? <LocalAccounts /> : null}
-      <SignInForm next={next} />
+      <SignInForm next={next} canResetPassword={allowsSelfServiceAccounts()} />
       {allowsSelfServiceAccounts() ? (
         <p className="text-sm text-graphite">
           New to Peti? <Link href="/sign-up">Create an account</Link>

@@ -55,7 +55,9 @@ export const demoAccounts = {
   accounts: [
     { email: "rohan@peti.local", role: "Renter" },
     { email: "aarav@peti.local", role: "Owner" },
+    { email: "kabir@peti.local", role: "Owner" },
     { email: "meera@peti.local", role: "Owner" },
+    { email: "isha@peti.local", role: "Owner" },
   ],
 } as const;
 

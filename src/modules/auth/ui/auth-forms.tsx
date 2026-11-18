@@ -93,7 +93,14 @@ export function SignUpForm() {
 
 type SignInValues = z.input<typeof signInSchema>;
 
-export function SignInForm({ next }: { next?: string | undefined }) {
+export function SignInForm({
+  next,
+  canResetPassword = true,
+}: {
+  next?: string | undefined;
+  /** False in the public demo, where password recovery is switched off. */
+  canResetPassword?: boolean;
+}) {
   const router = useRouter();
   const [formError, setFormError] = useState<string | null>(null);
   const form = useForm<SignInValues>({
@@ -140,9 +147,11 @@ export function SignInForm({ next }: { next?: string | undefined }) {
         <Button type="submit" size="lg" pending={isSubmitting}>
           Sign in
         </Button>
-        <Link href="/forgot-password" className="text-sm text-burgundy">
-          Forgotten your password?
-        </Link>
+        {canResetPassword ? (
+          <Link href="/forgot-password" className="text-sm text-burgundy">
+            Forgotten your password?
+          </Link>
+        ) : null}
       </div>
     </form>
   );

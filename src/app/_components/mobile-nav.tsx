@@ -6,7 +6,7 @@ import { listAnOutfit, primaryNav } from "@/config/site";
 import { Sheet } from "@/shared/ui/overlay";
 import type { HeaderViewer } from "./viewer";
 
-export function MobileNav({ viewer }: { viewer: HeaderViewer | null }) {
+export function MobileNav({ viewer, canJoin = true }: { viewer: HeaderViewer | null; canJoin?: boolean }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
   // The two marketplace actions lead, then the account, then the rest.
@@ -23,7 +23,7 @@ export function MobileNav({ viewer }: { viewer: HeaderViewer | null }) {
         ]
       : [
           { href: "/sign-in", label: "Sign in" },
-          { href: "/sign-up", label: "Join Peti" },
+          ...(canJoin ? [{ href: "/sign-up", label: "Join Peti" }] : []),
         ]),
     ...primaryNav.slice(1),
   ];

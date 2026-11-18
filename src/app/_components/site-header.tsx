@@ -8,7 +8,8 @@ import type { HeaderViewer } from "./viewer";
 
 export type { HeaderViewer };
 
-export function SiteHeader({ viewer }: { viewer: HeaderViewer | null }) {
+/** `canJoin`: false in the public demo, where sign-up is switched off (visitors use the shared accounts). */
+export function SiteHeader({ viewer, canJoin = true }: { viewer: HeaderViewer | null; canJoin?: boolean }) {
   return (
     <header className="border-b border-ink bg-paper">
       <div className="border-b border-rule">
@@ -54,13 +55,15 @@ export function SiteHeader({ viewer }: { viewer: HeaderViewer | null }) {
               <Link href="/sign-in" className="text-sm no-underline hover:underline">
                 Sign in
               </Link>
-              <Link href="/sign-up" className="text-sm no-underline hover:underline">
-                Join Peti
-              </Link>
+              {canJoin ? (
+                <Link href="/sign-up" className="text-sm no-underline hover:underline">
+                  Join Peti
+                </Link>
+              ) : null}
             </>
           )}
         </div>
-        <MobileNav viewer={viewer} />
+        <MobileNav viewer={viewer} canJoin={canJoin} />
       </div>
       {/* Small screens: the two marketplace actions stay one tap away instead of inside the menu. */}
       <nav aria-label="Marketplace" className="grid grid-cols-2 border-t border-rule lg:hidden">
