@@ -175,25 +175,25 @@ explicit). Routes are given where a requirement maps to a page; the full route l
 
 ### 6.1 Authentication and contact verification (AUTH)
 
-| ID         | Requirement                                                                                                                                                                    | Priority |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
-| FR-AUTH-01 | A visitor can sign up with name, email and password (`/sign-up`) and must accept the current terms and privacy notice.                                                         | M        |
-| FR-AUTH-02 | A verification email is sent on sign-up; the email address is marked verified only through the emailed link (`/verify-email`).                                                 | M        |
-| FR-AUTH-03 | A user can sign in and out (`/sign-in`); sessions are stored server-side and can be revoked.                                                                                   | M        |
-| FR-AUTH-04 | A user can request a password reset by email (`/forgot-password`) and set a new password from a single-use, time-limited link (`/reset-password`).                             | M        |
-| FR-AUTH-05 | A user can add an Indian mobile number and verify it by a one-time code sent by SMS.                                                                                           | M        |
-| FR-AUTH-06 | A verified email is required before a user can request a booking or submit a listing for review.                                                                               | M        |
-| FR-AUTH-07 | A verified phone number is required before a user can request a booking or submit a listing for review, because the phone number is the contact channel revealed on CONFIRMED. | S        |
-| FR-AUTH-08 | Sign-in, sign-up, password reset and OTP requests are rate-limited per account and per IP address.                                                                             | M        |
-| FR-AUTH-09 | In local and test environments, emails and OTPs are written to a developer outbox (`/dev/outbox`) instead of being sent; this page does not exist in production.               | M        |
-| FR-AUTH-10 | Users have a role of `USER` or `ADMIN`; admin pages and actions are refused to non-admins on the server.                                                                       | M        |
-| FR-AUTH-11 | Social sign-in (Google and similar).                                                                                                                                           | W        |
+| ID         | Requirement                                                                                                                                                                       | Priority |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| FR-AUTH-01 | A visitor can sign up with name, email and password (`/sign-up`) and must accept the current terms and privacy notice; the time and version accepted are recorded on the account. | M        |
+| FR-AUTH-02 | A verification email is sent on sign-up; the email address is marked verified only through the emailed link (handled by `/api/auth/verify-email`).                                | M        |
+| FR-AUTH-03 | A user can sign in and out (`/sign-in`); sessions are stored server-side and can be revoked.                                                                                      | M        |
+| FR-AUTH-04 | A user can request a password reset by email (`/forgot-password`) and set a new password from a single-use, time-limited link (`/reset-password`).                                | M        |
+| FR-AUTH-05 | A user can add an Indian mobile number and verify it by a one-time code sent by SMS.                                                                                              | M        |
+| FR-AUTH-06 | A verified email is required before a user can request a booking or submit a listing for review.                                                                                  | M        |
+| FR-AUTH-07 | A verified phone number is required before a user can request a booking or submit a listing for review, because the phone number is the contact channel revealed on CONFIRMED.    | S        |
+| FR-AUTH-08 | Sign-in, sign-up, password reset and OTP requests are rate-limited per account and per IP address.                                                                                | M        |
+| FR-AUTH-09 | In local and test environments, emails and OTPs are written to a developer outbox (`/dev/outbox`) instead of being sent; this page does not exist in production.                  | M        |
+| FR-AUTH-10 | Users have a role of `USER` or `ADMIN`; admin pages and actions are refused to non-admins on the server.                                                                          | M        |
+| FR-AUTH-11 | Social sign-in (Google and similar).                                                                                                                                              | W        |
 
 ### 6.2 Profile, addresses and trust signals (PROF)
 
 | ID         | Requirement                                                                                                                                                                                                                                | Priority |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
-| FR-PROF-01 | A user can edit their display name, profile photo, short bio and locality (`/account/profile`).                                                                                                                                            | M        |
+| FR-PROF-01 | A user can edit their display name, profile photo, short bio and locality (on `/account`).                                                                                                                                                 | M        |
 | FR-PROF-02 | A user can add, edit and delete addresses in Ahmedabad and mark one as default (`/account/addresses`). Owners choose a pickup address per listing.                                                                                         | M        |
 | FR-PROF-03 | A public profile shows display name, locality (not the full address), member-since date, completed rentals as owner and renter, published reviews and which contact channels are verified (email, phone).                                  | M        |
 | FR-PROF-04 | Every user's identity verification status is `UNVERIFIED`. The product never shows an "ID verified", "KYC verified" or similar badge, and never collects Aadhaar, PAN or any ID document.                                                  | M        |
@@ -379,12 +379,12 @@ explicit). Routes are given where a requirement maps to a page; the full route l
 
 ### 6.16 Public content (CONT)
 
-| ID         | Requirement                                                                                                                                                                         | Priority |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| FR-CONT-01 | How it works (`/how-it-works`) explains renting and lending, including the money flow, deposit, cancellation tiers and inspection window.                                           | M        |
-| FR-CONT-02 | About (`/about`), terms (`/terms`) and privacy (`/privacy`) pages. Terms and privacy are drafts for legal review and are versioned; the accepted version is stored on each booking. | M        |
-| FR-CONT-03 | Trust and safety (`/trust-and-safety`) as FR-PROF-05, including that Peti does not take custody of garments and that the deposit is the maximum recoverable amount.                 | M        |
-| FR-CONT-04 | Gujarati language interface.                                                                                                                                                        | W        |
+| ID         | Requirement                                                                                                                                                                                                                                                        | Priority |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
+| FR-CONT-01 | How it works (`/how-it-works`) explains renting and lending, including the money flow, deposit, cancellation tiers and inspection window.                                                                                                                          | M        |
+| FR-CONT-02 | About (`/about`), terms (`/terms`) and privacy (`/privacy`) pages. Terms and privacy are drafts for legal review and are versioned; the version accepted at sign-up is stored on the account, and each booking stores the rental-policy version it was made under. | M        |
+| FR-CONT-03 | Trust and safety (`/trust-and-safety`) as FR-PROF-05, including that Peti does not take custody of garments and that the deposit is the maximum recoverable amount.                                                                                                | M        |
+| FR-CONT-04 | Gujarati language interface.                                                                                                                                                                                                                                       | W        |
 
 ---
 
@@ -399,7 +399,7 @@ explicit). Routes are given where a requirement maps to a page; the full route l
 | NFR-SEC-05   | Security        | Passwords are hashed by the auth library; sessions are HTTP-only, secure, same-site cookies.                                                                                                                                           |
 | NFR-SEC-06   | Security        | Uploads are checked by magic bytes and size, re-encoded and served through the application, never executed.                                                                                                                            |
 | NFR-SEC-07   | Security        | Rate limits on auth, booking requests, uploads and disputes.                                                                                                                                                                           |
-| NFR-SEC-08   | Security        | An independent security review before any production launch; findings tracked in `docs/security/`.                                                                                                                                     |
+| NFR-SEC-08   | Security        | An independent security review before any production launch; findings tracked in `docs/architecture/security-architecture.md` and the audit reports in `docs/audits/`.                                                                 |
 | NFR-PRI-01   | Privacy         | Collect the minimum: no ID documents, no Aadhaar, no date of birth. Photo EXIF and GPS data are stripped.                                                                                                                              |
 | NFR-PRI-02   | Privacy         | Phone numbers and addresses are shown only to the other participant from CONFIRMED, and to admins.                                                                                                                                     |
 | NFR-PRI-03   | Privacy         | The privacy notice describes what is collected, why, and for how long. A compliance review against India's Digital Personal Data Protection Act, 2023 and its rules is needed before launch (not legal advice).                        |
@@ -424,14 +424,14 @@ explicit). Routes are given where a requirement maps to a page; the full route l
 
 ## 8. Pages in scope
 
-| Area     | Pages (route)                                                                                                                                                                                                                                    |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Public   | Landing `/`, explore `/explore`, category `/categories/[slug]`, outfit detail `/outfits/[slug]`, how it works `/how-it-works`, about `/about`, trust and safety `/trust-and-safety`, terms `/terms`, privacy `/privacy`                          |
-| Auth     | Sign-up `/sign-up`, sign-in `/sign-in`, password recovery `/forgot-password` and `/reset-password`, email verification `/verify-email`                                                                                                           |
-| Renter   | Profile `/account/profile`, addresses `/account/addresses`, my rentals `/account/rentals`, booking detail `/account/rentals/[id]`, saved outfits `/account/saved`, reviews `/account/reviews`                                                    |
-| Owner    | Dashboard `/lend`, create listing `/lend/outfits/new`, edit listing `/lend/outfits/[id]/edit`, availability calendar `/lend/outfits/[id]/calendar`, booking requests `/lend/requests`, rental history `/lend/history`, earnings `/lend/earnings` |
-| Admin    | Overview `/admin`, users `/admin/users`, listing moderation `/admin/listings`, bookings `/admin/bookings`, disputes `/admin/disputes`, payouts `/admin/payouts`, categories `/admin/categories`, activity `/admin/activity`                      |
-| Dev only | Outbox `/dev/outbox`, sandbox checkout `/dev/sandbox-checkout/[orderId]`, design system `/dev/design-system` — 404 outside local and test                                                                                                        |
+| Area     | Pages (route)                                                                                                                                                                                                                                                                             |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Public   | Landing `/`, explore `/explore`, category `/categories/[slug]`, outfit detail `/outfits/[slug]`, how it works `/how-it-works`, about `/about`, trust and safety `/trust-and-safety`, terms `/terms`, privacy `/privacy`                                                                   |
+| Auth     | Sign-up `/sign-up`, sign-in `/sign-in`, password recovery `/forgot-password` and `/reset-password`, email verification link `/api/auth/verify-email`                                                                                                                                      |
+| Renter   | Profile and verification `/account`, addresses `/account/addresses`, my rentals `/account/rentals`, booking detail `/account/rentals/[id]`, saved outfits `/account/saved`, reviews `/account/reviews`                                                                                    |
+| Owner    | Lending landing page `/lend`, My outfits `/lend/dashboard`, create listing `/lend/outfits/new`, edit listing `/lend/outfits/[id]/edit`, availability calendar `/lend/outfits/[id]/calendar`, booking requests `/lend/requests`, rental history `/lend/history`, earnings `/lend/earnings` |
+| Admin    | Overview `/admin`, users `/admin/users`, listing moderation `/admin/listings`, bookings `/admin/bookings`, disputes `/admin/disputes`, payouts `/admin/payouts`, categories `/admin/categories`, activity `/admin/activity`                                                               |
+| Dev only | POC tools `/dev`, outbox `/dev/outbox`, sandbox checkout `/dev/sandbox-checkout/[orderId]`, design system `/dev/design-system` — 404 outside local and test                                                                                                                               |
 
 The booking detail page is shared: the owner reaches the same booking page from `/lend/requests` and
 `/lend/history`, and sees owner actions (approve, reject, record handover, record return, confirm return,
