@@ -16,8 +16,8 @@ import { signedError } from "@/app/_lib/flash";
 export const metadata: Metadata = { title: "Listing moderation" };
 
 const VIEWS: Record<string, { label: string; statuses: OutfitStatus[] }> = {
-  review: { label: "Awaiting review", statuses: ["PENDING_REVIEW"] },
-  live: { label: "Live and paused", statuses: ["ACTIVE", "PAUSED"] },
+  review: { label: "Pending approval", statuses: ["PENDING_REVIEW"] },
+  live: { label: "Published and paused", statuses: ["ACTIVE", "PAUSED"] },
   suspended: { label: "Suspended", statuses: ["SUSPENDED"] },
   rejected: { label: "Changes requested", statuses: ["REJECTED"] },
 };

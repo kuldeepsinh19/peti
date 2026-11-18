@@ -142,8 +142,8 @@ export default async function EditListingPage({
         {query.saved === "1" ? <Notice tone="success" title="Changes saved" /> : null}
         {query.saved === "review" ? (
           <Notice tone="warning" title="Changes saved and sent for review">
-            You changed what renters see, so an administrator will check the listing again before it goes back
-            live.
+            You changed what renters see, so an administrator will check the listing again before it is
+            published again.
           </Notice>
         ) : null}
         {s === "REJECTED" && view.moderationNote ? (

@@ -261,7 +261,7 @@ const steps = [
   {
     numeral: "I",
     title: "List what you own",
-    body: "Photograph the garment, record its real measurements and condition, choose 2, 3, 5 or 7-day prices and a refundable deposit. Every listing is reviewed before it goes live.",
+    body: "Photograph the garment, record its real measurements and condition, choose 2, 3, 5 or 7-day prices and a refundable deposit. Every listing is reviewed before it is published.",
   },
   {
     numeral: "II",

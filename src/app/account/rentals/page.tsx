@@ -6,7 +6,7 @@ import { ButtonLink } from "@/shared/ui/button";
 import { EmptyState, Notice } from "@/shared/ui/feedback";
 import { PageHeader } from "@/shared/ui/layout";
 
-export const metadata: Metadata = { title: "Your rentals" };
+export const metadata: Metadata = { title: "My rentals" };
 
 export default async function RentalsPage({
   searchParams,
@@ -18,7 +18,7 @@ export default async function RentalsPage({
   const params = await searchParams;
   return (
     <div className="pb-16">
-      <PageHeader eyebrow="Renting" title="Your rentals" />
+      <PageHeader eyebrow="Renting" title="My rentals" />
       {params.payment === "invalid" || params.payment === "error" ? (
         <Notice tone="danger" title="We could not verify that payment" className="mt-8">
           If money left your account, it will be confirmed or refunded automatically.

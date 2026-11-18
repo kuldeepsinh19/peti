@@ -135,7 +135,7 @@ export default async function ListingPreviewPage({
         </ButtonLink>
         <p className="w-full text-caption text-stone sm:w-auto">
           {canSubmit
-            ? "A Peti administrator reviews every listing before it goes live."
+            ? "A Peti administrator reviews every listing before it is published."
             : s === "PENDING_REVIEW"
               ? "Submitted: a Peti administrator is reviewing it."
               : null}

@@ -66,7 +66,7 @@ const DECISION_MESSAGES: Partial<
   reject: {
     subject: (title) => `Changes requested for ${title}`,
     body: (note) =>
-      `A Peti administrator asked for changes before it goes live: ${note ?? "see the listing"}. Edit it and submit it again.`,
+      `A Peti administrator asked for changes before it is published: ${note ?? "see the listing"}. Edit it and submit it again.`,
   },
   reinstate: {
     subject: (title) => `${title} is no longer suspended`,

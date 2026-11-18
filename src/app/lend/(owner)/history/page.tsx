@@ -5,7 +5,7 @@ import { BookingList } from "@/modules/bookings/ui/booking-list";
 import { EmptyState } from "@/shared/ui/feedback";
 import { PageHeader } from "@/shared/ui/layout";
 
-export const metadata: Metadata = { title: "Rental history" };
+export const metadata: Metadata = { title: "Past rentals" };
 
 export default async function HistoryPage() {
   const actor = await requireActorOrRedirect("/lend/history");
@@ -17,7 +17,7 @@ export default async function HistoryPage() {
   ]);
   return (
     <div className="pb-16">
-      <PageHeader eyebrow="Lending" title="Rental history" />
+      <PageHeader eyebrow="Lending" title="Past rentals" />
       <div className="mt-10">
         <BookingList
           rows={rows}

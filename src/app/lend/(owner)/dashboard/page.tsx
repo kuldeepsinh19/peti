@@ -160,7 +160,7 @@ export default async function MyOutfitsPage({
             </h2>
             <p className="mt-4 max-w-prose text-lg text-graphite">
               List it in three steps: the details, a few photographs, and a preview of exactly what renters
-              will see. A Peti administrator checks it before it goes live.
+              will see. A Peti administrator checks it before it is published.
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
               <ButtonLink href="/lend/outfits/new" size="lg">
