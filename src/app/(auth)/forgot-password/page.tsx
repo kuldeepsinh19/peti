@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { OutboxHint } from "@/app/_components/outbox-hint";
 import Link from "next/link";
 import { allowsSelfServiceAccounts } from "@/config/env";
 import { ForgotPasswordForm } from "@/modules/auth/ui/auth-forms";
@@ -16,6 +17,7 @@ export default function ForgotPasswordPage() {
       <p className="text-graphite">
         Enter the email you signed up with and we will send you a link to choose a new one.
       </p>
+      <OutboxHint what="Password reset emails" />
       {allowsSelfServiceAccounts() ? <ForgotPasswordForm /> : <DemoAccountsOnly />}
       <p className="text-sm text-graphite">
         Remembered it? <Link href="/sign-in">Sign in</Link>

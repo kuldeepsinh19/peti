@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { OutboxHint } from "@/app/_components/outbox-hint";
 import Link from "next/link";
 import { allowsSelfServiceAccounts } from "@/config/env";
 import { SignUpForm } from "@/modules/auth/ui/auth-forms";
@@ -19,6 +20,7 @@ export default function SignUpPage() {
         We will email you a link to confirm your address. To request or list an outfit you will also verify
         your mobile number. We never ask for identity documents.
       </p>
+      <OutboxHint what="The confirmation email and the mobile code" />
       {allowsSelfServiceAccounts() ? <SignUpForm /> : <DemoAccountsOnly />}
       <p className="text-sm text-graphite">
         Already have an account? <Link href="/sign-in">Sign in</Link>

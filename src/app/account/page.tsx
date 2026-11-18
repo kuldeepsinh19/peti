@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { OutboxHint } from "@/app/_components/outbox-hint";
 import Link from "next/link";
 import { container } from "@/composition/container";
 import { requireActorOrRedirect } from "@/composition/session";
@@ -100,6 +101,9 @@ export default async function AccountPage({
               { term: "Identity", value: <Tag>Not verified — Peti does not check ID documents</Tag> },
             ]}
           />
+          {!account.emailVerified || !account.phoneVerified ? (
+            <OutboxHint what="Confirmation emails and mobile codes" />
+          ) : null}
           {!account.emailVerified ? <ResendVerificationEmail email={account.email} /> : null}
           {!account.phoneVerified ? <PhoneVerification currentNumber={account.phoneNumber} /> : null}
         </div>
