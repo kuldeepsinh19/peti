@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import { allowsSelfServiceAccounts } from "@/config/env";
+import Link from "next/link";
+import { allowsSelfServiceAccounts, isDevToolingEnabled } from "@/config/env";
 import { site } from "@/config/site";
 import { getActor } from "@/composition/session";
 import { SiteFooter } from "./_components/site-footer";
@@ -30,11 +31,22 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         >
           Skip to content
         </a>
-        {allowsSelfServiceAccounts() ? null : (
+        {!allowsSelfServiceAccounts() ? (
           <p className="bg-olive-deep px-4 py-2 text-center text-caption text-paper">
             Demonstration: fictional people and outfits, sandbox payments only. Do not enter real details.
           </p>
-        )}
+        ) : isDevToolingEnabled() ? (
+          <p className="bg-olive-deep px-4 py-2 text-center text-caption text-paper" data-testid="poc-banner">
+            Local POC: payments, emails and text messages are simulated — nothing is charged or sent.{" "}
+            <Link href="/dev" className="text-paper underline">
+              Tools
+            </Link>{" "}
+            ·{" "}
+            <Link href="/dev/outbox" className="text-paper underline">
+              Outbox
+            </Link>
+          </p>
+        ) : null}
         <SiteHeader viewer={viewer} />
         <main id="main" className="flex-1">
           {children}
