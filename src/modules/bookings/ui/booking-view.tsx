@@ -30,8 +30,28 @@ export interface BookingViewProps {
       | { mode: "CLIENT_SDK"; scriptUrl: string; publicConfig: Readonly<Record<string, unknown>> }
     >
   >;
-  flash?: { done?: string; error?: string; payment?: string };
+  flash?: { done?: string; error?: string; payment?: string; requested?: string };
+  /** The sandbox payment provider is in use: payments are simulated and labelled as such. */
+  simulatedPayments?: boolean;
 }
+
+/** What a successful command did, in words (shown after the page reloads). */
+const DONE_MESSAGES: Record<string, string> = {
+  approve: "Request approved. The renter has been asked to pay; the dates are held until then.",
+  reject: "Request declined. The renter has been told.",
+  withdraw: "Request withdrawn. Nothing was charged.",
+  cancel:
+    "Booking cancelled. Any refund due is listed under Money below and is sent by the next background run.",
+  acknowledgeHandover: "Handover confirmed. The rental has started.",
+  confirmReturn:
+    "Return confirmed and the rental is complete. The deposit refund and the payout are listed under Money below.",
+  acceptClaim: "Claim accepted. The deposit is settled as claimed.",
+  withdrawDispute: "Dispute withdrawn.",
+  openDispute: "Dispute opened. The deposit stays held until a Peti administrator decides it.",
+  resolveDispute: "Dispute decided. Both sides have been told.",
+  addDisputeMessage: "Message sent.",
+  report: "Condition report saved. The other side has been told.",
+};
 
 const instant = new Intl.DateTimeFormat("en-IN", {
   dateStyle: "medium",
@@ -90,6 +110,7 @@ export function BookingView({
   report,
   checkout,
   flash,
+  simulatedPayments = false,
 }: BookingViewProps) {
   const role = b.viewerRole;
   const policy = readPolicySnapshot(b.policy);
@@ -141,7 +162,24 @@ export function BookingView({
             {flash.error}
           </Notice>
         ) : null}
-        {flash?.done ? <Notice tone="success" title="Done" /> : null}
+        {flash?.done ? (
+          <Notice tone="success" title="Done">
+            {DONE_MESSAGES[flash.done] ?? null}
+          </Notice>
+        ) : null}
+        {flash?.requested === "1" && b.status === "PENDING_APPROVAL" ? (
+          <Notice tone="success" title="Request sent">
+            {b.owner.name} has until {b.expiresAt ? instant.format(b.expiresAt) : "the deadline below"} to
+            answer. Nothing is charged until they approve and you pay.
+          </Notice>
+        ) : null}
+        {flash?.payment === "failed" ? (
+          <Notice tone="danger" title="Payment failed">
+            {simulatedPayments ? "The simulated payment was declined. " : "The payment was declined. "}
+            Nothing was taken, and the booking is still waiting for payment: you can try again before{" "}
+            {b.expiresAt ? instant.format(b.expiresAt) : "the deadline"}.
+          </Notice>
+        ) : null}
         {flash?.payment === "confirmed" || flash?.payment === "already_confirmed" ? (
           <Notice tone="success" title="Payment received">
             Your booking is confirmed.
@@ -219,7 +257,10 @@ export function BookingView({
               the booking is confirmed only when the payment provider confirms the payment.
             </p>
             {role === "RENTER" ? (
-              <PayButton label={`Pay ${formatInr(b.money.renterTotalPaise)}`} start={checkout} />
+              <PayButton
+                label={`Pay ${formatInr(b.money.renterTotalPaise)}${simulatedPayments ? " (simulated)" : ""}`}
+                start={checkout}
+              />
             ) : null}
             {role !== "ADMIN" ? (
               <CommandForm {...cmd} name="cancel" label="Cancel booking" variant="quiet" />

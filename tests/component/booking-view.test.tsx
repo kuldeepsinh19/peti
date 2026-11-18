@@ -123,3 +123,30 @@ describe("booking page: contesting a late fee (#22)", () => {
     expect(screen.getByRole("option", { name: "I disagree with the late fee" })).toBeInTheDocument();
   });
 });
+
+describe("booking page: what just happened", () => {
+  it("confirms a request was sent, with the owner's deadline", () => {
+    const b = booking({ status: "PENDING_APPROVAL", expiresAt: new Date("2026-12-02T06:30:00Z") });
+    show(b, "RENTER", "2026-12-01", { flash: { requested: "1" } });
+    expect(screen.getByText("Request sent")).toBeInTheDocument();
+    expect(screen.getByText(/Kabir has until/)).toBeInTheDocument();
+  });
+
+  it("says a declined payment took nothing and can be retried", () => {
+    const b = booking({ status: "AWAITING_PAYMENT", expiresAt: new Date("2026-12-02T06:30:00Z") });
+    show(b, "RENTER", "2026-12-01", { flash: { payment: "failed" }, simulatedPayments: true });
+    expect(screen.getByText("Payment failed")).toBeInTheDocument();
+    expect(screen.getByText(/simulated payment was declined/)).toBeInTheDocument();
+  });
+
+  it("labels a simulated payment button", () => {
+    const b = booking({ status: "AWAITING_PAYMENT", expiresAt: new Date("2026-12-02T06:30:00Z") });
+    show(b, "RENTER", "2026-12-01", { simulatedPayments: true });
+    expect(screen.getByRole("button", { name: "Pay ₹9,500 (simulated)" })).toBeInTheDocument();
+  });
+
+  it("says what a command did instead of a bare Done", () => {
+    show(booking(), "RENTER", "2026-12-05", { flash: { done: "cancel" } });
+    expect(screen.getByText(/Booking cancelled/)).toBeInTheDocument();
+  });
+});

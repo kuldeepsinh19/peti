@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { container } from "@/composition/container";
+import { allowsSandboxPayments } from "@/config/env";
 import { BookingView } from "@/modules/bookings/ui/booking-view";
 import type { UserActor } from "@/shared/application/actor";
 import { DomainError } from "@/shared/domain/errors";
@@ -22,7 +23,7 @@ export async function BookingPage({
   returnTo: string;
   searchParams: Search;
 }) {
-  const { bookings, clock } = container();
+  const { bookings, clock, env } = container();
   const booking = await bookings.detail(actor, bookingId).catch((error: unknown) => {
     if (error instanceof DomainError) notFound();
     throw error;
@@ -32,6 +33,7 @@ export async function BookingPage({
     done: one(searchParams.done),
     error: signedError(searchParams),
     payment: one(searchParams.payment),
+    requested: one(searchParams.requested),
   };
   return (
     <BookingView
@@ -43,6 +45,7 @@ export async function BookingPage({
       report={conditionReportAction}
       checkout={startCheckoutAction.bind(null, booking.id)}
       flash={flash}
+      simulatedPayments={allowsSandboxPayments(env) && env.PAYMENT_PROVIDER === "sandbox"}
     />
   );
 }
