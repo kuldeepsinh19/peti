@@ -63,7 +63,7 @@ export default async function AdminOverviewPage() {
           />
           <Figure label="Open disputes" value={m.openDisputes} href="/admin/disputes" />
           <Figure label="Payouts to send" value={m.pendingPayouts} href="/admin/payouts" />
-          <Figure label="Refunds failed" value={m.failedRefunds} />
+          <Figure label="Refunds failed" value={m.failedRefunds} href="/admin/payouts#failed-refunds" />
         </div>
       </section>
       <section aria-labelledby="marketplace" className="grid gap-10 lg:grid-cols-2">
@@ -79,7 +79,7 @@ export default async function AdminOverviewPage() {
                 term: "Members",
                 value: `${m.users} (${m.verifiedUsers} with email and mobile verified, ${m.suspendedUsers} suspended)`,
               },
-              { term: "Live listings", value: String(count(m.listings, "ACTIVE")) },
+              { term: "Published listings", value: String(count(m.listings, "ACTIVE")) },
               { term: "Paused or in draft", value: String(count(m.listings, "PAUSED", "DRAFT")) },
               { term: "Requests waiting", value: String(count(m.bookings, "PENDING_APPROVAL")) },
               { term: "Awaiting payment", value: String(count(m.bookings, "AWAITING_PAYMENT")) },
