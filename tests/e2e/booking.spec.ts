@@ -1,4 +1,5 @@
 import { type Browser, expect, type Page, test } from "@playwright/test";
+import { requestSomeFreeDay } from "./request-helper";
 
 const PASSWORD = "peti-demo-password";
 
@@ -24,15 +25,8 @@ test("rent an outfit: request, approval, sandbox payment, confirmation", async (
   await renter.getByRole("link", { name: "Choose your dates" }).click();
   await expect(renter.getByRole("heading", { name: /Choose your/ })).toBeVisible();
 
-  // A random selectable day (held dates are disabled). Earlier runs against the same database hold dates,
-  // so move on a month at a time until one has free days.
-  const days = renter.locator(".peti-calendar button.rdp-day_button:not([disabled])");
-  for (let month = 0; month < 6 && (await days.count()) === 0; month++) {
-    await renter.locator(".peti-calendar button.rdp-button_next").click();
-  }
-  await days.nth(Math.floor(Math.random() * Math.min(10, await days.count()))).click();
-  await renter.getByLabel(/I accept the/).check();
-  await renter.getByRole("button", { name: "Send request" }).click();
+  // A random free day (held dates are disabled; see the helper for earlier runs' waiting requests).
+  await requestSomeFreeDay(renter);
   await expect(renter).toHaveURL(/\/account\/rentals\/[0-9a-f-]+\?requested=1/);
   await expect(renter.getByText("Awaiting the owner").first()).toBeVisible();
   const bookingPath = new URL(renter.url()).pathname;

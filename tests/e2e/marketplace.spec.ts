@@ -1,5 +1,6 @@
 import path from "node:path";
 import { type Browser, expect, type Page, test } from "@playwright/test";
+import { requestSomeFreeDay } from "./request-helper";
 
 /**
  * The two sides of the marketplace from the same kind of account (Phase 3):
@@ -106,13 +107,7 @@ test("Journey B: explore, search, open an outfit, check availability, request it
   // The outfit page has its own (read-only) calendar: wait for the request page before picking a day.
   await expect(renter).toHaveURL(/\/outfits\/[^/]+\/request$/);
   await expect(renter.getByRole("heading", { name: /Choose your/ })).toBeVisible();
-  const days = renter.locator(".peti-calendar button.rdp-day_button:not([disabled])");
-  for (let month = 0; month < 6 && (await days.count()) === 0; month++) {
-    await renter.locator(".peti-calendar button.rdp-button_next").click();
-  }
-  await days.nth(Math.floor(Math.random() * Math.min(10, await days.count()))).click();
-  await renter.getByLabel(/I accept the/).check();
-  await renter.getByRole("button", { name: "Send request" }).click();
+  await requestSomeFreeDay(renter);
   await expect(renter).toHaveURL(/\/account\/rentals\/[0-9a-f-]+\?requested=1/);
   await expect(renter.getByText("Awaiting the owner").first()).toBeVisible();
 });
