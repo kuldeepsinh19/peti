@@ -296,6 +296,11 @@ npx vercel deploy --prod --yes
 `.vercelignore` keeps `.env` files out of the upload (the Vercel CLI does not read `.gitignore`) but includes
 `demo-storage/`.
 
+Updating an existing demo uses the same steps without the `link` and `integration` lines: `pnpm db:deploy` for
+new migrations, then the seed again. The seed skips accounts and listings that exist, but adds photographs a
+listing is missing, for example after the photograph minimum changed. Then deploy, so the new files in
+`demo-storage/` ship with the code.
+
 ## Not production-ready yet
 
 The following are missing or deliberately out of scope. Do not take real users or real money until they
