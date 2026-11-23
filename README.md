@@ -6,6 +6,10 @@ or designer saree they wore once can lend it to someone who needs it for a weddi
 approve every rental; Peti holds the payment and the deposit, keeps the record of the garment's condition,
 and earns a commission only on rentals that go ahead. Peti never owns, stores or ships garments.
 
+**Live demo:** https://peti-kappa.vercel.app — fictional data and sandbox payments. Sign in with one of the
+shared demo accounts listed on the sign-in page; sign-up is switched off
+([what the demo mode allows](docs/development/deployment-guide.md#public-demo-on-vercel)).
+
 ![Landing page](docs/screenshots/home-desktop.jpg)
 
 > **Status:** a proof of concept with demonstration data. There are no real users or rentals. Payments run
