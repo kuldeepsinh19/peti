@@ -124,6 +124,11 @@ Emails and one-time codes appear at `/dev/outbox`; payments go through `/dev/san
 the background jobs on demand. Full guide: [local setup](docs/development/local-setup.md); demonstrating the
 journeys: [POC demo guide](docs/development/poc-demo-guide.md).
 
+Other scripts worth knowing: `pnpm jobs:sweep` runs the background sweep once against the running server,
+`pnpm db:drift` fails if the migrations and `schema.prisma` disagree, and `pnpm db:reset` rebuilds the
+development database from migrations (destroys its data). The full list is in
+[local setup](docs/development/local-setup.md).
+
 ## Tests
 
 ```bash
